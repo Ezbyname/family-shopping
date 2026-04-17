@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="קניות משפחה">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>קניות משפחה</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0d1117;--surface:#161b22;--card:#1f2937;--card2:#273040;
+  --accent:#f0b429;--accent-dim:rgba(240,180,41,.15);
+  --green:#34d399;--green-dim:rgba(52,211,153,.12);
+  --red:#f87171;--text:#e6edf3;--muted:#7d8590;--border:#30363d;
+  --radius:16px;--safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);
+  display:flex;flex-direction:column;max-width:480px;margin:0 auto;}
+
+.screen{display:none;flex-direction:column;height:100%;overflow:hidden}
+.screen.active{display:flex}
+
+/* LOADING */
+#loading-screen{justify-content:center;align-items:center;gap:14px;
+  background:radial-gradient(ellipse at 50% 0%,rgba(240,180,41,.07) 0%,transparent 60%),var(--bg);}
+.spinner{width:36px;height:36px;border:3px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* SETUP */
+#setup-screen{justify-content:flex-start;align-items:center;padding:24px 18px 40px;
+  overflow-y:auto;
+  background:radial-gradient(ellipse at 50% 0%,rgba(240,180,41,.08) 0%,transparent 55%),var(--bg);}
+.setup-logo{font-size:52px;margin-bottom:4px;animation:bob 2s ease infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+.setup-title{font-size:24px;font-weight:900;margin-bottom:3px;letter-spacing:-.5px}
+.setup-title span{color:var(--accent)}
+.setup-sub{font-size:13px;color:var(--muted);margin-bottom:24px;text-align:center}
+.setup-card{background:var(--surface);border:1px solid var(--border);border-radius:18px;
+  padding:18px;width:100%;margin-bottom:10px;}
+.sc-title{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.8px;
+  text-transform:uppercase;margin-bottom:11px}
+.field{margin-bottom:9px}
+.field label{font-size:11px;color:var(--muted);display:block;margin-bottom:3px;font-weight:600}
+.field input{width:100%;background:var(--card);border:1.5px solid var(--border);
+  border-radius:11px;padding:10px 12px;color:var(--text);
+  font-family:'Heebo',sans-serif;font-size:15px;outline:none;transition:border-color .2s;}
+.field input:focus{border-color:var(--accent)}
+.field input::placeholder{color:var(--muted)}
+.btn-p{width:100%;background:var(--accent);color:#111;border:none;
+  border-radius:12px;padding:12px;font-family:'Heebo',sans-serif;
+  font-size:15px;font-weight:800;cursor:pointer;transition:opacity .15s,transform .1s;}
+.btn-p:active{opacity:.85;transform:scale(.98)}
+.divider{text-align:center;color:var(--muted);font-size:11px;margin:3px 0;
+  position:relative;width:100%}
+.divider::before,.divider::after{content:'';position:absolute;top:50%;width:43%;
+  height:1px;background:var(--border)}
+.divider::before{right:0}.divider::after{left:0}
+.btn-s{width:100%;background:transparent;color:var(--text);
+  border:1.5px solid var(--border);border-radius:12px;padding:11px;
+  font-family:'Heebo',sans-serif;font-size:14px;font-weight:600;cursor:pointer;
+  transition:border-color .2s;}
+.btn-s:active{border-color:var(--accent)}
+
+/* HEADER */
+.header{background:var(--surface);padding:12px 13px 0;
+  border-bottom:1px solid var(--border);flex-shrink:0;z-index:10;}
+.header-top{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.group-info{flex:1;min-width:0}
+.group-name{font-size:16px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.group-code{font-size:11px;color:var(--muted)}
+.group-code span{color:var(--accent);font-weight:700;letter-spacing:1px}
+.hdr-r{display:flex;align-items:center;gap:5px;flex-shrink:0}
+.av-stack{display:flex}
+.av{width:26px;height:26px;border-radius:50%;background:var(--card2);
+  border:2px solid var(--surface);display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;color:var(--accent);margin-right:-6px;}
+.icon-btn{width:32px;height:32px;border-radius:50%;border:none;background:var(--card);
+  color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:14px;transition:background .15s,transform .1s;}
+.icon-btn:active{transform:scale(.85);background:var(--card2)}
+.online-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;
+  transition:opacity .3s;box-shadow:0 0 5px var(--green);}
+
+.tabs{display:flex;gap:1px}
+.tab{flex:1;background:transparent;border:none;padding:7px 2px 10px;color:var(--muted);
+  font-family:'Heebo',sans-serif;font-size:11px;font-weight:600;cursor:pointer;
+  border-bottom:3px solid transparent;transition:color .2s;white-space:nowrap;}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab .cnt{display:inline-block;background:var(--card2);font-size:9px;font-weight:700;
+  border-radius:50px;padding:1px 5px;margin-right:2px;}
+.tab.active .cnt{background:var(--accent-dim);color:var(--accent)}
+
+/* ADD BAR */
+.add-bar{display:flex;gap:7px;padding:8px 11px;background:var(--surface);
+  border-bottom:1px solid var(--border);flex-shrink:0;}
+.add-input{flex:1;background:var(--card);border:1.5px solid var(--border);
+  border-radius:11px;padding:10px 12px;color:var(--text);
+  font-family:'Heebo',sans-serif;font-size:14px;outline:none;transition:border-color .2s;}
+.add-input:focus{border-color:var(--accent)}
+.add-input::placeholder{color:var(--muted)}
+.add-btn{background:var(--accent);color:#111;border:none;border-radius:11px;
+  width:40px;height:40px;font-size:22px;cursor:pointer;font-weight:700;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  transition:transform .1s,opacity .1s;}
+.add-btn:active{transform:scale(.85);opacity:.85}
+
+/* LIST */
+.list-wrap{flex:1;overflow-y:auto;padding:8px 10px;overscroll-behavior:contain}
+.list-wrap::-webkit-scrollbar{width:0}
+.sec-label{font-size:10px;font-weight:700;letter-spacing:1.1px;color:var(--muted);
+  text-transform:uppercase;margin:10px 3px 5px;}
+
+.item-card{background:var(--card);border-radius:var(--radius);padding:10px 11px;
+  margin-bottom:6px;display:flex;align-items:center;gap:9px;
+  border:1.5px solid transparent;
+  transition:opacity .3s,border-color .2s,background .2s;animation:sIn .2s ease;}
+@keyframes sIn{from{opacity:0;transform:translateY(-7px)}to{opacity:1;transform:translateY(0)}}
+.item-card.bought{opacity:.42;background:var(--surface)}
+.item-card.fav{border-color:rgba(240,180,41,.35)}
+.check-btn{width:26px;height:26px;border-radius:50%;border:2px solid var(--border);
+  background:transparent;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;flex-shrink:0;font-size:12px;transition:background .2s,border-color .2s;}
+.item-card.bought .check-btn{background:var(--green);border-color:var(--green)}
+.item-body{flex:1;min-width:0}
+.item-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item-card.bought .item-name{text-decoration:line-through;color:var(--muted)}
+.item-by{font-size:10px;color:var(--muted);margin-top:2px}
+.item-by span{background:var(--card2);border-radius:4px;padding:1px 5px}
+.qty-row{display:flex;align-items:center;gap:5px;margin-top:5px}
+.qty-btn{width:24px;height:24px;border-radius:50%;border:none;background:var(--card2);
+  color:var(--text);font-size:14px;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;font-weight:700;transition:background .1s,transform .1s;line-height:1;}
+.qty-btn:active{transform:scale(.78);background:var(--accent);color:#111}
+.qty-num{font-size:13px;font-weight:800;min-width:18px;text-align:center;color:var(--accent)}
+.bought-tag{background:var(--green-dim);color:var(--green);
+  border:1px solid rgba(52,211,153,.3);border-radius:6px;padding:2px 7px;
+  font-size:10px;font-weight:700;cursor:pointer;}
+.pending-tag{background:var(--card2);color:var(--muted);border:1px solid var(--border);
+  border-radius:6px;padding:2px 7px;font-size:10px;font-weight:600;cursor:pointer;}
+.item-acts{display:flex;flex-direction:column;gap:4px;flex-shrink:0}
+.act-btn{width:27px;height:27px;border-radius:50%;border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:13px;
+  transition:transform .1s,background .15s;background:var(--card2);color:var(--muted);}
+.act-btn:active{transform:scale(.78)}
+.act-btn.fav-on{background:var(--accent-dim);color:var(--accent)}
+.act-btn.del:active{background:rgba(248,113,113,.2);color:var(--red)}
+.empty{text-align:center;padding:50px 20px;color:var(--muted)}
+.empty .em{font-size:42px;margin-bottom:7px}
+.empty p{font-size:13px;font-weight:500}
+.clear-btn{width:100%;background:transparent;border:1.5px dashed var(--border);
+  border-radius:12px;padding:10px;color:var(--muted);font-family:'Heebo',sans-serif;
+  font-size:12px;font-weight:600;cursor:pointer;margin-top:7px;transition:border-color .2s,color .2s;}
+.clear-btn:active{border-color:var(--red);color:var(--red)}
+
+/* PRICE */
+.price-wrap{flex:1;overflow-y:auto;padding:9px 10px}
+.price-wrap::-webkit-scrollbar{width:0}
+.price-ctrl{background:var(--surface);border-radius:var(--radius);padding:13px;
+  margin-bottom:9px;border:1px solid var(--border);}
+.price-ctrl-title{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.7px;
+  text-transform:uppercase;margin-bottom:9px}
+.radius-row{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+.radius-row label{font-size:12px;color:var(--muted);white-space:nowrap}
+input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent);cursor:pointer}
+.radius-val{font-size:13px;font-weight:800;color:var(--accent);min-width:42px;text-align:left}
+.stores-row{display:flex;gap:5px;overflow-x:auto;padding:2px 0}
+.stores-row::-webkit-scrollbar{height:0}
+.store-chip{flex-shrink:0;background:var(--card);border:1.5px solid var(--border);
+  border-radius:50px;padding:5px 11px;font-family:'Heebo',sans-serif;
+  font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .15s;}
+.store-chip.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+.compare-card{background:var(--card);border-radius:var(--radius);padding:12px;
+  margin-bottom:7px;border:1px solid var(--border);}
+.cmp-name{font-size:13px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:5px}
+.store-prices{display:flex;flex-direction:column;gap:4px}
+.spr{display:flex;align-items:center;justify-content:space-between;
+  background:var(--card2);border-radius:9px;padding:7px 10px;}
+.spr.best{background:var(--green-dim);border:1px solid rgba(52,211,153,.2)}
+.spr-name{font-size:12px;font-weight:600}
+.spr-price{font-size:13px;font-weight:800}
+.spr.best .spr-price{color:var(--green)}
+.best-badge{font-size:9px;background:var(--green);color:#000;border-radius:4px;padding:1px 5px;font-weight:700}
+.add-price-row{display:flex;gap:5px;margin-top:7px}
+.pi{background:var(--card2);border:1px solid var(--border);border-radius:9px;
+  padding:7px 8px;color:var(--text);font-family:'Heebo',sans-serif;font-size:12px;outline:none;}
+.pi:focus{border-color:var(--accent)}
+.pi::placeholder{color:var(--muted)}
+.pi-store{flex:1.3}.pi-price{flex:1}
+.pa-btn{background:var(--accent);color:#111;border:none;border-radius:9px;
+  padding:7px 11px;font-family:'Heebo',sans-serif;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0}
+
+/* BOTTOM NAV */
+.bottom-nav{display:flex;background:var(--surface);border-top:1px solid var(--border);
+  padding:6px 0 calc(6px + var(--safe-b));flex-shrink:0;}
+.nav-btn{flex:1;background:transparent;border:none;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 0;
+  color:var(--muted);font-family:'Heebo',sans-serif;font-size:10px;font-weight:600;transition:color .15s;}
+.nav-btn .ni{font-size:18px;line-height:1}
+.nav-btn.active{color:var(--accent)}
+
+/* MODALS */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);
+  z-index:200;align-items:flex-end;justify-content:center;}
+.overlay.show{display:flex}
+.modal{background:var(--surface);border-radius:22px 22px 0 0;
+  padding:18px 17px calc(18px + var(--safe-b));width:100%;max-width:480px;
+  animation:slideUp .23s ease;}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 14px}
+.modal-title{font-size:16px;font-weight:800;margin-bottom:13px;text-align:center}
+.modal-row{display:flex;gap:8px;margin-top:10px}
+.mbtn{flex:1;padding:12px;border-radius:12px;border:none;
+  font-family:'Heebo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:opacity .15s;}
+.mbtn.primary{background:var(--accent);color:#111}
+.mbtn.ghost{background:var(--card2);color:var(--text)}
+.mbtn:active{opacity:.8}
+
+.invite-box{background:var(--card);border-radius:13px;padding:15px;
+  text-align:center;border:2px dashed rgba(240,180,41,.3);margin-bottom:12px;}
+.invite-code{font-size:32px;font-weight:900;letter-spacing:6px;color:var(--accent)}
+.invite-hint{font-size:11px;color:var(--muted);margin-top:3px}
+.members-list{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;max-height:190px;overflow-y:auto}
+.member-row{display:flex;align-items:center;gap:9px;background:var(--card);border-radius:11px;padding:9px 11px;}
+.member-av{width:30px;height:30px;border-radius:50%;background:var(--accent-dim);
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700;color:var(--accent);flex-shrink:0;}
+.member-name{font-size:13px;font-weight:600}
+.member-sub{font-size:10px;color:var(--muted)}
+
+.share-box{background:var(--card);border-radius:12px;padding:12px;font-size:12px;
+  line-height:1.7;white-space:pre-wrap;max-height:170px;overflow-y:auto;
+  border:1px solid var(--border);margin-bottom:11px;direction:rtl;}
+
+/* TOAST */
+.toast{position:fixed;bottom:82px;left:50%;transform:translateX(-50%) translateY(14px);
+  background:var(--card2);color:var(--text);padding:8px 16px;border-radius:50px;
+  font-size:12px;font-weight:600;opacity:0;transition:all .28s;z-index:400;
+  pointer-events:none;white-space:nowrap;border:1px solid var(--border);}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="screen active" id="loading-screen">
+  <div style="font-size:50px;animation:bob 2s ease infinite">🛒</div>
+  <div class="spinner"></div>
+  <div style="font-size:13px;color:var(--muted)">מתחבר לענן...</div>
+</div>
+
+<!-- SETUP -->
+<div class="screen" id="setup-screen">
+  <div class="setup-logo">🛒</div>
+  <div class="setup-title">קניות <span>משפחה</span></div>
+  <div class="setup-sub">רשימה משותפת • זמן אמת • כל המשפחה</div>
+  <div class="setup-card">
+    <div class="sc-title">✨ צור קבוצה חדשה</div>
+    <div class="field"><label>השם שלך</label>
+      <input id="cn-name" placeholder="למשל: אבא" maxlength="20"></div>
+    <div class="field"><label>שם הקבוצה</label>
+      <input id="cn-group" placeholder="למשל: משפחת כהן" maxlength="30"></div>
+    <button class="btn-p" onclick="createGroup()">🚀 צור קבוצה</button>
+  </div>
+  <div class="divider">או</div>
+  <div class="setup-card">
+    <div class="sc-title">🔗 הצטרף לקבוצה קיימת</div>
+    <div class="field"><label>השם שלך</label>
+      <input id="jn-name" placeholder="למשל: אמא" maxlength="20"></div>
+    <div class="field"><label>קוד הצטרפות (6 ספרות)</label>
+      <input id="jn-code" placeholder="123456" maxlength="6"
+        style="letter-spacing:4px;font-size:20px;font-weight:800;text-align:center"
+        oninput="this.value=this.value.replace(/\D/g,'')"></div>
+    <button class="btn-s" onclick="joinGroup()">🔗 הצטרף</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="screen" id="main-screen">
+  <div class="header">
+    <div class="header-top">
+      <div class="group-info">
+        <div class="group-name" id="hdr-group-name">משפחה</div>
+        <div class="group-code">קוד: <span id="hdr-group-code">------</span></div>
+      </div>
+      <div class="hdr-r">
+        <div class="online-dot" id="online-dot" style="opacity:.3"></div>
+        <div class="av-stack" id="av-stack"></div>
+        <button class="icon-btn" onclick="openMembers()">👥</button>
+        <button class="icon-btn" onclick="openShare()">📤</button>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab active" id="tab-all" onclick="setTab('all')">הכל <span class="cnt" id="cnt-all">0</span></button>
+      <button class="tab" id="tab-fav" onclick="setTab('fav')">⭐ <span class="cnt" id="cnt-fav">0</span></button>
+      <button class="tab" id="tab-bought" onclick="setTab('bought')">✅ <span class="cnt" id="cnt-bought">0</span></button>
+      <button class="tab" id="tab-price" onclick="setTab('price')">💰 מחיר</button>
+    </div>
+  </div>
+  <div class="add-bar" id="add-bar">
+    <input class="add-input" id="new-item-input" placeholder="הוסף לרשימה..."
+      maxlength="50" onkeydown="if(event.key==='Enter')addItem()">
+    <button class="add-btn" onclick="addItem()">+</button>
+  </div>
+  <div id="list-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+    <div class="list-wrap" id="list-content"></div>
+  </div>
+  <div id="price-panel" style="flex:1;overflow:hidden;display:none;flex-direction:column">
+    <div class="price-wrap" id="price-content"></div>
+  </div>
+  <div class="bottom-nav">
+    <button class="nav-btn active" id="nav-list" onclick="setTab('all')"><span class="ni">🛒</span>רשימה</button>
+    <button class="nav-btn" id="nav-fav" onclick="setTab('fav')"><span class="ni">⭐</span>מועדפים</button>
+    <button class="nav-btn" id="nav-price" onclick="setTab('price')"><span class="ni">💰</span>השוואה</button>
+    <button class="nav-btn" id="nav-members" onclick="openMembers()"><span class="ni">👥</span>משפחה</button>
+  </div>
+</div>
+
+<!-- MODAL: MEMBERS -->
+<div class="overlay" id="members-overlay" onclick="closeOL(event,'members-overlay')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">👥 המשפחה שלנו</div>
+    <div class="invite-box">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:5px">קוד הצטרפות</div>
+      <div class="invite-code" id="modal-code">------</div>
+      <div class="invite-hint">שתף קוד זה עם בני משפחה</div>
+    </div>
+    <div class="members-list" id="members-list"></div>
+    <div class="modal-row">
+      <button class="mbtn primary" onclick="copyCode()">📋 העתק קוד</button>
+      <button class="mbtn ghost" onclick="closeOL2('members-overlay')">סגור</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: SHARE -->
+<div class="overlay" id="share-overlay" onclick="closeOL(event,'share-overlay')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📋 שתף רשימה</div>
+    <div class="share-box" id="share-box"></div>
+    <div class="modal-row">
+      <button class="mbtn primary" onclick="doShare()">📤 שתף</button>
+      <button class="mbtn ghost" onclick="closeOL2('share-overlay')">סגור</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, push, onValue, update, remove }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const FB = {
+  apiKey:"AIzaSyC_D-qyOz_N8EkvYUMmt3TAgpi5P9q7sTw",
+  authDomain:"family-shopping-list-7ad33.firebaseapp.com",
+  databaseURL:"https://family-shopping-list-7ad33-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:"family-shopping-list-7ad33",
+  storageBucket:"family-shopping-list-7ad33.firebasestorage.app",
+  messagingSenderId:"844977987151",
+  appId:"1:844977987151:web:09ca0aefa9b9727318543a"
+};
+const app = initializeApp(FB);
+const db  = getDatabase(app);
+
+let myName='', myId='', groupId='', groupName='';
+let items={}, members={}, prices={};
+let curTab='all', priceRadius=10;
+const STORES=['שופרסל','רמי לוי','ויקטורי','מחסני להב','יינות ביתן'];
+let activeStores=new Set(STORES);
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
+
+function saveLocal(){localStorage.setItem('fsl_v2',JSON.stringify({myName,myId,groupId,groupName}))}
+
+window.createGroup=async function(){
+  const name=document.getElementById('cn-name').value.trim();
+  const grp=document.getElementById('cn-group').value.trim();
+  if(!name||!grp){toast('⚠️ מלא שם וקבוצה');return;}
+  const code=String(Math.floor(100000+Math.random()*900000));
+  groupId=code; groupName=grp; myId='u_'+Date.now(); myName=name;
+  await set(ref(db,`groups/${code}/info`),{name:grp,code});
+  await set(ref(db,`groups/${code}/members/${myId}`),{name,id:myId,joined:Date.now()});
+  saveLocal(); connectToGroup();
+};
+
+window.joinGroup=async function(){
+  const name=document.getElementById('jn-name').value.trim();
+  const code=document.getElementById('jn-code').value.trim();
+  if(!name||code.length!==6){toast('⚠️ מלא שם וקוד 6 ספרות');return;}
+  const snap=await get(ref(db,`groups/${code}/info`));
+  if(!snap.exists()){toast('❌ קבוצה לא נמצאה');return;}
+  const info=snap.val();
+  groupId=code; groupName=info.name; myId='u_'+Date.now(); myName=name;
+  await set(ref(db,`groups/${code}/members/${myId}`),{name,id:myId,joined:Date.now()});
+  saveLocal(); connectToGroup();
+};
+
+function connectToGroup(){
+  showScreen('main-screen');
+  document.getElementById('hdr-group-name').textContent=groupName;
+  document.getElementById('hdr-group-code').textContent=groupId;
+  document.getElementById('modal-code').textContent=groupId;
+
+  onValue(ref(db,'.info/connected'),snap=>{
+    document.getElementById('online-dot').style.opacity=snap.val()?'1':'.3';
+  });
+  onValue(ref(db,`groups/${groupId}/items`),snap=>{
+    items=snap.val()||{}; renderList(); renderPrices(); updateCounts();
+  });
+  onValue(ref(db,`groups/${groupId}/members`),snap=>{
+    members=snap.val()||{}; renderAvatars();
+  });
+  onValue(ref(db,`groups/${groupId}/prices`),snap=>{
+    prices=snap.val()||{}; if(curTab==='price')renderPrices();
+  });
+  toast('👋 שלום '+myName+'!');
+}
+
+window.addItem=function(){
+  const inp=document.getElementById('new-item-input');
+  const name=inp.value.trim(); if(!name)return;
+  push(ref(db,`groups/${groupId}/items`),{name,qty:1,bought:false,fav:false,addedBy:myName,ts:Date.now()});
+  inp.value=''; toast('✅ '+name+' נוסף');
+};
+
+window.toggleBought=function(id){const i=items[id];update(ref(db,`groups/${groupId}/items/${id}`),{bought:!i.bought})};
+window.toggleFav=function(id){const i=items[id];update(ref(db,`groups/${groupId}/items/${id}`),{fav:!i.fav});toast(i.fav?'הוסר מהמועדפים':'⭐ נוסף למועדפים')};
+window.changeQty=function(id,d){const i=items[id];update(ref(db,`groups/${groupId}/items/${id}`),{qty:Math.max(1,(i.qty||1)+d)})};
+window.deleteItem=function(id){remove(ref(db,`groups/${groupId}/items/${id}`))};
+window.clearBought=function(){Object.entries(items).forEach(([id,i])=>{if(i.bought)remove(ref(db,`groups/${groupId}/items/${id}`))});toast('🗑 נקנים נמחקו')};
+
+window.setTab=function(tab){
+  curTab=tab;
+  ['all','fav','bought','price'].forEach(t=>{
+    const el=document.getElementById('tab-'+t);if(el)el.classList.toggle('active',t===tab);
+  });
+  ['list','fav','price','members'].forEach(n=>{
+    const el=document.getElementById('nav-'+n);if(el)el.classList.remove('active');
+  });
+  if(tab==='price'){document.getElementById('nav-price').classList.add('active');}
+  else if(tab==='fav'){document.getElementById('nav-fav').classList.add('active');}
+  else{document.getElementById('nav-list').classList.add('active');}
+
+  const isPrice=tab==='price';
+  document.getElementById('add-bar').style.display=isPrice?'none':'flex';
+  document.getElementById('list-panel').style.display=isPrice?'none':'flex';
+  document.getElementById('price-panel').style.display=isPrice?'flex':'none';
+  if(isPrice)renderPrices(); else renderList();
+};
+
+function renderList(){
+  const wrap=document.getElementById('list-content');
+  let list=Object.entries(items).map(([id,v])=>({...v,id})).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  if(curTab==='fav') list=list.filter(i=>i.fav);
+  if(curTab==='bought') list=list.filter(i=>i.bought);
+  if(!list.length){
+    const m={all:{e:'🛒',t:'הרשימה ריקה'},fav:{e:'⭐',t:'אין מועדפים'},bought:{e:'✅',t:'עדיין לא קנית'}};
+    const d=m[curTab]||m.all;
+    wrap.innerHTML=`<div class="empty"><div class="em">${d.e}</div><p>${d.t}</p></div>`;return;
+  }
+  const pending=list.filter(i=>!i.bought), bList=list.filter(i=>i.bought);
+  let html='';
+  if(pending.length){
+    if(curTab!=='bought')html+=`<div class="sec-label">לקנות (${pending.length})</div>`;
+    pending.forEach(i=>html+=itemHTML(i));
+  }
+  if(bList.length){
+    html+=`<div class="sec-label">✅ נקנה (${bList.length})</div>`;
+    bList.forEach(i=>html+=itemHTML(i));
+    if(curTab!=='fav')html+=`<button class="clear-btn" onclick="clearBought()">🗑 מחק את כל הנקנים</button>`;
+  }
+  wrap.innerHTML=html;
+}
+
+function itemHTML(item){
+  const byMe=item.addedBy===myName;
+  const isFavTab=curTab==='fav';
+  const checkBtn=isFavTab?'':`<button class="check-btn" onclick="toggleBought('${item.id}')">${item.bought?'✓':''}</button>`;
+  const boughtBtn=isFavTab?'':`<span class="${item.bought?'bought-tag':'pending-tag'}" onclick="toggleBought('${item.id}')">${item.bought?'✅ קניתי':'קניתי'}</span>`;
+  return `<div class="item-card${(!isFavTab&&item.bought)?' bought':''}${item.fav?' fav':''}">
+    ${checkBtn}
+    <div class="item-body">
+      <div class="item-name">${esc(item.name)}</div>
+      <div class="item-by"><span>${esc(item.addedBy||'?')}${byMe?' (אני)':''}</span></div>
+      <div class="qty-row">
+        <button class="qty-btn" onclick="changeQty('${item.id}',-1)">−</button>
+        <span class="qty-num">${item.qty||1}</span>
+        <button class="qty-btn" onclick="changeQty('${item.id}',1)">+</button>
+        ${boughtBtn}
+      </div>
+    </div>
+    <div class="item-acts">
+      <button class="act-btn${item.fav?' fav-on':''}" onclick="toggleFav('${item.id}')">⭐</button>
+      <button class="act-btn del" onclick="deleteItem('${item.id}')">✕</button>
+    </div>
+  </div>`;
+}
+
+function updateCounts(){
+  const all=Object.keys(items).length;
+  const fav=Object.values(items).filter(i=>i.fav).length;
+  const bought=Object.values(items).filter(i=>i.bought).length;
+  document.getElementById('cnt-all').textContent=all;
+  document.getElementById('cnt-fav').textContent=fav;
+  document.getElementById('cnt-bought').textContent=bought;
+}
+
+function renderAvatars(){
+  const stack=document.getElementById('av-stack');
+  stack.innerHTML=Object.values(members).slice(0,4).map(m=>
+    `<div class="av" title="${esc(m.name)}">${m.name.charAt(0)}</div>`).join('');
+}
+
+window.setRadius=function(v){
+  priceRadius=+v;
+  document.getElementById('radius-val').textContent=v+' ק"מ';
+};
+window.toggleStore=function(s){
+  if(activeStores.has(s))activeStores.delete(s); else activeStores.add(s);
+  renderPrices();
+};
+window.addPrice=function(itemId){
+  const sel=document.getElementById('sel-'+itemId);
+  const inp=document.getElementById('pi-'+itemId);
+  const storeName=sel.value, priceVal=parseFloat(inp.value);
+  if(!storeName||isNaN(priceVal)||priceVal<=0){toast('⚠️ בחר חנות ומחיר תקין');return;}
+  update(ref(db,`groups/${groupId}/prices/${itemId}/${storeName.replace(/\s/g,'_')}`),
+    {price:priceVal,store:storeName,updatedBy:myName,ts:Date.now()});
+  inp.value=''; sel.selectedIndex=0;
+  toast('💰 מחיר נשמר!');
+};
+
+function renderPrices(){
+  if(curTab!=='price')return;
+  const wrap=document.getElementById('price-content');
+  const itemList=Object.entries(items).filter(([,v])=>!v.bought);
+  const storesHTML=STORES.map(s=>
+    `<button class="store-chip${activeStores.has(s)?' on':''}" onclick="toggleStore('${s}')">${s}</button>`
+  ).join('');
+  const storeOpts=STORES.filter(s=>activeStores.has(s)).map(s=>`<option value="${s}">${s}</option>`).join('');
+
+  let html=`<div class="price-ctrl">
+    <div class="price-ctrl-title">⚙️ הגדרות חיפוש</div>
+    <div class="radius-row">
+      <label>רדיוס</label>
+      <input type="range" min="1" max="50" value="${priceRadius}" oninput="setRadius(this.value)">
+      <span class="radius-val" id="radius-val">${priceRadius} ק"מ</span>
+    </div>
+    <div class="stores-row">${storesHTML}</div>
+  </div>`;
+
+  if(!itemList.length){
+    html+=`<div class="empty"><div class="em">🛒</div><p>אין פריטים ברשימה</p></div>`;
+    wrap.innerHTML=html; return;
+  }
+
+  itemList.forEach(([id,item])=>{
+    const itemPrices=prices[id]||{};
+    const relevant=STORES.filter(s=>activeStores.has(s));
+    const rows=relevant.map(s=>{
+      const key=s.replace(/\s/g,'_');
+      const p=itemPrices[key];
+      return{store:s,price:p?p.price:null,by:p?p.updatedBy:null};
+    });
+    const withP=rows.filter(r=>r.price!==null);
+    const minP=withP.length?Math.min(...withP.map(r=>r.price)):null;
+
+    const pricesHTML=rows.map(r=>{
+      const best=r.price!==null&&r.price===minP&&withP.length>1;
+      return `<div class="spr${best?' best':''}">
+        <span class="spr-name">${r.store}</span>
+        <span style="display:flex;align-items:center;gap:4px">
+          ${best?'<span class="best-badge">הכי זול</span>':''}
+          <span class="spr-price">${r.price!==null?'₪'+r.price.toFixed(2):'—'}</span>
+        </span>
+      </div>`;
+    }).join('');
+
+    html+=`<div class="compare-card">
+      <div class="cmp-name">🛍 ${esc(item.name)} <span style="color:var(--muted);font-weight:400;font-size:11px">×${item.qty||1}</span></div>
+      <div class="store-prices">${pricesHTML}</div>
+      <div class="add-price-row">
+        <select class="pi pi-store" id="sel-${id}">
+          <option value="">חנות...</option>${storeOpts}
+        </select>
+        <input class="pi pi-price" id="pi-${id}" type="number" placeholder="₪ מחיר" step="0.01" min="0">
+        <button class="pa-btn" onclick="addPrice('${id}')">שמור</button>
+      </div>
+    </div>`;
+  });
+  wrap.innerHTML=html;
+}
+
+window.openMembers=function(){
+  document.getElementById('modal-code').textContent=groupId;
+  document.getElementById('members-list').innerHTML=Object.values(members).map(m=>`
+    <div class="member-row">
+      <div class="member-av">${m.name.charAt(0)}</div>
+      <div><div class="member-name">${esc(m.name)}</div>
+        <div class="member-sub">${m.id===myId?'👤 זה אתה':'חבר קבוצה'}</div></div>
+    </div>`).join('');
+  document.getElementById('members-overlay').classList.add('show');
+};
+
+window.copyCode=function(){
+  navigator.clipboard.writeText(
+    `הצטרף לרשימת הקניות שלנו 🛒\nקוד הצטרפות: ${groupId}`
+  ).then(()=>toast('📋 קוד הועתק!'));
+};
+
+window.openShare=function(){
+  const pending=Object.values(items).filter(i=>!i.bought);
+  const bought=Object.values(items).filter(i=>i.bought);
+  let text=`🛒 רשימת קניות — ${groupName}\n${'─'.repeat(22)}\n\n`;
+  if(pending.length){text+='📋 לקנות:\n';pending.forEach(i=>{text+=`${i.fav?'⭐ ':'• '}${i.name}  ×${i.qty||1}\n`});}
+  if(bought.length){text+='\n✅ כבר קניתי:\n';bought.forEach(i=>{text+=`✓ ${i.name}  ×${i.qty||1}\n`});}
+  if(!Object.keys(items).length)text+='(הרשימה ריקה)';
+  document.getElementById('share-box').textContent=text;
+  document.getElementById('share-overlay').classList.add('show');
+};
+
+window.doShare=function(){
+  const text=document.getElementById('share-box').textContent;
+  if(navigator.share){navigator.share({title:'רשימת קניות',text});closeOL2('share-overlay');return;}
+  navigator.clipboard.writeText(text).then(()=>{closeOL2('share-overlay');toast('📋 הועתק!')});
+};
+
+window.closeOL=function(e,id){if(e.target===document.getElementById(id))closeOL2(id)};
+window.closeOL2=function(id){document.getElementById(id).classList.remove('show')};
+
+window.toast=function(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(window._toastT);
+  window._toastT=setTimeout(()=>t.classList.remove('show'),2200);
+};
+
+// SERVICE WORKER
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+
+// INIT
+(function init(){
+  const saved=localStorage.getItem('fsl_v2');
+  if(saved){
+    const u=JSON.parse(saved);
+    myName=u.myName;myId=u.myId;groupId=u.groupId;groupName=u.groupName;
+    connectToGroup();
+  } else {
+    showScreen('setup-screen');
+  }
+})();
+</script>
+</body>
+</html>
