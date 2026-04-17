@@ -423,7 +423,7 @@ const db  = getDatabase(app);
 let myName='', myId='', groupId='', groupName='';
 let items={}, members={}, prices={};
 let curTab='all', priceRadius=10;
-const STORES=['שופרסל','רמי לוי','ויקטורי','מחסני להב','יינות ביתן'];
+const STORES=['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב','אושר עד'];
 let activeStores=new Set(STORES);
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
@@ -683,7 +683,7 @@ window.selectProduct = function(idx){
 
 function showProductPrices(product){
   const wrap = document.getElementById('price-content');
-  const STORE_LIST = ['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב'];
+  const STORE_LIST = ['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב','אושר עד'];
   const relevant = STORE_LIST.filter(s => activeStores.has(s));
 
   const storesHTML = STORE_LIST.map(s=>
@@ -758,7 +758,7 @@ window.backToResults = function(){
 };
 
 function renderManualFallback(query){
-  const STORE_LIST = ['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב'];
+  const STORE_LIST = ['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב','אושר עד'];
   const storeInputs = STORE_LIST.map(s=>`
     <div class="spr">
       <span class="spr-name">${s}</span>
