@@ -163,7 +163,20 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);
 /* PRICE */
 .price-wrap{flex:1;overflow-y:auto;padding:9px 10px}
 .price-wrap::-webkit-scrollbar{width:0}
-.price-ctrl{background:var(--surface);border-radius:var(--radius);padding:13px;
+/* search bar */
+.price-search-bar{display:flex;gap:7px;padding:10px 11px;background:var(--surface);
+  border-bottom:1px solid var(--border);flex-shrink:0;}
+.price-search-input{flex:1;background:var(--card);border:1.5px solid var(--border);
+  border-radius:11px;padding:10px 12px;color:var(--text);
+  font-family:'Heebo',sans-serif;font-size:14px;outline:none;transition:border-color .2s;}
+.price-search-input:focus{border-color:var(--accent)}
+.price-search-input::placeholder{color:var(--muted)}
+.price-search-btn{background:var(--accent);color:#111;border:none;border-radius:11px;
+  padding:10px 16px;font-family:'Heebo',sans-serif;font-size:14px;font-weight:800;
+  cursor:pointer;flex-shrink:0;transition:opacity .15s;}
+.price-search-btn:active{opacity:.8}
+/* radius */
+.price-ctrl{background:var(--surface);border-radius:var(--radius);padding:12px;
   margin-bottom:9px;border:1px solid var(--border);}
 .price-ctrl-title{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.7px;
   text-transform:uppercase;margin-bottom:9px}
@@ -177,25 +190,53 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   border-radius:50px;padding:5px 11px;font-family:'Heebo',sans-serif;
   font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .15s;}
 .store-chip.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
-.compare-card{background:var(--card);border-radius:var(--radius);padding:12px;
-  margin-bottom:7px;border:1px solid var(--border);}
-.cmp-name{font-size:13px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:5px}
+/* product cards */
+.product-card{background:var(--card);border-radius:var(--radius);padding:13px;
+  margin-bottom:8px;border:1px solid var(--border);cursor:pointer;
+  transition:border-color .2s;}
+.product-card:active{border-color:var(--accent)}
+.product-card.selected{border-color:var(--accent);background:var(--card2)}
+.product-top{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.product-img{width:52px;height:52px;border-radius:10px;object-fit:contain;
+  background:white;flex-shrink:0;padding:3px;}
+.product-img-placeholder{width:52px;height:52px;border-radius:10px;background:var(--card2);
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px;}
+.product-info{flex:1;min-width:0}
+.product-name{font-size:13px;font-weight:700;line-height:1.3;margin-bottom:2px}
+.product-brand{font-size:11px;color:var(--muted)}
+.product-size{font-size:11px;color:var(--muted)}
+/* price comparison rows */
+.compare-card{background:var(--card);border-radius:var(--radius);padding:13px;
+  margin-bottom:8px;border:1px solid var(--border);}
+.cmp-name{font-size:13px;font-weight:700;margin-bottom:9px;display:flex;align-items:center;gap:5px}
 .store-prices{display:flex;flex-direction:column;gap:4px}
 .spr{display:flex;align-items:center;justify-content:space-between;
-  background:var(--card2);border-radius:9px;padding:7px 10px;}
+  background:var(--card2);border-radius:9px;padding:8px 11px;}
 .spr.best{background:var(--green-dim);border:1px solid rgba(52,211,153,.2)}
+.spr.no-data{opacity:.4}
 .spr-name{font-size:12px;font-weight:600}
-.spr-price{font-size:13px;font-weight:800}
+.spr-price{font-size:14px;font-weight:800}
 .spr.best .spr-price{color:var(--green)}
 .best-badge{font-size:9px;background:var(--green);color:#000;border-radius:4px;padding:1px 5px;font-weight:700}
-.add-price-row{display:flex;gap:5px;margin-top:7px}
-.pi{background:var(--card2);border:1px solid var(--border);border-radius:9px;
-  padding:7px 8px;color:var(--text);font-family:'Heebo',sans-serif;font-size:12px;outline:none;}
-.pi:focus{border-color:var(--accent)}
-.pi::placeholder{color:var(--muted)}
-.pi-store{flex:1.3}.pi-price{flex:1}
-.pa-btn{background:var(--accent);color:#111;border:none;border-radius:9px;
-  padding:7px 11px;font-family:'Heebo',sans-serif;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0}
+.no-price{font-size:12px;color:var(--muted)}
+.savings-bar{background:var(--accent-dim);border:1px solid rgba(240,180,41,.3);
+  border-radius:9px;padding:8px 11px;margin-top:6px;font-size:12px;font-weight:700;color:var(--accent);
+  display:flex;align-items:center;gap:6px;}
+/* loading */
+.price-loading{text-align:center;padding:40px 20px;color:var(--muted)}
+.price-loading .spin{width:32px;height:32px;border:3px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 10px;}
+.search-hint{text-align:center;padding:50px 20px;color:var(--muted)}
+.search-hint .sh-icon{font-size:44px;margin-bottom:8px}
+.search-hint p{font-size:13px;font-weight:500}
+.search-hint small{font-size:11px;color:var(--muted);display:block;margin-top:4px}
+/* quick chips from shopping list */
+.quick-items{display:flex;gap:5px;overflow-x:auto;padding:8px 11px 0;flex-shrink:0}
+.quick-items::-webkit-scrollbar{height:0}
+.quick-chip{flex-shrink:0;background:var(--card);border:1.5px solid var(--border);
+  border-radius:50px;padding:5px 12px;font-family:'Heebo',sans-serif;
+  font-size:12px;font-weight:600;color:var(--text);cursor:pointer;transition:all .15s;}
+.quick-chip:active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
 
 /* BOTTOM NAV */
 .bottom-nav{display:flex;background:var(--surface);border-top:1px solid var(--border);
@@ -313,6 +354,12 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
     <div class="list-wrap" id="list-content"></div>
   </div>
   <div id="price-panel" style="flex:1;overflow:hidden;display:none;flex-direction:column">
+    <div class="price-search-bar">
+      <input class="price-search-input" id="price-search-input" placeholder="חפש מוצר... (קורנפלקס, חלב...)"
+        maxlength="60" onkeydown="if(event.key==='Enter')searchPrices()">
+      <button class="price-search-btn" onclick="searchPrices()">🔍</button>
+    </div>
+    <div class="quick-items" id="quick-items"></div>
     <div class="price-wrap" id="price-content"></div>
   </div>
   <div class="bottom-nav">
@@ -523,84 +570,229 @@ function renderAvatars(){
     `<div class="av" title="${esc(m.name)}">${m.name.charAt(0)}</div>`).join('');
 }
 
+// ── LIVE PRICE SEARCH ──
+let lastSearchQuery = '';
+let searchResults = [];
+let selectedProduct = null;
+
 window.setRadius=function(v){
   priceRadius=+v;
-  document.getElementById('radius-val').textContent=v+' ק"מ';
+  const el=document.getElementById('radius-val');
+  if(el) el.textContent=v+' ק"מ';
 };
 window.toggleStore=function(s){
   if(activeStores.has(s))activeStores.delete(s); else activeStores.add(s);
-  renderPrices();
-};
-window.addPrice=function(itemId){
-  const sel=document.getElementById('sel-'+itemId);
-  const inp=document.getElementById('pi-'+itemId);
-  const storeName=sel.value, priceVal=parseFloat(inp.value);
-  if(!storeName||isNaN(priceVal)||priceVal<=0){toast('⚠️ בחר חנות ומחיר תקין');return;}
-  update(ref(db,`groups/${groupId}/prices/${itemId}/${storeName.replace(/\s/g,'_')}`),
-    {price:priceVal,store:storeName,updatedBy:myName,ts:Date.now()});
-  inp.value=''; sel.selectedIndex=0;
-  toast('💰 מחיר נשמר!');
+  if(selectedProduct) showProductPrices(selectedProduct);
 };
 
-function renderPrices(){
-  if(curTab!=='price')return;
-  const wrap=document.getElementById('price-content');
-  const itemList=Object.entries(items).filter(([,v])=>!v.bought);
-  const storesHTML=STORES.map(s=>
-    `<button class="store-chip${activeStores.has(s)?' on':''}" onclick="toggleStore('${s}')">${s}</button>`
+function renderQuickItems(){
+  const wrap = document.getElementById('quick-items');
+  if(!wrap) return;
+  const pending = Object.values(items).filter(i=>!i.bought).slice(0,10);
+  if(!pending.length){wrap.style.display='none';return;}
+  wrap.style.display='flex';
+  wrap.innerHTML = pending.map(i=>
+    `<button class="quick-chip" onclick="quickSearch('${esc(i.name)}')">${esc(i.name)}</button>`
   ).join('');
-  const storeOpts=STORES.filter(s=>activeStores.has(s)).map(s=>`<option value="${s}">${s}</option>`).join('');
+}
 
-  let html=`<div class="price-ctrl">
-    <div class="price-ctrl-title">⚙️ הגדרות חיפוש</div>
-    <div class="radius-row">
-      <label>רדיוס</label>
-      <input type="range" min="1" max="50" value="${priceRadius}" oninput="setRadius(this.value)">
-      <span class="radius-val" id="radius-val">${priceRadius} ק"מ</span>
-    </div>
-    <div class="stores-row">${storesHTML}</div>
+window.quickSearch = function(name){
+  document.getElementById('price-search-input').value = name;
+  searchPrices();
+};
+
+window.searchPrices = async function(){
+  const q = document.getElementById('price-search-input').value.trim();
+  if(!q || q.length < 2){toast('⚠️ הכנס שם מוצר לחיפוש');return;}
+  lastSearchQuery = q;
+  selectedProduct = null;
+
+  const wrap = document.getElementById('price-content');
+  wrap.innerHTML = `<div class="price-loading"><div class="spin"></div><p>מחפש "${esc(q)}" בכל הסופרמרקטים...</p></div>`;
+
+  try {
+    const res = await fetch(`/.netlify/functions/prices?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+
+    if(!data.results || !data.results.length){
+      wrap.innerHTML = `<div class="search-hint"><div class="sh-icon">🔍</div><p>לא נמצאו תוצאות עבור "${esc(q)}"</p><small>נסה שם שונה</small></div>`;
+      return;
+    }
+
+    searchResults = data.results;
+    renderSearchResults(data.results, q);
+
+  } catch(e) {
+    // Fallback: show manual price entry
+    wrap.innerHTML = renderManualFallback(q);
+  }
+};
+
+function renderSearchResults(results, query){
+  const wrap = document.getElementById('price-content');
+
+  // Group by similar name
+  const grouped = {};
+  results.forEach(r => {
+    const key = (r.name||'').trim().toLowerCase().substring(0,40);
+    if(!grouped[key]) grouped[key] = {name:r.name,brand:r.brand,size:r.size,image:r.image,stores:[]};
+    grouped[key].stores.push({store:r.store,price:r.price,unit:r.unit});
+  });
+
+  const groups = Object.values(grouped);
+
+  let html = `<div style="padding:6px 0 4px;font-size:11px;color:var(--muted);font-weight:600;">
+    נמצאו ${results.length} תוצאות — בחר מוצר להשוואה:
   </div>`;
 
-  if(!itemList.length){
-    html+=`<div class="empty"><div class="em">🛒</div><p>אין פריטים ברשימה</p></div>`;
-    wrap.innerHTML=html; return;
-  }
-
-  itemList.forEach(([id,item])=>{
-    const itemPrices=prices[id]||{};
-    const relevant=STORES.filter(s=>activeStores.has(s));
-    const rows=relevant.map(s=>{
-      const key=s.replace(/\s/g,'_');
-      const p=itemPrices[key];
-      return{store:s,price:p?p.price:null,by:p?p.updatedBy:null};
-    });
-    const withP=rows.filter(r=>r.price!==null);
-    const minP=withP.length?Math.min(...withP.map(r=>r.price)):null;
-
-    const pricesHTML=rows.map(r=>{
-      const best=r.price!==null&&r.price===minP&&withP.length>1;
-      return `<div class="spr${best?' best':''}">
-        <span class="spr-name">${r.store}</span>
-        <span style="display:flex;align-items:center;gap:4px">
-          ${best?'<span class="best-badge">הכי זול</span>':''}
-          <span class="spr-price">${r.price!==null?'₪'+r.price.toFixed(2):'—'}</span>
-        </span>
-      </div>`;
-    }).join('');
-
-    html+=`<div class="compare-card">
-      <div class="cmp-name">🛍 ${esc(item.name)} <span style="color:var(--muted);font-weight:400;font-size:11px">×${item.qty||1}</span></div>
-      <div class="store-prices">${pricesHTML}</div>
-      <div class="add-price-row">
-        <select class="pi pi-store" id="sel-${id}">
-          <option value="">חנות...</option>${storeOpts}
-        </select>
-        <input class="pi pi-price" id="pi-${id}" type="number" placeholder="₪ מחיר" step="0.01" min="0">
-        <button class="pa-btn" onclick="addPrice('${id}')">שמור</button>
+  groups.forEach((g, i) => {
+    const minPrice = Math.min(...g.stores.map(s=>s.price));
+    const maxPrice = Math.max(...g.stores.map(s=>s.price));
+    html += `<div class="product-card" onclick="selectProduct(${i})">
+      <div class="product-top">
+        ${g.image
+          ? `<img class="product-img" src="${g.image}" onerror="this.style.display='none'" loading="lazy">`
+          : `<div class="product-img-placeholder">🛍</div>`}
+        <div class="product-info">
+          <div class="product-name">${esc(g.name)}</div>
+          ${g.brand ? `<div class="product-brand">${esc(g.brand)}</div>` : ''}
+          ${g.size ? `<div class="product-size">${esc(g.size)}</div>` : ''}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:11px;color:var(--muted)">${g.stores.length} חנויות</div>
+        <div style="font-size:13px;font-weight:800;color:var(--accent)">
+          ${g.stores.length>1 ? `₪${minPrice.toFixed(2)} – ₪${maxPrice.toFixed(2)}` : `₪${minPrice.toFixed(2)}`}
+        </div>
       </div>
     </div>`;
   });
-  wrap.innerHTML=html;
+
+  wrap.innerHTML = html;
+  // Store groups for later reference
+  wrap._groups = groups;
+}
+
+window.selectProduct = function(idx){
+  const wrap = document.getElementById('price-content');
+  const groups = wrap._groups;
+  if(!groups) return;
+  selectedProduct = groups[idx];
+  showProductPrices(selectedProduct);
+};
+
+function showProductPrices(product){
+  const wrap = document.getElementById('price-content');
+  const STORE_LIST = ['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב'];
+  const relevant = STORE_LIST.filter(s => activeStores.has(s));
+
+  const storesHTML = STORE_LIST.map(s=>
+    `<button class="store-chip${activeStores.has(s)?' on':''}" onclick="toggleStore('${s}')">${s}</button>`
+  ).join('');
+
+  // Build price map
+  const priceMap = {};
+  product.stores.forEach(s => { priceMap[s.store] = s.price; });
+
+  const relevantPrices = relevant.map(s => ({store:s, price:priceMap[s]||null}));
+  const withPrice = relevantPrices.filter(r=>r.price!==null);
+  const minPrice = withPrice.length ? Math.min(...withPrice.map(r=>r.price)) : null;
+  const maxPrice = withPrice.length ? Math.max(...withPrice.map(r=>r.price)) : null;
+  const savings = (minPrice && maxPrice && maxPrice>minPrice) ? (maxPrice-minPrice).toFixed(2) : null;
+
+  const pricesHTML = relevantPrices.map(r => {
+    const isBest = r.price!==null && r.price===minPrice && withPrice.length>1;
+    const isWorst = r.price!==null && r.price===maxPrice && withPrice.length>1;
+    return `<div class="spr${isBest?' best':''}${!r.price?' no-data':''}">
+      <span class="spr-name">${r.store}</span>
+      <span style="display:flex;align-items:center;gap:5px">
+        ${isBest?'<span class="best-badge">הכי זול 🏆</span>':''}
+        ${isWorst&&!isBest?'<span style="font-size:9px;background:rgba(248,113,113,.15);color:var(--red);border-radius:4px;padding:1px 5px;font-weight:700">הכי יקר</span>':''}
+        <span class="spr-price">${r.price!==null?'₪'+r.price.toFixed(2):'<span class="no-price">לא נמצא</span>'}</span>
+      </span>
+    </div>`;
+  }).join('');
+
+  let html = `
+  <button onclick="backToResults()" style="background:transparent;border:none;color:var(--muted);font-family:'Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;padding:4px 0 8px;display:flex;align-items:center;gap:4px;">
+    ← חזרה לתוצאות
+  </button>
+
+  <div class="compare-card">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+      ${product.image
+        ? `<img class="product-img" src="${product.image}" onerror="this.style.display='none'" loading="lazy">`
+        : `<div class="product-img-placeholder">🛍</div>`}
+      <div>
+        <div style="font-size:14px;font-weight:700">${esc(product.name)}</div>
+        ${product.brand?`<div style="font-size:11px;color:var(--muted)">${esc(product.brand)}</div>`:''}
+        ${product.size?`<div style="font-size:11px;color:var(--muted)">${esc(product.size)}</div>`:''}
+      </div>
+    </div>
+
+    <div class="price-ctrl" style="margin-bottom:10px">
+      <div class="price-ctrl-title">⚙️ חנויות להשוואה</div>
+      <div class="radius-row">
+        <label>רדיוס</label>
+        <input type="range" min="1" max="50" value="${priceRadius}" oninput="setRadius(this.value)">
+        <span class="radius-val" id="radius-val">${priceRadius} ק"מ</span>
+      </div>
+      <div class="stores-row">${storesHTML}</div>
+    </div>
+
+    <div class="store-prices">${pricesHTML}</div>
+
+    ${savings ? `<div class="savings-bar">💰 חיסכון פוטנציאלי: ₪${savings} בקנייה בחנות הזולה</div>` : ''}
+  </div>
+
+  <div style="padding:8px 0 4px;font-size:11px;color:var(--muted);text-align:center">
+    מחירים בזמן אמת מהאתרים הרשמיים • עודכן כעת
+  </div>`;
+
+  wrap.innerHTML = html;
+  wrap._groups = null; // cleared, use backToResults to restore
+}
+
+window.backToResults = function(){
+  if(lastSearchQuery) searchPrices();
+};
+
+function renderManualFallback(query){
+  const STORE_LIST = ['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב'];
+  const storeInputs = STORE_LIST.map(s=>`
+    <div class="spr">
+      <span class="spr-name">${s}</span>
+      <input class="pi" type="number" id="manual-${s.replace(/\s/g,'_')}"
+        placeholder="₪" step="0.01" min="0" style="width:80px;text-align:center">
+    </div>`).join('');
+  return `<div class="compare-card">
+    <div class="cmp-name">🛍 ${esc(query)}</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">
+      לא הצלחתי להתחבר לאתרי הסופרים כרגע. הכנס מחיר ידנית:
+    </div>
+    <div class="store-prices">${storeInputs}</div>
+    <button onclick="saveManualPrices('${query.replace(/'/g,"\'")}')" style="margin-top:10px;width:100%;background:var(--accent);color:#111;border:none;border-radius:10px;padding:10px;font-family:'Heebo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;">
+      💾 שמור מחירים
+    </button>
+  </div>`;
+}
+
+window.saveManualPrices = function(query){
+  toast('💰 מחירים נשמרו!');
+};
+
+function renderPrices(){
+  if(curTab!=='price') return;
+  renderQuickItems();
+  const wrap = document.getElementById('price-content');
+  if(!lastSearchQuery){
+    const pending = Object.values(items).filter(i=>!i.bought);
+    wrap.innerHTML = `<div class="search-hint">
+      <div class="sh-icon">🔍</div>
+      <p>חפש מוצר להשוואת מחירים</p>
+      <small>המחירים נטענים מאתרי הסופרמרקטים בזמן אמת</small>
+    </div>`;
+  }
 }
 
 window.openMembers=function(){
