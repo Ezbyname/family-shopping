@@ -631,23 +631,67 @@ window.searchPrices = async function(){
 function renderSearchResults(results, query){
   const wrap = document.getElementById('price-content');
 
-  // Group by similar name
-  const grouped = {};
-  results.forEach(r => {
-    const key = (r.name||'').trim().toLowerCase().substring(0,40);
-    if(!grouped[key]) grouped[key] = {name:r.name,brand:r.brand,size:r.size,image:r.image,stores:[]};
-    grouped[key].stores.push({store:r.store,price:r.price,unit:r.unit});
+  // Normalize: API returns storePrices[], we use stores[] internally
+  // Each result is either a product-with-storePrices or a flat store item
+  const normalized = results.map(r => {
+    // Already has storePrices array (from server grouping)
+    if (Array.isArray(r.storePrices)) {
+      return {
+        name: r.name || '',
+        brand: r.brand || '',
+        size: r.size || '',
+        image: r.image || '',
+        stores: r.storePrices.map(sp => ({
+          store: sp.store,
+          price: parseFloat(sp.price) || 0,
+          unit: sp.unit || ''
+        })).filter(sp => sp.price > 0)
+      };
+    }
+    // Flat item with store+price directly
+    if (r.store && r.price) {
+      return {
+        name: r.name || '',
+        brand: r.brand || '',
+        size: r.size || '',
+        image: r.image || '',
+        stores: [{ store: r.store, price: parseFloat(r.price)||0, unit: r.unit||'' }]
+      };
+    }
+    return { name: r.name||'', brand: r.brand||'', size: r.size||'', image: r.image||'', stores: [] };
+  }).filter(r => r.name.length > 0);
+
+  // De-duplicate by name
+  const seen = new Set();
+  const groups = [];
+  normalized.forEach(r => {
+    const key = r.name.trim().toLowerCase().substring(0,40);
+    if (!seen.has(key)) { seen.add(key); groups.push(r); }
+    else {
+      // Merge stores into existing
+      const existing = groups.find(g => g.name.trim().toLowerCase().substring(0,40) === key);
+      if (existing) existing.stores.push(...r.stores);
+    }
   });
 
-  const groups = Object.values(grouped);
+  const withPrices = groups.filter(g => g.stores.length > 0);
+  const withoutPrices = groups.filter(g => g.stores.length === 0);
+  const sorted = [...withPrices, ...withoutPrices];
 
   let html = `<div style="padding:6px 0 4px;font-size:11px;color:var(--muted);font-weight:600;">
-    נמצאו ${results.length} תוצאות — בחר מוצר להשוואה:
+    נמצאו ${sorted.length} מוצרים${withPrices.length > 0 ? ` • ${withPrices.length} עם מחירים` : ''} — לחץ להשוואה:
   </div>`;
 
-  groups.forEach((g, i) => {
-    const minPrice = Math.min(...g.stores.map(s=>s.price));
-    const maxPrice = Math.max(...g.stores.map(s=>s.price));
+  sorted.forEach((g, i) => {
+    const validPrices = g.stores.filter(s => s.price > 0);
+    const minPrice = validPrices.length ? Math.min(...validPrices.map(s=>s.price)) : null;
+    const maxPrice = validPrices.length ? Math.max(...validPrices.map(s=>s.price)) : null;
+    const priceLabel = minPrice
+      ? (validPrices.length > 1
+          ? `<span style="color:var(--green)">₪${minPrice.toFixed(2)}</span> – ₪${maxPrice.toFixed(2)}`
+          : `₪${minPrice.toFixed(2)}`)
+      : `<span style="color:var(--muted);font-size:11px">הכנס מחיר ידנית</span>`;
+
     html += `<div class="product-card" onclick="selectProduct(${i})">
       <div class="product-top">
         ${g.image
@@ -659,18 +703,15 @@ function renderSearchResults(results, query){
           ${g.size ? `<div class="product-size">${esc(g.size)}</div>` : ''}
         </div>
       </div>
-      <div style="display:flex;align-items:center;justify-content:space-between">
-        <div style="font-size:11px;color:var(--muted)">${g.stores.length} חנויות</div>
-        <div style="font-size:13px;font-weight:800;color:var(--accent)">
-          ${g.stores.length>1 ? `₪${minPrice.toFixed(2)} – ₪${maxPrice.toFixed(2)}` : `₪${minPrice.toFixed(2)}`}
-        </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+        <div style="font-size:11px;color:var(--muted)">${validPrices.length > 0 ? validPrices.length+' חנויות' : '📝 ידני'}</div>
+        <div style="font-size:13px;font-weight:800">${priceLabel}</div>
       </div>
     </div>`;
   });
 
   wrap.innerHTML = html;
-  // Store groups for later reference
-  wrap._groups = groups;
+  wrap._groups = sorted;
 }
 
 window.selectProduct = function(idx){
@@ -702,15 +743,29 @@ function showProductPrices(product){
 
   const pricesHTML = relevantPrices.map(r => {
     const isBest = r.price!==null && r.price===minPrice && withPrice.length>1;
-    const isWorst = r.price!==null && r.price===maxPrice && withPrice.length>1;
-    return `<div class="spr${isBest?' best':''}${!r.price?' no-data':''}">
-      <span class="spr-name">${r.store}</span>
-      <span style="display:flex;align-items:center;gap:5px">
-        ${isBest?'<span class="best-badge">הכי זול 🏆</span>':''}
-        ${isWorst&&!isBest?'<span style="font-size:9px;background:rgba(248,113,113,.15);color:var(--red);border-radius:4px;padding:1px 5px;font-weight:700">הכי יקר</span>':''}
-        <span class="spr-price">${r.price!==null?'₪'+r.price.toFixed(2):'<span class="no-price">לא נמצא</span>'}</span>
-      </span>
-    </div>`;
+    const isWorst = r.price!==null && r.price===maxPrice && withPrice.length>1 && r.price!==minPrice;
+    const storeKey = r.store.replace(/\s/g,'_');
+    if (r.price !== null) {
+      return `<div class="spr${isBest?' best':''}">
+        <span class="spr-name">${r.store}</span>
+        <span style="display:flex;align-items:center;gap:5px">
+          ${isBest?'<span class="best-badge">הכי זול 🏆</span>':''}
+          ${isWorst?'<span style="font-size:9px;background:rgba(248,113,113,.15);color:var(--red);border-radius:4px;padding:1px 5px;font-weight:700">הכי יקר</span>':''}
+          <span class="spr-price">₪${r.price.toFixed(2)}</span>
+        </span>
+      </div>`;
+    } else {
+      return `<div class="spr no-data" style="gap:8px">
+        <span class="spr-name" style="flex-shrink:0">${r.store}</span>
+        <span style="display:flex;align-items:center;gap:5px;flex:1;justify-content:flex-end">
+          <input type="number" id="mp-${storeKey}" placeholder="₪ הכנס מחיר"
+            step="0.01" min="0"
+            style="width:100px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:4px 8px;color:var(--text);font-family:'Heebo',sans-serif;font-size:12px;text-align:center;outline:none;">
+          <button onclick="saveManualPrice('${r.store}','mp-${storeKey}')"
+            style="background:var(--accent);color:#111;border:none;border-radius:7px;padding:4px 8px;font-family:'Heebo',sans-serif;font-size:11px;font-weight:700;cursor:pointer;">שמור</button>
+        </span>
+      </div>`;
+    }
   }).join('');
 
   let html = `
@@ -755,6 +810,18 @@ function showProductPrices(product){
 
 window.backToResults = function(){
   if(lastSearchQuery) searchPrices();
+};
+
+window.saveManualPrice = function(storeName, inputId) {
+  const val = parseFloat(document.getElementById(inputId)?.value);
+  if (!val || val <= 0) { toast('⚠️ הכנס מחיר תקין'); return; }
+  if (!selectedProduct) return;
+  // Add to product stores
+  const existing = selectedProduct.stores.find(s => s.store === storeName);
+  if (existing) existing.price = val;
+  else selectedProduct.stores.push({ store: storeName, price: val, unit: '' });
+  showProductPrices(selectedProduct);
+  toast('💰 מחיר נשמר!');
 };
 
 function renderManualFallback(query){
