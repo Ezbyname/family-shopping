@@ -611,7 +611,7 @@ window.searchPrices = async function(){
   wrap.innerHTML = `<div class="price-loading"><div class="spin"></div><p>מחפש "${esc(q)}" בכל הסופרמרקטים...</p></div>`;
 
   try {
-    const res = await fetch(`/.netlify/functions/prices?q=${encodeURIComponent(q)}`);
+    const res = await fetch(`/api/prices?q=${encodeURIComponent(q)}`);
     const data = await res.json();
 
     if(!data.results || !data.results.length){
