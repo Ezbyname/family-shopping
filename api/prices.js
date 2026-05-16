@@ -1,180 +1,254 @@
+// api/prices.js
+// v2.0.0 — Hebrew translation layer + Open Food Facts + Israeli gov price aggregators
+// CHANGELOG:
+//   v1.0.0 — initial version (supermarket direct fetch, blocked by CORS)
+//   v2.0.0 — Hebrew→English translation dictionary, dual OFF search, gov price APIs
+
+const HE_EN = {
+  'חלב':'milk','חלב טרי':'fresh milk','חלב מלא':'whole milk',
+  'חלב 3%':'milk 3%','חלב 1%':'milk 1%','חלב עיזים':'goat milk',
+  'חלב שוקולד':'chocolate milk','חלב ללא לקטוז':'lactose free milk',
+  'גבינה':'cheese','גבינה לבנה':'white cheese','גבינה צהובה':'yellow cheese',
+  'גבינת עיזים':'goat cheese','גבינת שמנת':'cream cheese',
+  'קוטג':"cottage cheese","קוטג'":'cottage cheese',
+  'שמנת':'cream','שמנת חמוצה':'sour cream','יוגורט':'yogurt',
+  'יוגורט יווני':'greek yogurt','חמאה':'butter','מרגרינה':'margarine',
+  'לחם':'bread','לחם אחיד':'whole wheat bread','לחם מלא':'whole grain bread',
+  'פיתה':'pita','חלה':'challah','לחמניות':'rolls','בגט':'baguette',
+  'קמח':'flour','קמח מלא':'whole wheat flour','שמרים':'yeast',
+  'ביצים':'eggs','ביצה':'egg','ביצים חופשיות':'free range eggs',
+  'קורנפלקס':'cornflakes','שיבולת שועל':'oatmeal','גרנולה':'granola',
+  'אורז':'rice','אורז מלא':'brown rice','אורז בסמטי':'basmati rice',
+  'פסטה':'pasta','ספגטי':'spaghetti','מקרוני':'macaroni','פנה':'penne',
+  'שמן':'oil','שמן זית':'olive oil','שמן חמניות':'sunflower oil',
+  'סוכר':'sugar','סוכר חום':'brown sugar','דבש':'honey',
+  'מלח':'salt','פלפל שחור':'black pepper','כמון':'cumin',
+  'פפריקה':'paprika','כורכום':'turmeric','קינמון':'cinnamon',
+  'טחינה':'tahini','חומוס':'hummus','קטשופ':'ketchup',
+  'מיונז':'mayonnaise','חרדל':'mustard',
+  'טונה':'tuna','סרדינים':'sardines',
+  'קפה':'coffee','קפה נמס':'instant coffee','אספרסו':'espresso',
+  'תה':'tea','תה ירוק':'green tea',
+  'מיץ':'juice','מיץ תפוזים':'orange juice','מיץ תפוחים':'apple juice',
+  'מים':'water','סודה':'soda water','קולה':'cola',
+  'שוקולד':'chocolate','עוגיות':'cookies','ביסקוויט':'biscuit',
+  'במבה':'bamba','ביסלי':'bisli','גלידה':'ice cream',
+  'עוף':'chicken','חזה עוף':'chicken breast','בשר טחון':'ground beef',
+  'קציצות':'meatballs','נקניק':'sausage',
+  'עגבניות':'tomatoes','מלפפון':'cucumber','בצל':'onion','שום':'garlic',
+  'גזר':'carrot','תפוח אדמה':'potato','ברוקולי':'broccoli',
+  'חסה':'lettuce','תרד':'spinach','פטריות':'mushrooms',
+  'תפוח':'apple','בננה':'banana','תפוז':'orange','לימון':'lemon',
+  'ענבים':'grapes','אבטיח':'watermelon','תות':'strawberry','מנגו':'mango',
+  'נייר טואלט':'toilet paper','מגבות נייר':'paper towels',
+  'סבון':'soap','שמפו':'shampoo','אבקת כביסה':'laundry detergent',
+  'נוזל כלים':'dish soap','שקיות זבל':'garbage bags',
+};
+
+function isHebrew(s){ return /[\u0590-\u05FF]/.test(s); }
+
+function translateHebrew(q) {
+  const lower = q.trim();
+  if (HE_EN[lower]) return HE_EN[lower];
+  for (const [he, en] of Object.entries(HE_EN)) {
+    if (lower.includes(he) || he.includes(lower)) return en;
+  }
+  return null; // no translation found
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
+
   const query = (req.query?.q || '').trim();
-  if (!query || query.length < 2) return res.status(400).json({ error: 'חסר פרמטר חיפוש' });
-  console.log(`[prices] Searching: "${query}"`);
-  const [offRes,shufRes,ramiRes,vicRes,yeinotRes,osherRes] = await Promise.allSettled([
-    searchOpenFoodFacts(query), fetchShufersal(query), fetchRamiLevy(query),
-    fetchVictory(query), fetchYeinotBitan(query), fetchOsherAd(query),
-  ]);
-  const offProducts  = offRes.status==='fulfilled'    ? offRes.value    : [];
-  const shufPrices   = shufRes.status==='fulfilled'   ? shufRes.value   : [];
-  const ramiPrices   = ramiRes.status==='fulfilled'   ? ramiRes.value   : [];
-  const vicPrices    = vicRes.status==='fulfilled'    ? vicRes.value    : [];
-  const yeinotPrices = yeinotRes.status==='fulfilled' ? yeinotRes.value : [];
-  const osherPrices  = osherRes.status==='fulfilled'  ? osherRes.value  : [];
-  console.log(`[prices] OFF:${offProducts.length} Shuf:${shufPrices.length} Rami:${ramiPrices.length} Vic:${vicPrices.length} Yeinot:${yeinotPrices.length} Osher:${osherPrices.length}`);
-  const allStorePrices = [...shufPrices,...ramiPrices,...vicPrices,...yeinotPrices,...osherPrices];
-  const results = [];
-  for (const p of offProducts) {
-    const storePrices = allStorePrices.filter(sp => nameSimilarity(sp.name, p.name) > 0.3);
-    results.push({ ...p, storePrices });
+  if (!query || query.length < 2)
+    return res.status(400).json({ error: 'חסר פרמטר חיפוש' });
+
+  const hebrew = isHebrew(query);
+  const englishQuery = hebrew ? (translateHebrew(query) || query) : query;
+  const translated = hebrew && englishQuery !== query;
+
+  console.log(`[v2.0.0] "${query}" → "${englishQuery}" (translated: ${translated})`);
+
+  // Search Open Food Facts with both Hebrew and English in parallel
+  const searches = [searchOFF(englishQuery)];
+  if (translated) searches.push(searchOFF(query)); // also try Hebrew directly
+
+  const [offEn, offHe] = await Promise.allSettled(searches);
+
+  const seenBarcodes = new Set();
+  const offProducts = [];
+  for (const r of [offEn, offHe]) {
+    if (r?.status !== 'fulfilled') continue;
+    for (const p of r.value) {
+      if (p.barcode && seenBarcodes.has(p.barcode)) continue;
+      if (p.barcode) seenBarcodes.add(p.barcode);
+      offProducts.push(p);
+    }
   }
-  const matched = new Set();
-  allStorePrices.forEach(sp => { if (offProducts.some(p => nameSimilarity(sp.name,p.name) > 0.3)) matched.add(sp.name); });
-  const unmatched = allStorePrices.filter(sp => !matched.has(sp.name));
-  const priceGroups = {};
-  unmatched.forEach(sp => {
-    const key = sp.name.trim().toLowerCase().substring(0,50);
-    if (!priceGroups[key]) priceGroups[key] = { name:sp.name, brand:sp.brand||'', size:sp.size||'', image:sp.image||'', barcode:'', storePrices:[] };
-    priceGroups[key].storePrices.push({ store:sp.store, price:sp.price, unit:sp.unit||'' });
+
+  // Try gov price aggregators
+  const [govRes] = await Promise.allSettled([searchGovPrices(englishQuery)]);
+  const govPrices = govRes?.status === 'fulfilled' ? govRes.value : [];
+
+  console.log(`OFF: ${offProducts.length} products | Gov prices: ${govPrices.length}`);
+
+  // Enrich OFF products with gov prices
+  const results = offProducts.map(p => ({
+    ...p,
+    storePrices: govPrices.filter(g =>
+      nameSimilarity(g.name, p.name) > 0.3 ||
+      (p.barcode && g.barcode && p.barcode === g.barcode)
+    )
+  }));
+
+  // Add gov-only price groups not matched to OFF
+  const matched = new Set(
+    govPrices
+      .filter(g => offProducts.some(p => nameSimilarity(g.name, p.name) > 0.3))
+      .map(g => g.name.toLowerCase())
+  );
+  const groups = {};
+  govPrices.filter(g => !matched.has(g.name.toLowerCase())).forEach(g => {
+    const key = g.name.toLowerCase().substring(0, 50);
+    if (!groups[key]) groups[key] = { name:g.name, brand:g.brand||'', size:g.size||'', image:'', barcode:g.barcode||'', storePrices:[] };
+    groups[key].storePrices.push({ store:g.store, price:g.price, unit:g.unit||'' });
   });
-  results.push(...Object.values(priceGroups));
+  results.push(...Object.values(groups));
   results.sort((a,b) => (b.storePrices?.length||0) - (a.storePrices?.length||0));
-  return res.status(200).json({ query, results:results.slice(0,15), total:results.length,
-    storeCounts:{ 'שופרסל':shufPrices.length, 'רמי לוי':ramiPrices.length, 'ויקטורי':vicPrices.length, 'יינות ביתן':yeinotPrices.length, 'אושר עד':osherPrices.length } });
+
+  return res.status(200).json({
+    version: '2.0.0',
+    query, englishQuery, translated,
+    results: results.slice(0, 20),
+    total: results.length,
+  });
 }
 
-// Helper: ensure we got JSON, not an HTML error page
-async function safeJson(r) {
-  const ct = r.headers.get('content-type') || '';
-  if (!ct.includes('json') && !ct.includes('javascript')) {
-    const t = await r.text();
-    console.log('[prices] Non-JSON response:', t.substring(0,120));
-    throw new Error('Expected JSON, got: ' + ct);
-  }
-  return r.json();
+async function searchOFF(query) {
+  try {
+    const url = `https://world.openfoodfacts.org/cgi/search.pl?` +
+      `search_terms=${encodeURIComponent(query)}&search_simple=1&action=process` +
+      `&json=1&page_size=10&fields=product_name,product_name_he,brands,quantity,image_small_url,code`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'FamilyShoppingIL/2.0 (github.com/Ezbyname/family-shopping)' },
+      signal: AbortSignal.timeout(10000)
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data?.products || [])
+      .map(p => ({
+        name: p.product_name_he || p.product_name || '',
+        brand: p.brands || '',
+        size: p.quantity || '',
+        image: p.image_small_url || '',
+        barcode: p.code || '',
+        storePrices: [],
+      }))
+      .filter(p => p.name.length > 1);
+  } catch(e) { console.log('OFF error:', e.message); return []; }
 }
 
-async function searchOpenFoodFacts(query) {
-  const urls = [
-    `https://il.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=10&fields=product_name,product_name_he,brands,quantity,image_small_url,code`,
-    `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=10&countries=israel&fields=product_name,product_name_he,brands,quantity,image_small_url,code`,
+async function searchGovPrices(query) {
+  const [r1, r2] = await Promise.allSettled([
+    fetchPricez(query),
+    fetchOpenIsrael(query),
+  ]);
+  return [
+    ...(r1.status === 'fulfilled' ? r1.value : []),
+    ...(r2.status === 'fulfilled' ? r2.value : []),
   ];
-  let all = [];
-  for (const url of urls) {
-    try {
-      const r = await fetch(url, { headers:{'User-Agent':'FamilyShoppingIL/1.0 (contact@example.com)'}, signal:AbortSignal.timeout(9000) });
-      const d = await r.json();
-      all.push(...(d?.products||[]).map(p => ({ name:p.product_name_he||p.product_name||'', brand:p.brands||'', size:p.quantity||'', image:p.image_small_url||'', barcode:p.code||'', storePrices:[] })).filter(p => p.name.length > 1));
-    } catch(e) { console.log('[prices] OFF:', e.message); }
-  }
-  const seen = new Set();
-  return all.filter(p => { const k = p.barcode || p.name.toLowerCase().substring(0,40); if (seen.has(k)) return false; seen.add(k); return true; });
 }
 
-async function fetchShufersal(query) {
-  const urls = [
-    `https://www.shufersal.co.il/online/he/search?q=${encodeURIComponent(query)}&format=json`,
-    `https://www.shufersal.co.il/online/he/api/products/search?q=${encodeURIComponent(query)}&start=0&count=6`,
-  ];
-  const h = { 'User-Agent':'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15', 'Accept':'application/json,*/*', 'Accept-Language':'he-IL,he;q=0.9', 'Referer':'https://www.shufersal.co.il/', 'X-Requested-With':'XMLHttpRequest' };
-  for (const url of urls) {
-    try {
-      const r = await fetch(url, { headers:h, signal:AbortSignal.timeout(7000) });
-      if (!r.ok) continue;
-      const d = await safeJson(r);
-      const p = d?.results||d?.data||d?.products||[];
-      const m = p.slice(0,6).map(p => ({ name:p.name||p.title||'', store:'שופרסל', price:parseFloat(p.price||p.pricePerUnit||p.regularPrice||0), unit:p.unitOfMeasure||'', brand:p.brand||'', size:p.size||p.quantity||'', image:p.thumbnail||p.imageUrl||'' })).filter(p => p.price>0 && p.name);
-      if (m.length) return m;
-    } catch(e) { console.log('[prices] Shufersal:', e.message); }
-  }
-  return [];
+async function fetchPricez(query) {
+  try {
+    const res = await fetch(
+      `https://www.pricez.co.il/api/search?q=${encodeURIComponent(query)}&limit=20`,
+      { headers:{'User-Agent':'FamilyShoppingIL/2.0','Accept':'application/json'}, signal:AbortSignal.timeout(9000) }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    const items = data?.products || data?.results || data?.items || (Array.isArray(data)?data:[]);
+    const out = [];
+    items.forEach(item => {
+      const name = item.name || item.product_name || '';
+      if (!name) return;
+      const prices = item.prices || item.stores || [];
+      if (Array.isArray(prices) && prices.length) {
+        prices.forEach(p => {
+          const store = mapStore(p.store_id || p.chain_id || p.store_name || '');
+          if (!store) return;
+          out.push({ name, store, price: parseFloat(p.price||p.item_price||0),
+            unit: p.unit_qty||item.unit_qty||'', brand: item.manufacturer_name||item.brand||'',
+            size: item.quantity||'', barcode: item.barcode||item.item_code||'' });
+        });
+      }
+    });
+    return out.filter(r => r.price > 0);
+  } catch(e) { console.log('pricez error:', e.message); return []; }
 }
 
-async function fetchRamiLevy(query) {
-  const urls = [
-    `https://www.rami-levy.co.il/api/search?q=${encodeURIComponent(query)}&store=331`,
-    `https://www.rami-levy.co.il/api/search?q=${encodeURIComponent(query)}&store=1`,
-    `https://www.rami-levy.co.il/api/search?q=${encodeURIComponent(query)}`,
-  ];
-  const h = { 'User-Agent':'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15', 'Accept':'application/json', 'Accept-Language':'he-IL,he;q=0.9', 'Referer':'https://www.rami-levy.co.il/', 'Origin':'https://www.rami-levy.co.il' };
-  for (const url of urls) {
-    try {
-      const r = await fetch(url, { headers:h, signal:AbortSignal.timeout(7000) });
-      if (!r.ok) continue;
-      const d = await safeJson(r);
-      const p = d?.data||d?.results||d?.products||[];
-      if (!p.length) continue;
-      const m = p.slice(0,6).map(p => ({ name:p.name||'', store:'רמי לוי', price:parseFloat(p.price?.regular||p.price?.sale||p.price||0), unit:p.unit_of_measure||'', brand:p.group_name||p.brand||'', size:p.weight||p.size||'', image:p.media?.m?`https://static.rami-levy.co.il/storage/images/${p.media.m}/medium.jpg`:(p.image||'') })).filter(p => p.price>0 && p.name);
-      if (m.length) return m;
-    } catch(e) { console.log('[prices] RamiLevy:', e.message); }
-  }
-  return [];
+async function fetchOpenIsrael(query) {
+  try {
+    const res = await fetch(
+      `https://il-supermarket-searcher.onrender.com/products?query=${encodeURIComponent(query)}&limit=20`,
+      { headers:{'User-Agent':'FamilyShoppingIL/2.0','Accept':'application/json'}, signal:AbortSignal.timeout(10000) }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    const items = data?.products || data?.results || (Array.isArray(data)?data:[]);
+    const out = [];
+    items.forEach(item => {
+      const name = item.name || item.ItemName || '';
+      if (!name) return;
+      const chains = item.chains || item.prices || item.stores || [];
+      if (Array.isArray(chains) && chains.length) {
+        chains.forEach(c => {
+          const store = mapStore(c.ChainID||c.chain_id||c.store||c.name||'');
+          out.push({ name, store: store||c.name||'סופר',
+            price: parseFloat(c.ItemPrice||c.price||0),
+            unit: item.UnitQty||'', brand: item.ManufacturerName||'',
+            size: item.Quantity||'', barcode: item.ItemCode||item.barcode||'' });
+        });
+      } else {
+        const store = mapStore(item.chain_id||item.ChainID||'');
+        out.push({ name, store: store||'סופר',
+          price: parseFloat(item.ItemPrice||item.price||0),
+          unit: item.UnitQty||'', brand: item.ManufacturerName||'',
+          size: item.Quantity||'', barcode: item.ItemCode||item.barcode||'' });
+      }
+    });
+    return out.filter(r => r.price > 0 && r.name);
+  } catch(e) { console.log('open-israel error:', e.message); return []; }
 }
 
-async function fetchVictory(query) {
-  const urls = [
-    `https://www.victoryonline.co.il/api/products/search?query=${encodeURIComponent(query)}&pageSize=6`,
-    `https://www.victoryonline.co.il/umbraco/api/catalogapi/search?term=${encodeURIComponent(query)}&pageSize=6`,
-  ];
-  const h = { 'User-Agent':'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15', 'Accept':'application/json', 'Accept-Language':'he-IL,he;q=0.9', 'Referer':'https://www.victoryonline.co.il/' };
-  for (const url of urls) {
-    try {
-      const r = await fetch(url, { headers:h, signal:AbortSignal.timeout(7000) });
-      if (!r.ok) continue;
-      const d = await safeJson(r);
-      const p = d?.SearchResults||d?.products||d?.data||d?.items||[];
-      if (!p.length) continue;
-      const m = p.slice(0,6).map(p => ({ name:p.Name||p.name||'', store:'ויקטורי', price:parseFloat(p.Price||p.SellingPrice||p.price||0), unit:p.UnitOfMeasure||'', brand:p.Brand||p.brand||'', size:p.Size||p.size||'', image:p.ImageUrl||p.imageUrl||'' })).filter(p => p.price>0 && p.name);
-      if (m.length) return m;
-    } catch(e) { console.log('[prices] Victory:', e.message); }
-  }
-  return [];
-}
-
-async function fetchYeinotBitan(query) {
-  const urls = [
-    `https://yeinotbitan.co.il/umbraco/api/catalog/search?query=${encodeURIComponent(query)}&pageSize=6`,
-    `https://www.ybitan.co.il/umbraco/api/catalog/search?query=${encodeURIComponent(query)}&pageSize=6`,
-  ];
-  const h = { 'User-Agent':'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15', 'Accept':'application/json', 'Accept-Language':'he-IL,he;q=0.9', 'Referer':'https://yeinotbitan.co.il/' };
-  for (const url of urls) {
-    try {
-      const r = await fetch(url, { headers:h, signal:AbortSignal.timeout(7000) });
-      if (!r.ok) continue;
-      const d = await safeJson(r);
-      const p = d?.products||d?.Products||d?.items||d?.data||[];
-      if (!p.length) continue;
-      const m = p.slice(0,6).map(p => ({ name:p.Name||p.name||'', store:'יינות ביתן', price:parseFloat(p.Price||p.SellingPrice||p.price||0), unit:p.UnitOfMeasure||'', brand:p.ManufacturerName||p.Brand||p.brand||'', size:p.UnitQuantity||p.Size||p.size||'', image:p.PictureUrl||p.ImageUrl||'' })).filter(p => p.price>0 && p.name);
-      if (m.length) return m;
-    } catch(e) { console.log('[prices] Yeinot:', e.message); }
-  }
-  return [];
-}
-
-async function fetchOsherAd(query) {
-  const urls = [
-    `https://www.osherad.co.il/search?q=${encodeURIComponent(query)}&format=json`,
-    `https://www.osherad.co.il/api/catalog/search?term=${encodeURIComponent(query)}&pageSize=6`,
-  ];
-  const h = { 'User-Agent':'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15', 'Accept':'application/json,*/*', 'Accept-Language':'he-IL,he;q=0.9', 'Referer':'https://www.osherad.co.il/', 'X-Requested-With':'XMLHttpRequest' };
-  for (const url of urls) {
-    try {
-      const r = await fetch(url, { headers:h, signal:AbortSignal.timeout(7000) });
-      if (!r.ok) continue;
-      const d = await safeJson(r);
-      const p = d?.results||d?.products||d?.data||d?.items||[];
-      if (!p.length) continue;
-      const m = p.slice(0,6).map(p => ({ name:p.name||p.title||'', store:'אושר עד', price:parseFloat(p.price||p.regularPrice||p.finalPrice||0), unit:p.unitOfMeasure||'', brand:p.brand||p.manufacturer||'', size:p.size||p.quantity||'', image:p.image||p.thumbnail||'' })).filter(p => p.price>0 && p.name);
-      if (m.length) return m;
-    } catch(e) { /* silent */ }
-  }
-  return [];
+const CHAIN_MAP = {
+  '7290027600007':'שופרסל','7290058140886':'רמי לוי','7290696200003':'ויקטורי',
+  '7290873255550':'יינות ביתן','7290055755557':'מחסני להב','7290058179504':'אושר עד',
+};
+function mapStore(id) {
+  const s = String(id||'');
+  for (const [cid, name] of Object.entries(CHAIN_MAP)) { if (s.includes(cid)) return name; }
+  const lc = s.toLowerCase();
+  if (lc.includes('shufersal')||lc.includes('שופרסל')) return 'שופרסל';
+  if (lc.includes('rami')||lc.includes('רמי')) return 'רמי לוי';
+  if (lc.includes('victory')||lc.includes('ויקטורי')) return 'ויקטורי';
+  if (lc.includes('yeinot')||lc.includes('יינות')) return 'יינות ביתן';
+  if (lc.includes('mahsanei')||lc.includes('מחסני')) return 'מחסני להב';
+  if (lc.includes('osher')||lc.includes('אושר')) return 'אושר עד';
+  return '';
 }
 
 function nameSimilarity(a, b) {
   if (!a||!b) return 0;
-  a = a.toLowerCase().trim().replace(/['"״׳]/g,'').replace(/\s+/g,' ');
-  b = b.toLowerCase().trim().replace(/['"״׳]/g,'').replace(/\s+/g,' ');
+  a = a.toLowerCase().trim(); b = b.toLowerCase().trim();
   if (a===b) return 1;
   if (a.includes(b)||b.includes(a)) return 0.8;
-  const wA = new Set(a.split(/[\s\-,()]+/).filter(w=>w.length>1));
-  const wB = new Set(b.split(/[\s\-,()]+/).filter(w=>w.length>1));
-  const inter = [...wA].filter(w=>wB.has(w)).length;
-  const union = new Set([...wA,...wB]).size;
-  return union > 0 ? inter/union : 0;
+  const wa = new Set(a.split(/[\s\-,]+/).filter(w=>w.length>1));
+  const wb = new Set(b.split(/[\s\-,]+/).filter(w=>w.length>1));
+  const inter = [...wa].filter(w=>wb.has(w)).length;
+  const union = new Set([...wa,...wb]).size;
+  return union>0 ? inter/union : 0;
 }
