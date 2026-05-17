@@ -125,7 +125,15 @@ async function main() {
     totalProducts: total, chainsEnabled: chains.length, chainsSucceeded: succeeded, chainsFailed: failed,
   });
 
-  process.exit(failed === chains.length ? 1 : 0);
+  // Exit 0 (success) unless ALL chains failed
+// Partial success is OK — prices from some chains are better than nothing
+if (failed === chains.length) {
+  logger.fail('All chains failed — check network connectivity and URLs');
+  process.exit(1);
+} else {
+  if (failed > 0) logger.warn(`${failed} chain(s) failed but ${succeeded} succeeded — partial sync OK`);
+  process.exit(0);
+}
 }
 
 main().catch(e => { logger.fail('Fatal:', e); process.exit(1); });
