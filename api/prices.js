@@ -1,25 +1,16 @@
-// api/prices.js — v3.0.0
-// GET /api/prices?barcode=&lat=&lng=&radiusKm=
-// GET /api/prices?q=&lat=&lng=&radiusKm=
-// Priority: official prices > manual prices
+// api/prices.js — v4.0.0 — NO Firebase dependency, Open Food Facts only
+// Firebase prices added later once sync job runs
 
-import { getDB, haversine, cors } from './_firebase.js';
-
-const HE_EN = {
-  'חלב':'milk','חלב טרי':'fresh milk','חלב מלא':'whole milk','חלב 3%':'milk 3%',
-  'חלב 1%':'milk 1%','חלב עיזים':'goat milk','גבינה':'cheese',
-  'גבינה לבנה':'white cheese','גבינה צהובה':'yellow cheese',
-  "קוטג'":'cottage cheese','קוטג':'cottage cheese',
-  'שמנת':'cream','שמנת חמוצה':'sour cream','יוגורט':'yogurt',
-  'יוגורט יווני':'greek yogurt','חמאה':'butter',
-  'לחם':'bread','לחם אחיד':'whole wheat bread','פיתה':'pita',
-  'קמח':'flour','ביצים':'eggs','ביצה':'egg',
+const HE_EN={'חלב':'milk','חלב 3%':'milk 3%','חלב 1%':'milk 1%','חלב עיזים':'goat milk',
+  'גבינה':'cheese','גבינה לבנה':'white cheese',"קוטג'":'cottage cheese','קוטג':'cottage cheese',
+  'שמנת':'cream','יוגורט':'yogurt','יוגורט יווני':'greek yogurt','חמאה':'butter',
+  'לחם':'bread','פיתה':'pita','קמח':'flour','ביצים':'eggs','ביצה':'egg',
   'קורנפלקס':'cornflakes','שיבולת שועל':'oatmeal','גרנולה':'granola',
   'אורז':'rice','פסטה':'pasta','ספגטי':'spaghetti','מקרוני':'macaroni',
   'שמן':'oil','שמן זית':'olive oil','שמן חמניות':'sunflower oil',
-  'סוכר':'sugar','דבש':'honey','מלח':'salt',
-  'טחינה':'tahini','חומוס':'hummus','קטשופ':'ketchup','מיונז':'mayonnaise',
-  'טונה':'tuna','קפה':'coffee','קפה נמס':'instant coffee','תה':'tea',
+  'סוכר':'sugar','דבש':'honey','מלח':'salt','טחינה':'tahini','חומוס':'hummus',
+  'קטשופ':'ketchup','מיונז':'mayonnaise','טונה':'tuna',
+  'קפה':'coffee','קפה נמס':'instant coffee','תה':'tea',
   'מיץ':'juice','מים':'water','קולה':'cola',
   'שוקולד':'chocolate','עוגיות':'cookies','במבה':'bamba','ביסלי':'bisli',
   'גלידה':'ice cream','עוף':'chicken','בשר טחון':'ground beef',
@@ -27,128 +18,75 @@ const HE_EN = {
   'גזר':'carrot','תפוח אדמה':'potato','ברוקולי':'broccoli',
   'תפוח':'apple','בננה':'banana','תפוז':'orange','לימון':'lemon',
   'נייר טואלט':'toilet paper','סבון':'soap','שמפו':'shampoo',
-  'אבקת כביסה':'laundry detergent','נוזל כלים':'dish soap',
-};
+  'אבקת כביסה':'laundry detergent','נוזל כלים':'dish soap'};
 
-const isHebrew = s => /[\u0590-\u05FF]/.test(s);
-const translateHebrew = q => {
-  const l = q.trim();
-  if (HE_EN[l]) return HE_EN[l];
-  for (const [h, e] of Object.entries(HE_EN)) if (l.includes(h) || h.includes(l)) return e;
-  return null;
-};
+const isHebrew=s=>/[\u0590-\u05FF]/.test(s);
+const translate=q=>{const l=q.trim();if(HE_EN[l])return HE_EN[l];for(const[h,e]of Object.entries(HE_EN))if(l.includes(h)||h.includes(l))return e;return null;};
 
-export default async function handler(req, res) {
-  cors(res);
-  if (req.method === 'OPTIONS') return res.status(200).end();
+export default async function handler(req,res){
+  res.setHeader('Access-Control-Allow-Origin','*');
+  res.setHeader('Access-Control-Allow-Methods','GET,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers','Content-Type');
+  if(req.method==='OPTIONS')return res.status(200).end();
 
-  const { barcode, q, lat, lng, radiusKm } = req.query;
-  const userLat = parseFloat(lat || '');
-  const userLng = parseFloat(lng || '');
-  const radius  = parseFloat(radiusKm || '0');
-  const hasLocation = !isNaN(userLat) && !isNaN(userLng) && radius > 0;
+  const q=String(req.query?.q||'').trim();
+  const barcode=String(req.query?.barcode||'').replace(/\D/g,'');
 
-  // Load store index if radius filtering needed
-  let storeIndex = {};
-  if (hasLocation) storeIndex = await loadStoreIndex(getDB());
-
-  if (barcode) {
-    const clean = String(barcode).replace(/\D/g, '');
-    if (!clean || clean.length < 4) return res.status(400).json({ error: 'Invalid barcode' });
-    const { prices, source } = await getPricesForBarcode(getDB(), clean, hasLocation, userLat, userLng, radius, storeIndex);
-    return res.status(200).json({ barcode: clean, source, radiusKm: radius || null, prices });
+  if(barcode&&barcode.length>=4){
+    // Firebase price lookup by barcode
+    const prices=await getFirebasePrices(barcode);
+    return res.status(200).json({version:'4.0.0',barcode,source:prices.length?'official':'none',prices});
   }
 
-  if (q) {
-    const query = q.trim();
-    const hebrew = isHebrew(query);
-    const en = hebrew ? (translateHebrew(query) || query) : query;
-    const offProducts = await searchOFF(en);
+  if(!q||q.length<2)
+    return res.status(400).json({error:'Provide ?q= or ?barcode='});
 
-    const db = getDB();
-    const enriched = await Promise.all(offProducts.map(async p => {
-      if (!p.barcode) return { ...p, storePrices: [], priceSource: 'none' };
-      const { prices, source } = await getPricesForBarcode(db, p.barcode, hasLocation, userLat, userLng, radius, storeIndex);
-      return { ...p, storePrices: prices, priceSource: source };
+  const hebrew=isHebrew(q);
+  const en=hebrew?(translate(q)||q):q;
+  console.log(`[v4.0.0] "${q}" -> "${en}"`);
+
+  try{
+    const products=await searchOFF(en);
+    // Enrich with Firebase prices if available
+    const enriched=await Promise.all(products.map(async p=>{
+      if(!p.barcode)return{...p,storePrices:[],priceSource:'none'};
+      const prices=await getFirebasePrices(p.barcode);
+      return{...p,storePrices:prices,priceSource:prices.length?'official':'none'};
     }));
-
-    enriched.sort((a, b) => {
-      const o = { official: 0, manual: 1, none: 2 };
-      return (o[a.priceSource]??2) - (o[b.priceSource]??2) || (b.storePrices?.length||0) - (a.storePrices?.length||0);
-    });
-
-    let syncStatus = null;
-    try { const s = await db.ref('syncSummary').get(); if (s.exists()) syncStatus = s.val(); } catch (_) {}
-
-    return res.status(200).json({ version: '3.0.0', query, englishQuery: en, results: enriched.slice(0,20), syncStatus });
+    enriched.sort((a,b)=>(b.storePrices?.length||0)-(a.storePrices?.length||0));
+    return res.status(200).json({version:'4.0.0',query:q,englishQuery:en,results:enriched.slice(0,20),total:enriched.length});
+  }catch(e){
+    console.error('[prices v4]',e.message);
+    return res.status(200).json({version:'4.0.0',query:q,results:[],error:e.message});
   }
-
-  return res.status(400).json({ error: 'Provide ?barcode= or ?q=' });
 }
 
-async function getPricesForBarcode(db, barcode, hasLocation, lat, lng, radius, storeIndex) {
-  // Official prices
-  try {
-    const snap = await db.ref(`prices/${barcode}`).get();
-    if (snap.exists()) {
-      let prices = Object.entries(snap.val())
-        .map(([storeKey, p]) => {
-          if (!p?.price || p.price <= 0) return null;
-          const store = storeIndex[storeKey] || storeIndex[`${p.chainId}_${p.storeId}`] || null;
-          const dist  = (store?.hasCoords && hasLocation)
-            ? haversine(lat, lng, store.latitude, store.longitude)
-            : null;
-          // Exclude from radius filter if no coords or outside radius
-          if (hasLocation && (dist === null || dist > radius)) return null;
-          return {
-            store:     p.chainName || p.chainId,
-            chainId:   p.chainId,
-            storeId:   p.storeId,
-            storeName: p.storeName || store?.storeName || '',
-            city:      store?.city || '',
-            distanceKm: dist ? Math.round(dist * 10) / 10 : null,
-            price:     p.price,
-            unit:      p.unit || '',
-            updatedAt: p.updatedAt,
-            source:    'official',
-          };
-        })
-        .filter(Boolean)
-        .sort((a, b) => a.price - b.price);
-
-      if (prices.length > 0) return { prices, source: 'official' };
-    }
-  } catch (e) { console.warn('official lookup:', e.message); }
-
-  // Manual fallback
-  try {
-    const snap = await db.ref(`manualPrices/${barcode}`).get();
-    if (snap.exists()) {
-      const prices = Object.values(snap.val())
-        .filter(p => p?.price > 0)
-        .map(p => ({ store: p.chainName || 'User submitted', chainId: 'manual', price: p.price, note: p.note || '', submittedAt: p.submittedAt, source: 'manual' }))
-        .sort((a, b) => a.price - b.price);
-      if (prices.length > 0) return { prices, source: 'manual' };
-    }
-  } catch (_) {}
-
-  return { prices: [], source: 'none' };
+async function getFirebasePrices(barcode){
+  try{
+    const sa=process.env.FIREBASE_SERVICE_ACCOUNT;
+    const url=process.env.FIREBASE_DATABASE_URL;
+    if(!sa||!url)return[];
+    const {initializeApp,cert,getApps}=await import('firebase-admin/app');
+    const {getDatabase}=await import('firebase-admin/database');
+    if(!getApps().length)initializeApp({credential:cert(JSON.parse(sa)),databaseURL:url});
+    const db=getDatabase();
+    const snap=await db.ref(`prices/${barcode}`).get();
+    if(!snap.exists())return[];
+    return Object.values(snap.val()).filter(p=>p?.price>0)
+      .map(p=>({store:p.chainName||p.chainId||'סופר',price:p.price,unit:p.unit||'',updatedAt:p.updatedAt||'',source:'official'}))
+      .sort((a,b)=>a.price-b.price);
+  }catch(e){console.warn('[firebase]',e.message);return[];}
 }
 
-async function loadStoreIndex(db) {
-  try {
-    const snap = await db.ref('stores').get();
-    if (!snap.exists()) return {};
-    return snap.val() || {};
-  } catch (_) { return {}; }
-}
-
-async function searchOFF(query) {
-  try {
-    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=12&fields=product_name,product_name_he,brands,quantity,image_small_url,code`;
-    const res = await fetch(url, { headers: { 'User-Agent': 'FamilyShoppingIL/3.0' }, signal: AbortSignal.timeout(10000) });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data?.products || []).map(p => ({ name: p.product_name_he||p.product_name||'', brand: p.brands||'', size: p.quantity||'', image: p.image_small_url||'', barcode: p.code||'', storePrices: [] })).filter(p => p.name.length > 1);
-  } catch (_) { return []; }
+async function searchOFF(query){
+  const url=`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=12&fields=product_name,product_name_he,brands,quantity,image_small_url,code`;
+  const res=await fetch(url,{headers:{'User-Agent':'FamilyShoppingIL/4.0'},signal:AbortSignal.timeout(12000)});
+  if(!res.ok)throw new Error(`OFF ${res.status}`);
+  const data=await res.json();
+  return(data?.products||[]).map(p=>({
+    name:p.product_name_he||p.product_name||'',
+    brand:p.brands||'',size:p.quantity||'',
+    image:p.image_small_url||'',barcode:p.code||'',
+    storePrices:[]
+  })).filter(p=>p.name.length>1);
 }
