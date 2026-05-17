@@ -2,7 +2,7 @@
 // POST /api/basket-compare
 // Compares full shopping basket price across nearby stores
 
-import { getDB, haversine, cors } from './_firebase.js';
+import { getDB, haversine, cors } from './_firebase.js'; // getDB is now async
 
 export default async function handler(req, res) {
   cors(res);
@@ -30,7 +30,7 @@ export default async function handler(req, res) {
 
   if (!validItems.length) return res.status(400).json({ error: 'No valid items' });
 
-  const db = getDB();
+  const db = await getDB();
 
   // 1. Load store index (only stores with coordinates if location provided)
   const storeIndex = await loadStores(db);
@@ -106,6 +106,7 @@ export default async function handler(req, res) {
 }
 
 async function loadStores(db) {
+  if (!db) return {};
   try {
     const snap = await db.ref('stores').get();
     return snap.exists() ? snap.val() : {};
