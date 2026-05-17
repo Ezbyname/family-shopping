@@ -23,7 +23,8 @@ export default async function handler(req, res) {
   if (!cleanChain) return res.status(400).json({ error: 'chainName required' });
 
   try {
-    const db = getDB();
+    const db = await getDB();
+    if (!db) return res.status(503).json({ error: 'Database not available' });
 
     // Block if official prices already exist
     const offSnap = await db.ref(`prices/${clean}`).get();
