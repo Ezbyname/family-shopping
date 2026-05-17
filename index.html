@@ -418,6 +418,49 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent);cursor:pointer}
 .radius-val{font-size:13px;font-weight:800;color:var(--accent);min-width:44px;text-align:left}
 
+
+/* ══ BARCODE SCANNER ══ */
+.scan-btn{background:var(--blue-dim);color:var(--blue);border:1.5px solid rgba(96,165,250,.3);
+  border-radius:12px;padding:10px 14px;font-family:'Heebo',sans-serif;font-size:13px;
+  font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;
+  transition:all .15s;white-space:nowrap;flex-shrink:0;}
+.scan-btn:active{opacity:.8}
+.scanner-overlay{display:none;position:fixed;inset:0;background:#000;z-index:600;
+  flex-direction:column;align-items:center;justify-content:center;}
+.scanner-overlay.show{display:flex}
+.scanner-video{width:100%;max-width:480px;height:60vh;object-fit:cover;border-radius:0}
+.scanner-frame{position:absolute;width:240px;height:240px;border:3px solid var(--accent);
+  border-radius:16px;box-shadow:0 0 0 9999px rgba(0,0,0,.6);}
+.scanner-hint{color:white;font-size:14px;font-weight:600;margin-top:20px;text-align:center}
+.scanner-close{position:absolute;top:20px;right:20px;background:rgba(255,255,255,.2);
+  border:none;color:white;border-radius:50%;width:40px;height:40px;font-size:20px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.scanner-manual-barcode{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);
+  border-radius:12px;padding:12px 16px;color:white;font-family:'Heebo',sans-serif;
+  font-size:16px;text-align:center;outline:none;width:240px;margin-top:14px;
+  letter-spacing:3px;}
+
+/* ══ PRICE SUBMIT MODAL ══ */
+.price-submit-card{background:var(--card);border-radius:var(--radius);padding:16px;
+  margin-bottom:10px;border:1px solid var(--border);}
+.price-submit-title{font-size:14px;font-weight:700;margin-bottom:12px;text-align:center}
+.price-submit-product{display:flex;align-items:center;gap:10px;margin-bottom:14px;
+  background:var(--card2);border-radius:12px;padding:10px;}
+.store-price-inputs{display:flex;flex-direction:column;gap:7px}
+.spi-row{display:flex;align-items:center;justify-content:space-between;
+  background:var(--card2);border-radius:10px;padding:8px 12px;}
+.spi-store{font-size:13px;font-weight:600}
+.spi-right{display:flex;align-items:center;gap:6px;direction:ltr}
+.spi-currency{font-size:13px;font-weight:800;color:var(--accent)}
+.spi-input{width:80px;background:var(--card);border:1px solid var(--border);
+  border-radius:8px;padding:5px 8px;color:var(--text);font-family:'Heebo',sans-serif;
+  font-size:13px;text-align:left;outline:none;direction:ltr}
+.spi-input:focus{border-color:var(--accent)}
+.realtime-badge{background:var(--green-dim);color:var(--green);
+  border:1px solid rgba(52,211,153,.3);border-radius:6px;
+  padding:2px 8px;font-size:9px;font-weight:700;display:inline-flex;
+  align-items:center;gap:3px;}
+
 </style>
 </head>
 <body>
@@ -1528,6 +1571,249 @@ window._patchConnectToGroup = function() {
 // Call patch on connect
 const _realConnectToGroup = connectToGroup;
 
+
+// ══════════════════════════════════════════════════
+// BARCODE SCANNER + REAL-TIME PRICE SYSTEM
+// ══════════════════════════════════════════════════
+
+const STORE_LIST = ['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב','אושר עד'];
+let _scannerStream = null;
+let _barcodeDetector = null;
+let _scanInterval = null;
+let _currentProduct = null; // product being priced
+
+// ── OPEN SCANNER ──
+window.openScanner = async function() {
+  const overlay = document.getElementById('scanner-overlay');
+  overlay.classList.add('show');
+
+  try {
+    _scannerStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    const video = document.getElementById('scanner-video');
+    video.srcObject = _scannerStream;
+
+    // Try BarcodeDetector API (Chrome Android)
+    if ('BarcodeDetector' in window) {
+      _barcodeDetector = new BarcodeDetector({ formats: ['ean_13','ean_8','code_128','code_39'] });
+      _scanInterval = setInterval(async () => {
+        try {
+          const barcodes = await _barcodeDetector.detect(video);
+          if (barcodes.length > 0) {
+            const barcode = barcodes[0].rawValue;
+            closeScanner();
+            await handleBarcodeFound(barcode);
+          }
+        } catch (_) {}
+      }, 300);
+    } else {
+      // Fallback — manual entry only
+      document.querySelector('.scanner-hint').textContent = '📷 המצלמה פעילה — הכנס ברקוד ידנית למטה';
+    }
+  } catch (e) {
+    console.warn('Camera error:', e);
+    document.querySelector('.scanner-hint').textContent = '❌ אין גישה למצלמה — הכנס ברקוד ידנית';
+  }
+};
+
+window.closeScanner = function() {
+  document.getElementById('scanner-overlay').classList.remove('show');
+  if (_scanInterval) { clearInterval(_scanInterval); _scanInterval = null; }
+  if (_scannerStream) { _scannerStream.getTracks().forEach(t => t.stop()); _scannerStream = null; }
+  document.getElementById('scanner-manual-barcode').value = '';
+};
+
+window.submitManualBarcode = async function() {
+  const val = document.getElementById('scanner-manual-barcode').value.trim();
+  if (!val || val.length < 4) { toast('⚠️ הכנס ברקוד תקין'); return; }
+  closeScanner();
+  await handleBarcodeFound(val);
+};
+
+// ── HANDLE FOUND BARCODE ──
+async function handleBarcodeFound(barcode) {
+  toast(`🔍 מחפש ברקוד ${barcode}...`);
+
+  // Search Open Food Facts by barcode
+  let product = null;
+  try {
+    const res = await fetch(
+      `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`,
+      { headers: { 'User-Agent': 'FamilyShoppingIL/5.0' }, signal: AbortSignal.timeout(8000) }
+    );
+    const data = await res.json();
+    if (data.status === 1) {
+      const p = data.product;
+      product = {
+        barcode,
+        name: p.product_name_he || p.product_name || barcode,
+        brand: p.brands || '',
+        size: p.quantity || '',
+        image: p.image_small_url || '',
+      };
+    }
+  } catch (_) {}
+
+  if (!product) product = { barcode, name: `מוצר ${barcode}`, brand: '', size: '', image: '' };
+
+  // Check existing prices in Firebase
+  let existingPrices = {};
+  try {
+    const snap = await get(ref(db, `prices/${barcode}`));
+    if (snap.exists()) existingPrices = snap.val();
+  } catch (_) {}
+
+  // Show price entry modal
+  openPriceSubmit(product, existingPrices);
+}
+
+// ── PRICE SUBMIT MODAL ──
+function openPriceSubmit(product, existingPrices) {
+  _currentProduct = product;
+
+  // Product info header
+  const info = document.getElementById('price-submit-product-info');
+  info.innerHTML = `
+    ${product.image
+      ? `<img src="${product.image}" style="width:52px;height:52px;border-radius:10px;object-fit:contain;background:white;padding:3px;flex-shrink:0">`
+      : `<div style="width:52px;height:52px;border-radius:10px;background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">🛍</div>`}
+    <div>
+      <div style="font-size:14px;font-weight:700">${esc(product.name)}</div>
+      ${product.brand ? `<div style="font-size:11px;color:var(--muted)">${esc(product.brand)}</div>` : ''}
+      ${product.size  ? `<div style="font-size:11px;color:var(--muted)">${esc(product.size)}</div>` : ''}
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">ברקוד: ${esc(product.barcode)}</div>
+    </div>`;
+
+  // Store price inputs with existing values
+  const inputs = document.getElementById('store-price-inputs');
+  inputs.innerHTML = STORE_LIST.map(store => {
+    const storeKey = store.replace(/\s/g,'_');
+    // Find existing price for this store
+    const existing = Object.values(existingPrices).find(p =>
+      p.chainName === store || p.store === store
+    );
+    const val = existing?.price ? existing.price.toFixed(2) : '';
+    const isRecent = existing?.syncedAt && (Date.now() - existing.syncedAt < 7 * 24 * 3600 * 1000);
+    return `<div class="spi-row">
+      <div>
+        <div class="spi-store">${store}</div>
+        ${isRecent ? `<div style="font-size:9px;color:var(--green)">✓ עודכן לאחרונה</div>` : ''}
+      </div>
+      <div class="spi-right">
+        <span class="spi-currency">₪</span>
+        <input class="spi-input" id="spi-${storeKey}" type="number"
+          placeholder="0.00" step="0.01" min="0" value="${val}">
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('price-submit-overlay').classList.add('show');
+}
+
+window.submitPrices = async function() {
+  if (!_currentProduct) return;
+  const barcode = _currentProduct.barcode;
+  const updates = {};
+  let count = 0;
+
+  STORE_LIST.forEach(store => {
+    const storeKey = store.replace(/\s/g,'_');
+    const input = document.getElementById(`spi-${storeKey}`);
+    const val = parseFloat(input?.value);
+    if (!val || val <= 0) return;
+
+    const key = `prices/${barcode}/${storeKey}`;
+    updates[key] = {
+      barcode,
+      name: _currentProduct.name,
+      chainId: storeKey,
+      chainName: store,
+      storeId: '',
+      price: Math.round(val * 100) / 100,
+      unit: _currentProduct.size || '',
+      updatedAt: new Date().toISOString(),
+      source: 'user',
+      submittedBy: myName || 'user',
+      submittedAt: Date.now(),
+      syncedAt: Date.now(),
+    };
+    count++;
+  });
+
+  if (count === 0) { toast('⚠️ הכנס לפחות מחיר אחד'); return; }
+
+  try {
+    await update(ref(db, '/'), updates);
+    closeOL2('price-submit-overlay');
+    toast(`✅ ${count} מחירים נשמרו ועודכנו לכל המשפחה!`);
+
+    // Log activity
+    if (groupId && listId) {
+      logActivity('manual_price_added', barcode, _currentProduct.name);
+    }
+
+    // If currently showing this product in price tab — refresh
+    if (curTab === 'price') renderPrices();
+
+  } catch (e) {
+    toast('❌ שגיאה בשמירה: ' + e.message);
+  }
+};
+
+// ── ADD SCAN BUTTON TO PRICE SEARCH BAR ──
+function addScanButton() {
+  const bar = document.getElementById('add-bar');
+  if (bar && !document.getElementById('scan-btn')) {
+    const btn = document.createElement('button');
+    btn.id = 'scan-btn';
+    btn.className = 'scan-btn';
+    btn.innerHTML = '📷 סרוק';
+    btn.onclick = openScanner;
+    bar.appendChild(btn);
+  }
+  // Also add to price search bar
+  const priceBar = document.querySelector('.price-search-bar');
+  if (priceBar && !document.getElementById('price-scan-btn')) {
+    const btn2 = document.createElement('button');
+    btn2.id = 'price-scan-btn';
+    btn2.className = 'scan-btn';
+    btn2.innerHTML = '📷';
+    btn2.onclick = openScanner;
+    priceBar.appendChild(btn2);
+  }
+}
+
+// ── PROXY PRICE ATTEMPT ──
+// Try to fetch live prices via Edge proxy
+window.tryProxyPrice = async function(storeName, query) {
+  const storeMap = { 'שופרסל':'shufersal', 'רמי לוי':'ramilevi' };
+  const storeId = storeMap[storeName];
+  if (!storeId) return null;
+  try {
+    const res = await fetch(`/api/proxy-prices?q=${encodeURIComponent(query)}&store=${storeId}`,
+      { signal: AbortSignal.timeout(6000) });
+    const data = await res.json();
+    if (data.ok && data.data?.results?.length) {
+      return data.data.results[0]?.price || null;
+    }
+  } catch (_) {}
+  return null;
+};
+
+// ── REAL-TIME FIREBASE PRICE LISTENER ──
+// Watch prices/{barcode} and update UI when anyone submits a price
+function watchBarcodePrices(barcode, onUpdate) {
+  if (!db || !barcode) return;
+  return onValue(ref(db, `prices/${barcode}`), snap => {
+    if (snap.exists()) onUpdate(snap.val());
+  });
+}
+
+// ── INIT SCAN BUTTON ──
+// Called after connect
+window._scanButtonAdded = false;
+
 // SERVICE WORKER
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -1695,6 +1981,40 @@ window.confirmManualEntry = async function() {
     <div class="modal-row">
       <button class="mbtn primary" onclick="runBasketCompare()">🔍 השווה סל</button>
       <button class="mbtn ghost" onclick="closeOL2('basket-overlay')">סגור</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ BARCODE SCANNER ═══ -->
+<div class="scanner-overlay" id="scanner-overlay">
+  <button class="scanner-close" onclick="closeScanner()">✕</button>
+  <div style="position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:60vh">
+    <video id="scanner-video" class="scanner-video" autoplay playsinline muted></video>
+    <div class="scanner-frame"></div>
+  </div>
+  <div class="scanner-hint">📷 כוון את הברקוד למסגרת</div>
+  <input class="scanner-manual-barcode" id="scanner-manual-barcode"
+    placeholder="או הכנס ברקוד ידנית" type="number"
+    onkeydown="if(event.key==='Enter')submitManualBarcode()">
+  <button class="mbtn primary" style="margin-top:10px;width:240px"
+    onclick="submitManualBarcode()">חפש לפי ברקוד</button>
+</div>
+
+<!-- ═══ PRICE SUBMIT MODAL ═══ -->
+<div class="overlay" id="price-submit-overlay" onclick="closeOL(event,'price-submit-overlay')">
+  <div class="modal" style="max-height:85vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div class="modal-title">💰 הוסף מחיר מהסופר</div>
+    <div id="price-submit-product-info" style="display:flex;align-items:center;gap:10px;
+      background:var(--card);border-radius:12px;padding:10px;margin-bottom:12px"></div>
+    <div class="store-price-inputs" id="store-price-inputs"></div>
+    <div style="font-size:10px;color:var(--muted);text-align:center;margin:10px 0">
+      <span class="realtime-badge">🔴 LIVE</span> המחירים יתעדכנו מיד לכל המשפחה
+    </div>
+    <div class="modal-row">
+      <button class="mbtn primary" onclick="submitPrices()">💾 שמור מחירים</button>
+      <button class="mbtn ghost" onclick="closeOL2('price-submit-overlay')">סגור</button>
     </div>
   </div>
 </div>
