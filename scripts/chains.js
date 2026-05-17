@@ -1,0 +1,34 @@
+// scripts/chains.js — v2.0.0
+// Official Israeli supermarket chain config
+export const CHAINS = [
+  {
+    id: 'shufersal', name: 'שופרסל', chainId: '7290027600007', enabled: true,
+    indexUrl: 'https://prices.shufersal.co.il/FileObject/UpdateCategory?catID=0&storeId=0&sort=None&order=None&size=10&page=1',
+    baseUrl: 'https://prices.shufersal.co.il', indexType: 'json',
+  },
+  {
+    id: 'rami-levy', name: 'רמי לוי', chainId: '7290058140886', enabled: true,
+    indexUrl: 'https://url.retail.pe.il/MF/latest/',
+    baseUrl: 'https://url.retail.pe.il', indexType: 'html',
+  },
+  {
+    id: 'victory', name: 'ויקטורי', chainId: '7290696200003', enabled: true,
+    indexUrl: 'https://matrixcatalog.co.il/NBcompetitionRegulations.aspx',
+    baseUrl: 'https://matrixcatalog.co.il', indexType: 'html',
+  },
+  {
+    id: 'yeinot-bitan', name: 'יינות ביתן', chainId: '7290873255550', enabled: true,
+    indexUrl: 'https://publishprice.ybitan.co.il/',
+    baseUrl: 'https://publishprice.ybitan.co.il', indexType: 'html',
+  },
+  {
+    id: 'osher-ad', name: 'אושר עד', chainId: '7290058179504', enabled: true,
+    indexUrl: 'https://osherad.co.il/prices/',
+    baseUrl: 'https://osherad.co.il', indexType: 'html',
+  },
+  {
+    id: 'mahsanei-lahav', name: 'מחסני להב', chainId: '7290055755557', enabled: true,
+    indexUrl: 'https://lahav.store-next.co.il/prices/',
+    baseUrl: 'https://lahav.store-next.co.il', indexType: 'html',
+  },
+];
