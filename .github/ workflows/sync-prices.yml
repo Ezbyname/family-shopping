@@ -1,0 +1,36 @@
+name: Sync Israeli Supermarket Prices
+
+on:
+  schedule:
+    - cron: '0 4 * * *'   # 04:00 UTC = 07:00 Israel
+    - cron: '0 12 * * *'  # 12:00 UTC = 15:00 Israel
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: scripts/package-lock.json
+      - name: Install
+        working-directory: scripts
+        run: npm ci
+      - name: Sync prices
+        working-directory: scripts
+        env:
+          FIREBASE_DATABASE_URL: ${{ secrets.FIREBASE_DATABASE_URL }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          NODE_OPTIONS: '--max-old-space-size=512'
+        run: node sync-prices.js 2>&1 | tee sync.log
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sync-log-${{ github.run_id }}
+          path: scripts/sync.log
+          retention-days: 14
