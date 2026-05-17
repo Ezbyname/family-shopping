@@ -1411,13 +1411,12 @@ let listId = 'default';
 let myProfile = null;
 
 // Override addItem to include attribution and activity
-const _origAddItem = window.addItem;
 window.addItem = function() {
   const input = document.getElementById('new-item-input');
   const name = input.value.trim();
   if (!name) return;
   const m = myProfile || {};
-  const newRef = push(ref(db, `groups/${groupId}/${listId}/items`));
+  const newRef = push(ref(db, `groups/${groupId}/items`));
   set(newRef, {
     name, qty: 1, bought: false, fav: false,
     addedByUserId:      myId,
@@ -1439,7 +1438,7 @@ window.toggleBought = function(id) {
   const item = items[id];
   if (!item) return;
   const nowBought = !item.bought;
-  update(ref(db, `groups/${groupId}/${listId}/items/${id}`), {
+  update(ref(db, `groups/${groupId}/items/${id}`), {
     bought: nowBought,
     checkedByUserId: nowBought ? myId : null,
     checkedAt:       nowBought ? Date.now() : null,
@@ -1452,7 +1451,7 @@ const _origDeleteItem = window.deleteItem;
 window.deleteItem = function(id) {
   const item = items[id];
   if (item) logActivity('item_removed', id, item.name);
-  remove(ref(db, `groups/${groupId}/${listId}/items/${id}`));
+  remove(ref(db, `groups/${groupId}/items/${id}`));
 };
 
 // ══════════════════════════════════════════════════
