@@ -79,14 +79,32 @@ async function getFirebasePrices(barcode){
 }
 
 async function searchOFF(query){
-  const url=`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=12&fields=product_name,product_name_he,brands,quantity,image_small_url,code`;
-  const res=await fetch(url,{headers:{'User-Agent':'FamilyShoppingIL/4.0'},signal:AbortSignal.timeout(12000)});
-  if(!res.ok)throw new Error(`OFF ${res.status}`);
-  const data=await res.json();
-  return(data?.products||[]).map(p=>({
-    name:p.product_name_he||p.product_name||'',
-    brand:p.brands||'',size:p.quantity||'',
-    image:p.image_small_url||'',barcode:p.code||'',
-    storePrices:[]
-  })).filter(p=>p.name.length>1);
+  // Search with country filter for Israel first, fallback to global
+  const searches = [
+    // Israeli products first
+    `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=8&fields=product_name,product_name_he,brands,quantity,image_small_url,code&tagtype_0=countries&tag_contains_0=contains&tag_0=israel`,
+    // Global fallback
+    `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=12&fields=product_name,product_name_he,brands,quantity,image_small_url,code`
+  ];
+
+  const seen = new Set();
+  const results = [];
+
+  for(const url of searches){
+    try{
+      const res=await fetch(url,{headers:{'User-Agent':'FamilyShoppingIL/4.0'},signal:AbortSignal.timeout(10000)});
+      if(!res.ok)continue;
+      const data=await res.json();
+      for(const p of data?.products||[]){
+        const barcode=p.code||'';
+        if(barcode&&seen.has(barcode))continue;
+        if(barcode)seen.add(barcode);
+        const name=p.product_name_he||p.product_name||'';
+        if(name.length<1)continue;
+        results.push({name,brand:p.brands||'',size:p.quantity||'',image:p.image_small_url||'',barcode,storePrices:[]});
+      }
+      if(results.length>=8)break; // enough results
+    }catch(e){console.warn('OFF search error:',e.message);}
+  }
+  return results.slice(0,12);
 }
