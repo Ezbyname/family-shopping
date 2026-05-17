@@ -873,12 +873,18 @@ function showProductPrices(product){
     } else {
       return `<div class="spr no-data" style="gap:8px">
         <span class="spr-name" style="flex-shrink:0">${r.store}</span>
-        <span style="display:flex;align-items:center;gap:5px;flex:1;justify-content:flex-end">
-          <input type="number" id="mp-${storeKey}" placeholder="₪ הכנס מחיר"
+        <span style="display:flex;align-items:center;gap:5px;flex:1;justify-content:flex-end;direction:ltr">
+          <span style="font-size:13px;font-weight:700;color:var(--accent);flex-shrink:0">₪</span>
+          <input type="number" id="mp-${storeKey}" placeholder="0.00"
             step="0.01" min="0"
-            style="width:100px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:4px 8px;color:var(--text);font-family:'Heebo',sans-serif;font-size:12px;text-align:center;outline:none;">
+            style="width:80px;background:var(--card);border:1px solid var(--border);
+              border-radius:8px;padding:4px 8px;color:var(--text);font-family:'Heebo',sans-serif;
+              font-size:12px;text-align:left;outline:none;direction:ltr">
           <button onclick="saveManualPrice('${r.store}','mp-${storeKey}')"
-            style="background:var(--accent);color:#111;border:none;border-radius:7px;padding:4px 8px;font-family:'Heebo',sans-serif;font-size:11px;font-weight:700;cursor:pointer;">שמור</button>
+            style="background:var(--accent);color:#111;border:none;border-radius:7px;
+              padding:4px 10px;font-family:'Heebo',sans-serif;font-size:11px;font-weight:700;cursor:pointer;">
+            שמור
+          </button>
         </span>
       </div>`;
     }
@@ -945,8 +951,12 @@ function renderManualFallback(query, product){
   const storeInputs = STORE_LIST.map(s=>`
     <div class="spr">
       <span class="spr-name">${s}</span>
-      <input class="pi" type="number" id="manual-${s.replace(/\s/g,'_')}"
-        placeholder="₪" step="0.01" min="0" style="width:80px;text-align:center">
+      <div style="display:flex;align-items:center;gap:4px;direction:ltr">
+        <span style="font-size:13px;font-weight:700;color:var(--accent);flex-shrink:0">₪</span>
+        <input class="pi" type="number" id="manual-${s.replace(/\s/g,'_')}"
+          placeholder="0.00" step="0.01" min="0"
+          style="width:80px;text-align:left;padding-right:4px">
+      </div>
     </div>`).join('');
 
   // Product header with image
