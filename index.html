@@ -24,17 +24,17 @@
 html,body{height:100%;overflow:hidden}
 body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);
   display:flex;flex-direction:column;max-width:480px;margin:0 auto;}
-
+ 
 .screen{display:none;flex-direction:column;height:100%;overflow:hidden}
 .screen.active{display:flex}
-
+ 
 /* LOADING */
 #loading-screen{justify-content:center;align-items:center;gap:14px;
   background:radial-gradient(ellipse at 50% 0%,rgba(240,180,41,.07) 0%,transparent 60%),var(--bg);}
 .spinner{width:36px;height:36px;border:3px solid var(--border);
   border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg)}}
-
+ 
 /* SETUP */
 #setup-screen{justify-content:flex-start;align-items:center;padding:24px 18px 40px;
   overflow-y:auto;
@@ -69,7 +69,7 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);
   font-family:'Heebo',sans-serif;font-size:14px;font-weight:600;cursor:pointer;
   transition:border-color .2s;}
 .btn-s:active{border-color:var(--accent)}
-
+ 
 /* HEADER */
 .header{background:var(--surface);padding:12px 13px 0;
   border-bottom:1px solid var(--border);flex-shrink:0;z-index:10;}
@@ -89,7 +89,7 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);
 .icon-btn:active{transform:scale(.85);background:var(--card2)}
 .online-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;
   transition:opacity .3s;box-shadow:0 0 5px var(--green);}
-
+ 
 .tabs{display:flex;gap:1px}
 .tab{flex:1;background:transparent;border:none;padding:7px 2px 10px;color:var(--muted);
   font-family:'Heebo',sans-serif;font-size:11px;font-weight:600;cursor:pointer;
@@ -98,7 +98,7 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);
 .tab .cnt{display:inline-block;background:var(--card2);font-size:9px;font-weight:700;
   border-radius:50px;padding:1px 5px;margin-right:2px;}
 .tab.active .cnt{background:var(--accent-dim);color:var(--accent)}
-
+ 
 /* ADD BAR */
 .add-bar{display:flex;gap:7px;padding:8px 11px;background:var(--surface);
   border-bottom:1px solid var(--border);flex-shrink:0;}
@@ -112,13 +112,13 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);
   display:flex;align-items:center;justify-content:center;flex-shrink:0;
   transition:transform .1s,opacity .1s;}
 .add-btn:active{transform:scale(.85);opacity:.85}
-
+ 
 /* LIST */
 .list-wrap{flex:1;overflow-y:auto;padding:8px 10px;overscroll-behavior:contain}
 .list-wrap::-webkit-scrollbar{width:0}
 .sec-label{font-size:10px;font-weight:700;letter-spacing:1.1px;color:var(--muted);
   text-transform:uppercase;margin:10px 3px 5px;}
-
+ 
 .item-card{background:var(--card);border-radius:var(--radius);padding:10px 11px;
   margin-bottom:6px;display:flex;align-items:center;gap:9px;
   border:1.5px solid transparent;
@@ -160,7 +160,7 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);
   border-radius:12px;padding:10px;color:var(--muted);font-family:'Heebo',sans-serif;
   font-size:12px;font-weight:600;cursor:pointer;margin-top:7px;transition:border-color .2s,color .2s;}
 .clear-btn:active{border-color:var(--red);color:var(--red)}
-
+ 
 /* PRICE */
 .price-wrap{flex:1;overflow-y:auto;padding:9px 10px}
 .price-wrap::-webkit-scrollbar{width:0}
@@ -238,7 +238,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   border-radius:50px;padding:5px 12px;font-family:'Heebo',sans-serif;
   font-size:12px;font-weight:600;color:var(--text);cursor:pointer;transition:all .15s;}
 .quick-chip:active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
-
+ 
 /* BOTTOM NAV */
 .bottom-nav{display:flex;background:var(--surface);border-top:1px solid var(--border);
   padding:6px 0 calc(6px + var(--safe-b));flex-shrink:0;}
@@ -247,7 +247,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   color:var(--muted);font-family:'Heebo',sans-serif;font-size:10px;font-weight:600;transition:color .15s;}
 .nav-btn .ni{font-size:18px;line-height:1}
 .nav-btn.active{color:var(--accent)}
-
+ 
 /* MODALS */
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);
   z-index:200;align-items:flex-end;justify-content:center;}
@@ -264,7 +264,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 .mbtn.primary{background:var(--accent);color:#111}
 .mbtn.ghost{background:var(--card2);color:var(--text)}
 .mbtn:active{opacity:.8}
-
+ 
 .invite-box{background:var(--card);border-radius:13px;padding:15px;
   text-align:center;border:2px dashed rgba(240,180,41,.3);margin-bottom:12px;}
 .invite-code{font-size:32px;font-weight:900;letter-spacing:6px;color:var(--accent)}
@@ -276,18 +276,18 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   font-size:13px;font-weight:700;color:var(--accent);flex-shrink:0;}
 .member-name{font-size:13px;font-weight:600}
 .member-sub{font-size:10px;color:var(--muted)}
-
+ 
 .share-box{background:var(--card);border-radius:12px;padding:12px;font-size:12px;
   line-height:1.7;white-space:pre-wrap;max-height:170px;overflow-y:auto;
   border:1px solid var(--border);margin-bottom:11px;direction:rtl;}
-
+ 
 /* TOAST */
 .toast{position:fixed;bottom:82px;left:50%;transform:translateX(-50%) translateY(14px);
   background:var(--card2);color:var(--text);padding:8px 16px;border-radius:50px;
   font-size:12px;font-weight:600;opacity:0;transition:all .28s;z-index:400;
   pointer-events:none;white-space:nowrap;border:1px solid var(--border);}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-
+ 
 /* ── TRANSLATION RESOLVER POPUP ── */
 .resolver-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);
   z-index:500;align-items:flex-end;justify-content:center;}
@@ -325,7 +325,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 .resolver-loading .spin{width:24px;height:24px;border:3px solid var(--border);
   border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;
   margin:0 auto 8px;}
-
+ 
 /* ══ PROFILE SETUP SCREEN ══ */
 #profile-screen{justify-content:flex-start;align-items:center;padding:24px 18px 40px;overflow-y:auto;
   background:radial-gradient(ellipse at 50% 0%,rgba(240,180,41,.08) 0%,transparent 55%),var(--bg);}
@@ -354,14 +354,14 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 .cartoon-btn{background:var(--card);border:1.5px solid var(--border);border-radius:12px;
   padding:8px;font-size:32px;cursor:pointer;text-align:center;transition:all .15s;aspect-ratio:1}
 .cartoon-btn:active,.cartoon-btn.sel{background:var(--accent-dim);border-color:var(--accent)}
-
+ 
 /* ══ ITEM ATTRIBUTION ══ */
 .item-attribution{display:flex;align-items:center;gap:5px;margin-top:3px}
 .item-av{width:18px;height:18px;border-radius:50%;background:var(--accent-dim);
   display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0}
 .item-av img{width:100%;height:100%;object-fit:cover;border-radius:50%}
 .item-by-name{font-size:10px;color:var(--muted)}
-
+ 
 /* ══ ACTIVITY FEED ══ */
 .activity-feed{padding:8px 11px;flex-shrink:0;max-height:120px;overflow-y:auto;
   border-top:1px solid var(--border);background:var(--surface);}
@@ -374,7 +374,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 .act-toggle{background:transparent;border:none;color:var(--muted);
   font-family:'Heebo',sans-serif;font-size:10px;font-weight:600;cursor:pointer;
   padding:4px 8px;display:flex;align-items:center;gap:3px;}
-
+ 
 /* ══ PRICE COMPARE ══ */
 .price-badge-official{background:rgba(52,211,153,.15);color:var(--green);
   border:1px solid rgba(52,211,153,.3);border-radius:6px;padding:2px 7px;
@@ -386,7 +386,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   border:1px solid var(--border);border-radius:6px;padding:2px 7px;
   font-size:9px;font-weight:700;}
 .distance-label{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:3px}
-
+ 
 /* ══ BASKET COMPARE ══ */
 .basket-btn{background:var(--blue-dim);color:var(--blue);border:1.5px solid rgba(96,165,250,.3);
   border-radius:12px;padding:10px 14px;font-family:'Heebo',sans-serif;font-size:13px;
@@ -407,7 +407,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   padding:3px 8px;font-size:10px;font-weight:600;margin-top:5px;text-align:center}
 .best-badge-full{background:var(--green);color:#000;border-radius:6px;
   padding:2px 8px;font-size:10px;font-weight:700}
-
+ 
 /* ══ RADIUS CONTROL ══ */
 .radius-control{background:var(--surface);border-radius:var(--radius);padding:12px 14px;
   margin-bottom:10px;border:1px solid var(--border);}
@@ -417,18 +417,18 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 .radius-row label{font-size:12px;color:var(--muted);white-space:nowrap}
 input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent);cursor:pointer}
 .radius-val{font-size:13px;font-weight:800;color:var(--accent);min-width:44px;text-align:left}
-
+ 
 </style>
 </head>
 <body>
-
+ 
 <!-- LOADING -->
 <div class="screen active" id="loading-screen">
   <div style="font-size:50px;animation:bob 2s ease infinite">🛒</div>
   <div class="spinner"></div>
   <div style="font-size:13px;color:var(--muted)">מתחבר לענן...</div>
 </div>
-
+ 
 <!-- SETUP -->
 <div class="screen" id="setup-screen">
   <div class="setup-logo">🛒</div>
@@ -454,7 +454,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
     <button class="btn-s" onclick="joinGroup()">🔗 הצטרף</button>
   </div>
 </div>
-
+ 
 <!-- MAIN -->
 <div class="screen" id="main-screen">
   <div class="header">
@@ -501,7 +501,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
     <button class="nav-btn" id="nav-members" onclick="openMembers()"><span class="ni">👥</span>משפחה</button>
   </div>
 </div>
-
+ 
 <!-- MODAL: MEMBERS -->
 <div class="overlay" id="members-overlay" onclick="closeOL(event,'members-overlay')">
   <div class="modal">
@@ -519,7 +519,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
     </div>
   </div>
 </div>
-
+ 
 <!-- MODAL: SHARE -->
 <div class="overlay" id="share-overlay" onclick="closeOL(event,'share-overlay')">
   <div class="modal">
@@ -532,14 +532,14 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
     </div>
   </div>
 </div>
-
+ 
 <div class="toast" id="toast"></div>
-
+ 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, push, onValue, update, remove }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-
+ 
 const FB = {
   apiKey:"AIzaSyC_D-qyOz_N8EkvYUMmt3TAgpi5P9q7sTw",
   authDomain:"family-shopping-list-7ad33.firebaseapp.com",
@@ -551,18 +551,18 @@ const FB = {
 };
 const app = initializeApp(FB);
 const db  = getDatabase(app);
-
+ 
 let myName='', myId='', groupId='', groupName='';
 let items={}, members={}, prices={};
 let curTab='all', priceRadius=10;
 const STORES=['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב','אושר עד'];
 let activeStores=new Set(STORES);
-
+ 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
-
+ 
 function saveLocal(){localStorage.setItem('fsl_v2',JSON.stringify({myName,myId,groupId,groupName}))}
-
+ 
 window.createGroup=async function(){
   const name=document.getElementById('cn-name').value.trim();
   const grp=document.getElementById('cn-group').value.trim();
@@ -573,7 +573,7 @@ window.createGroup=async function(){
   await set(ref(db,`groups/${code}/members/${myId}`),{name,id:myId,joined:Date.now()});
   saveLocal(); connectToGroup();
 };
-
+ 
 window.joinGroup=async function(){
   const name=document.getElementById('jn-name').value.trim();
   const code=document.getElementById('jn-code').value.trim();
@@ -585,13 +585,13 @@ window.joinGroup=async function(){
   await set(ref(db,`groups/${code}/members/${myId}`),{name,id:myId,joined:Date.now()});
   saveLocal(); connectToGroup();
 };
-
+ 
 function connectToGroup(){
   showScreen('main-screen');
   document.getElementById('hdr-group-name').textContent=groupName;
   document.getElementById('hdr-group-code').textContent=groupId;
   document.getElementById('modal-code').textContent=groupId;
-
+ 
   onValue(ref(db,'.info/connected'),snap=>{
     document.getElementById('online-dot').style.opacity=snap.val()?'1':'.3';
   });
@@ -606,20 +606,20 @@ function connectToGroup(){
   });
   toast('👋 שלום '+myName+'!');
 }
-
+ 
 window.addItem=function(){
   const inp=document.getElementById('new-item-input');
   const name=inp.value.trim(); if(!name)return;
   push(ref(db,`groups/${groupId}/items`),{name,qty:1,bought:false,fav:false,addedBy:myName,ts:Date.now()});
   inp.value=''; toast('✅ '+name+' נוסף');
 };
-
+ 
 window.toggleBought=function(id){const i=items[id];update(ref(db,`groups/${groupId}/items/${id}`),{bought:!i.bought})};
 window.toggleFav=function(id){const i=items[id];update(ref(db,`groups/${groupId}/items/${id}`),{fav:!i.fav});toast(i.fav?'הוסר מהמועדפים':'⭐ נוסף למועדפים')};
 window.changeQty=function(id,d){const i=items[id];update(ref(db,`groups/${groupId}/items/${id}`),{qty:Math.max(1,(i.qty||1)+d)})};
 window.deleteItem=function(id){remove(ref(db,`groups/${groupId}/items/${id}`))};
 window.clearBought=function(){Object.entries(items).forEach(([id,i])=>{if(i.bought)remove(ref(db,`groups/${groupId}/items/${id}`))});toast('🗑 נקנים נמחקו')};
-
+ 
 window.setTab=function(tab){
   curTab=tab;
   ['all','fav','bought','price'].forEach(t=>{
@@ -631,14 +631,14 @@ window.setTab=function(tab){
   if(tab==='price'){document.getElementById('nav-price').classList.add('active');}
   else if(tab==='fav'){document.getElementById('nav-fav').classList.add('active');}
   else{document.getElementById('nav-list').classList.add('active');}
-
+ 
   const isPrice=tab==='price';
   document.getElementById('add-bar').style.display=isPrice?'none':'flex';
   document.getElementById('list-panel').style.display=isPrice?'none':'flex';
   document.getElementById('price-panel').style.display=isPrice?'flex':'none';
   if(isPrice)renderPrices(); else renderList();
 };
-
+ 
 function renderList(){
   const wrap=document.getElementById('list-content');
   let list=Object.entries(items).map(([id,v])=>({...v,id})).sort((a,b)=>(b.ts||0)-(a.ts||0));
@@ -662,31 +662,9 @@ function renderList(){
   }
   wrap.innerHTML=html;
 }
-
-function itemHTML(item){
-  const byMe=item.addedBy===myName;
-  const isFavTab=curTab==='fav';
-  const checkBtn=isFavTab?'':`<button class="check-btn" onclick="toggleBought('${item.id}')">${item.bought?'✓':''}</button>`;
-  const boughtBtn=isFavTab?'':`<span class="${item.bought?'bought-tag':'pending-tag'}" onclick="toggleBought('${item.id}')">${item.bought?'✅ קניתי':'קניתי'}</span>`;
-  return `<div class="item-card${(!isFavTab&&item.bought)?' bought':''}${item.fav?' fav':''}">
-    ${checkBtn}
-    <div class="item-body">
-      <div class="item-name">${esc(item.name)}</div>
-      <div class="item-by"><span>${esc(item.addedBy||'?')}${byMe?' (אני)':''}</span></div>
-      <div class="qty-row">
-        <button class="qty-btn" onclick="changeQty('${item.id}',-1)">−</button>
-        <span class="qty-num">${item.qty||1}</span>
-        <button class="qty-btn" onclick="changeQty('${item.id}',1)">+</button>
-        ${boughtBtn}
-      </div>
-    </div>
-    <div class="item-acts">
-      <button class="act-btn${item.fav?' fav-on':''}" onclick="toggleFav('${item.id}')">⭐</button>
-      <button class="act-btn del" onclick="deleteItem('${item.id}')">✕</button>
-    </div>
-  </div>`;
-}
-
+ 
+// itemHTML defined below with attribution support
+ 
 function updateCounts(){
   const all=Object.keys(items).length;
   const fav=Object.values(items).filter(i=>i.fav).length;
@@ -695,18 +673,18 @@ function updateCounts(){
   document.getElementById('cnt-fav').textContent=fav;
   document.getElementById('cnt-bought').textContent=bought;
 }
-
+ 
 function renderAvatars(){
   const stack=document.getElementById('av-stack');
   stack.innerHTML=Object.values(members).slice(0,4).map(m=>
     `<div class="av" title="${esc(m.name)}">${m.name.charAt(0)}</div>`).join('');
 }
-
+ 
 // ── LIVE PRICE SEARCH ──
 let lastSearchQuery = '';
 let searchResults = [];
 let selectedProduct = null;
-
+ 
 window.setRadius=function(v){
   priceRadius=+v;
   const el=document.getElementById('radius-val');
@@ -716,7 +694,7 @@ window.toggleStore=function(s){
   if(activeStores.has(s))activeStores.delete(s); else activeStores.add(s);
   if(selectedProduct) showProductPrices(selectedProduct);
 };
-
+ 
 function renderQuickItems(){
   const wrap = document.getElementById('quick-items');
   if(!wrap) return;
@@ -727,16 +705,16 @@ function renderQuickItems(){
     `<button class="quick-chip" onclick="quickSearch('${esc(i.name)}')">${esc(i.name)}</button>`
   ).join('');
 }
-
+ 
 window.quickSearch = function(name){
   document.getElementById('price-search-input').value = name;
   searchPrices();
 };
-
+ 
 window.searchPrices = async function(){
   const q = document.getElementById('price-search-input').value.trim();
   if(!q || q.length < 2){toast('⚠️ הכנס שם מוצר לחיפוש');return;}
-
+ 
   // Run through translation resolver pipeline
   await resolveAndSearch(q, async (resolvedQuery) => {
     lastSearchQuery = resolvedQuery;
@@ -746,24 +724,24 @@ window.searchPrices = async function(){
     try {
       const res = await fetch(`/api/prices?q=${encodeURIComponent(resolvedQuery)}`);
     const data = await res.json();
-
+ 
     if(!data.results || !data.results.length){
       wrap.innerHTML = `<div class="search-hint"><div class="sh-icon">🔍</div><p>לא נמצאו תוצאות עבור "${esc(q)}"</p><small>נסה שם שונה</small></div>`;
       return;
     }
-
+ 
     searchResults = data.results;
     renderSearchResults(data.results, q);
-
+ 
     } catch(e) {
       wrap.innerHTML = renderManualFallback(q);
     }
   });
 };
-
+ 
 function renderSearchResults(results, query){
   const wrap = document.getElementById('price-content');
-
+ 
   // Normalize: API returns storePrices[], we use stores[] internally
   // Each result is either a product-with-storePrices or a flat store item
   const normalized = results.map(r => {
@@ -793,7 +771,7 @@ function renderSearchResults(results, query){
     }
     return { name: r.name||'', brand: r.brand||'', size: r.size||'', image: r.image||'', stores: [] };
   }).filter(r => r.name.length > 0);
-
+ 
   // De-duplicate by name
   const seen = new Set();
   const groups = [];
@@ -806,15 +784,15 @@ function renderSearchResults(results, query){
       if (existing) existing.stores.push(...r.stores);
     }
   });
-
+ 
   const withPrices = groups.filter(g => g.stores.length > 0);
   const withoutPrices = groups.filter(g => g.stores.length === 0);
   const sorted = [...withPrices, ...withoutPrices];
-
+ 
   let html = `<div style="padding:6px 0 4px;font-size:11px;color:var(--muted);font-weight:600;">
     נמצאו ${sorted.length} מוצרים${withPrices.length > 0 ? ` • ${withPrices.length} עם מחירים` : ''} — לחץ להשוואה:
   </div>`;
-
+ 
   sorted.forEach((g, i) => {
     const validPrices = g.stores.filter(s => s.price > 0);
     const minPrice = validPrices.length ? Math.min(...validPrices.map(s=>s.price)) : null;
@@ -824,7 +802,7 @@ function renderSearchResults(results, query){
           ? `<span style="color:var(--green)">₪${minPrice.toFixed(2)}</span> – ₪${maxPrice.toFixed(2)}`
           : `₪${minPrice.toFixed(2)}`)
       : `<span style="color:var(--muted);font-size:11px">הכנס מחיר ידנית</span>`;
-
+ 
     html += `<div class="product-card" onclick="selectProduct(${i})">
       <div class="product-top">
         ${g.image
@@ -842,11 +820,11 @@ function renderSearchResults(results, query){
       </div>
     </div>`;
   });
-
+ 
   wrap.innerHTML = html;
   wrap._groups = sorted;
 }
-
+ 
 window.selectProduct = function(idx){
   const wrap = document.getElementById('price-content');
   const groups = wrap._groups;
@@ -854,26 +832,26 @@ window.selectProduct = function(idx){
   selectedProduct = groups[idx];
   showProductPrices(selectedProduct);
 };
-
+ 
 function showProductPrices(product){
   const wrap = document.getElementById('price-content');
   const STORE_LIST = ['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב','אושר עד'];
   const relevant = STORE_LIST.filter(s => activeStores.has(s));
-
+ 
   const storesHTML = STORE_LIST.map(s=>
     `<button class="store-chip${activeStores.has(s)?' on':''}" onclick="toggleStore('${s}')">${s}</button>`
   ).join('');
-
+ 
   // Build price map
   const priceMap = {};
   product.stores.forEach(s => { priceMap[s.store] = s.price; });
-
+ 
   const relevantPrices = relevant.map(s => ({store:s, price:priceMap[s]||null}));
   const withPrice = relevantPrices.filter(r=>r.price!==null);
   const minPrice = withPrice.length ? Math.min(...withPrice.map(r=>r.price)) : null;
   const maxPrice = withPrice.length ? Math.max(...withPrice.map(r=>r.price)) : null;
   const savings = (minPrice && maxPrice && maxPrice>minPrice) ? (maxPrice-minPrice).toFixed(2) : null;
-
+ 
   const pricesHTML = relevantPrices.map(r => {
     const isBest = r.price!==null && r.price===minPrice && withPrice.length>1;
     const isWorst = r.price!==null && r.price===maxPrice && withPrice.length>1 && r.price!==minPrice;
@@ -900,12 +878,12 @@ function showProductPrices(product){
       </div>`;
     }
   }).join('');
-
+ 
   let html = `
   <button onclick="backToResults()" style="background:transparent;border:none;color:var(--muted);font-family:'Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;padding:4px 0 8px;display:flex;align-items:center;gap:4px;">
     ← חזרה לתוצאות
   </button>
-
+ 
   <div class="compare-card">
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
       ${product.image
@@ -917,7 +895,7 @@ function showProductPrices(product){
         ${product.size?`<div style="font-size:11px;color:var(--muted)">${esc(product.size)}</div>`:''}
       </div>
     </div>
-
+ 
     <div class="price-ctrl" style="margin-bottom:10px">
       <div class="price-ctrl-title">⚙️ חנויות להשוואה</div>
       <div class="radius-row">
@@ -927,24 +905,24 @@ function showProductPrices(product){
       </div>
       <div class="stores-row">${storesHTML}</div>
     </div>
-
+ 
     <div class="store-prices">${pricesHTML}</div>
-
+ 
     ${savings ? `<div class="savings-bar">💰 חיסכון פוטנציאלי: ₪${savings} בקנייה בחנות הזולה</div>` : ''}
   </div>
-
+ 
   <div style="padding:8px 0 4px;font-size:11px;color:var(--muted);text-align:center">
     מחירים בזמן אמת מהאתרים הרשמיים • עודכן כעת
   </div>`;
-
+ 
   wrap.innerHTML = html;
   wrap._groups = null; // cleared, use backToResults to restore
 }
-
+ 
 window.backToResults = function(){
   if(lastSearchQuery) searchPrices();
 };
-
+ 
 window.saveManualPrice = function(storeName, inputId) {
   const val = parseFloat(document.getElementById(inputId)?.value);
   if (!val || val <= 0) { toast('⚠️ הכנס מחיר תקין'); return; }
@@ -956,7 +934,7 @@ window.saveManualPrice = function(storeName, inputId) {
   showProductPrices(selectedProduct);
   toast('💰 מחיר נשמר!');
 };
-
+ 
 function renderManualFallback(query){
   const STORE_LIST = ['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב','אושר עד'];
   const storeInputs = STORE_LIST.map(s=>`
@@ -976,11 +954,11 @@ function renderManualFallback(query){
     </button>
   </div>`;
 }
-
+ 
 window.saveManualPrices = function(query){
   toast('💰 מחירים נשמרו!');
 };
-
+ 
 function renderPrices(){
   if(curTab!=='price') return;
   renderQuickItems();
@@ -994,7 +972,7 @@ function renderPrices(){
     </div>`;
   }
 }
-
+ 
 window.openMembers=function(){
   document.getElementById('modal-code').textContent=groupId;
   document.getElementById('members-list').innerHTML=Object.values(members).map(m=>`
@@ -1005,13 +983,13 @@ window.openMembers=function(){
     </div>`).join('');
   document.getElementById('members-overlay').classList.add('show');
 };
-
+ 
 window.copyCode=function(){
   navigator.clipboard.writeText(
     `הצטרף לרשימת הקניות שלנו 🛒\nקוד הצטרפות: ${groupId}`
   ).then(()=>toast('📋 קוד הועתק!'));
 };
-
+ 
 window.openShare=function(){
   const pending=Object.values(items).filter(i=>!i.bought);
   const bought=Object.values(items).filter(i=>i.bought);
@@ -1022,41 +1000,41 @@ window.openShare=function(){
   document.getElementById('share-box').textContent=text;
   document.getElementById('share-overlay').classList.add('show');
 };
-
+ 
 window.doShare=function(){
   const text=document.getElementById('share-box').textContent;
   if(navigator.share){navigator.share({title:'רשימת קניות',text});closeOL2('share-overlay');return;}
   navigator.clipboard.writeText(text).then(()=>{closeOL2('share-overlay');toast('📋 הועתק!')});
 };
-
+ 
 window.closeOL=function(e,id){if(e.target===document.getElementById(id))closeOL2(id)};
 window.closeOL2=function(id){document.getElementById(id).classList.remove('show')};
-
+ 
 window.toast=function(msg){
   const t=document.getElementById('toast');
   t.textContent=msg;t.classList.add('show');
   clearTimeout(window._toastT);
   window._toastT=setTimeout(()=>t.classList.remove('show'),2200);
 };
-
-
+ 
+ 
 // ══════════════════════════════════════════════════
 // PROFILE & AVATAR SYSTEM
 // ══════════════════════════════════════════════════
-
+ 
 const EMOJIS = ['🛒','🍎','🥛','🧀','🥚','🍞','☕','🍋','🍇','🥕',
   '🧅','🥦','🐔','🐟','🦁','🐯','🐻','🦊','🐼','🐸',
   '😀','😎','🤩','🥳','🎉','⭐','🌟','💪','🏃','👨‍👩‍👧'];
-
+ 
 const CARTOONS = [
   {id:'c01',e:'👨'},  {id:'c02',e:'👩'},  {id:'c03',e:'👴'},  {id:'c04',e:'👵'},
   {id:'c05',e:'👦'},  {id:'c06',e:'👧'},  {id:'c07',e:'🧑'},  {id:'c08',e:'👱'},
   {id:'c09',e:'🧔'},  {id:'c10',e:'👲'},  {id:'c11',e:'🧕'},  {id:'c12',e:'👮'},
   {id:'c13',e:'🕵️'}, {id:'c14',e:'👩‍🍳'},{id:'c15',e:'🧑‍🚀'},{id:'c16',e:'🧑‍🎨'},
 ];
-
+ 
 let _profileAvatar = { type: 'emoji', value: '🛒' };
-
+ 
 function renderProfileSetup() {
   // Emoji grid
   const eg = document.getElementById('emoji-grid');
@@ -1067,28 +1045,28 @@ function renderProfileSetup() {
   if (cg) cg.innerHTML = CARTOONS.map(c =>
     `<button class="cartoon-btn" onclick="pickCartoon('${c.id}','${c.e}')">${c.e}</button>`).join('');
 }
-
+ 
 window.showAvatarPanel = function(type) {
   document.getElementById('emoji-panel').style.display   = type==='emoji'   ? 'block' : 'none';
   document.getElementById('cartoon-panel').style.display = type==='cartoon' ? 'block' : 'none';
 };
-
+ 
 window.pickEmoji = function(emoji) {
   _profileAvatar = { type: 'emoji', value: emoji };
   updateProfilePreview();
   document.querySelectorAll('.emoji-btn').forEach(b => b.classList.toggle('sel', b.textContent===emoji));
 };
-
+ 
 window.pickCartoon = function(id, emoji) {
   _profileAvatar = { type: 'cartoon', value: id, emoji };
   updateProfilePreview();
   document.querySelectorAll('.cartoon-btn').forEach(b => b.classList.toggle('sel', b.textContent===emoji));
 };
-
+ 
 window.triggerPhotoUpload = function(source) {
   document.getElementById(source==='camera' ? 'camera-input' : 'gallery-input').click();
 };
-
+ 
 window.handlePhotoUpload = async function(input) {
   const file = input.files[0];
   if (!file) return;
@@ -1098,7 +1076,7 @@ window.handlePhotoUpload = async function(input) {
   _profileAvatar = { type: 'photo', value: url, isLocalBlob: true, file };
   updateProfilePreview();
 };
-
+ 
 async function compressImage(file, maxPx) {
   return new Promise(resolve => {
     const img = new Image();
@@ -1116,7 +1094,7 @@ async function compressImage(file, maxPx) {
     reader.readAsDataURL(file);
   });
 }
-
+ 
 function updateProfilePreview() {
   const wrap = document.getElementById('profile-preview-wrap');
   const content = document.getElementById('profile-preview-content');
@@ -1127,13 +1105,13 @@ function updateProfilePreview() {
     content.innerHTML = `<span style="font-size:38px">${e}</span>`;
   }
 }
-
+ 
 window.saveProfile = async function() {
   const name = document.getElementById('profile-name-input').value.trim();
   if (!name) { toast('⚠️ הכנס שם'); return; }
-
+ 
   let avatarValue = _profileAvatar.value;
-
+ 
   // Upload photo to Firebase Storage if needed
   if (_profileAvatar.type === 'photo' && _profileAvatar.isLocalBlob) {
     toast('⬆️ מעלה תמונה...');
@@ -1144,17 +1122,17 @@ window.saveProfile = async function() {
       avatarValue = _profileAvatar.value; // keep base64 as fallback
     }
   }
-
+ 
   const profile = {
     displayName:    name,
     avatarType:     _profileAvatar.type,
     avatarValue:    avatarValue,
     avatarEmoji:    _profileAvatar.emoji || null,
   };
-
+ 
   // Save to localStorage for quick access
   localStorage.setItem('fsl_profile', JSON.stringify(profile));
-
+ 
   // Save to Firebase groups/{groupId}/members/{myId}
   if (groupId && myId) {
     try {
@@ -1169,14 +1147,14 @@ window.saveProfile = async function() {
       });
     } catch (e) { console.warn('Profile save to Firebase failed:', e); }
   }
-
+ 
   // Update local state
   myName = name;
   myProfile = profile;
   showScreen('main-screen');
   toast(`👋 שלום ${name}!`);
 };
-
+ 
 async function uploadAvatarPhoto(file) {
   // Dynamic import Firebase Storage
   const { getStorage, ref: storRef, uploadBytes, getDownloadURL } = 
@@ -1187,7 +1165,7 @@ async function uploadAvatarPhoto(file) {
   await uploadBytes(sRef, file, { contentType: 'image/jpeg' });
   return await getDownloadURL(sRef);
 }
-
+ 
 // ══════════════════════════════════════════════════
 // AVATAR RENDERING HELPER
 // ══════════════════════════════════════════════════
@@ -1198,27 +1176,27 @@ function renderAvatar(avatarType, avatarValue, avatarEmoji, size=18) {
   const e = avatarType==='cartoon' ? (avatarEmoji||'🧑') : (avatarValue||'👤');
   return `<div class="item-av" style="width:${size}px;height:${size}px;font-size:${size-4}px">${e}</div>`;
 }
-
+ 
 // ══════════════════════════════════════════════════
 // ENHANCED ITEM HTML WITH ATTRIBUTION
 // ══════════════════════════════════════════════════
 // Override itemHTML to include attribution
 const _origItemHTML = window.itemHTML || null;
-
+ 
 function itemHTML(item) {
   const byMe = item.addedByUserId === myId || item.addedByDisplayName === myName;
   const isFavTab = curTab === 'fav';
-
+ 
   // Try live member profile
   const addedMember = members[item.addedByUserId] || null;
   const displayName = addedMember?.displayName || item.addedByDisplayName || item.addedBy || '?';
   const avatarType  = addedMember?.avatarType  || item.addedByAvatarType  || 'emoji';
   const avatarValue = addedMember?.avatarValue || item.addedByAvatarValue || '👤';
   const avatarEmoji = addedMember?.avatarEmoji || null;
-
+ 
   const checkBtn  = isFavTab ? '' : `<button class="check-btn" onclick="toggleBought('${item.id}')">${item.bought?'✓':''}</button>`;
   const boughtBtn = isFavTab ? '' : `<span class="${item.bought?'bought-tag':'pending-tag'}" onclick="toggleBought('${item.id}')">${item.bought?'✅ קניתי':'קניתי'}</span>`;
-
+ 
   return `<div class="item-card${(!isFavTab&&item.bought)?' bought':''}${item.fav?' fav':''}">
     ${checkBtn}
     <div class="item-body">
@@ -1241,18 +1219,18 @@ function itemHTML(item) {
     </div>
   </div>`;
 }
-
+ 
 // ══════════════════════════════════════════════════
 // ACTIVITY FEED
 // ══════════════════════════════════════════════════
 let _activityOpen = false;
-
+ 
 window.toggleActivityFeed = function() {
   _activityOpen = !_activityOpen;
   document.getElementById('activity-feed').style.display = _activityOpen ? 'block' : 'none';
   document.getElementById('act-toggle-icon').textContent = _activityOpen ? '▲' : '▼';
 };
-
+ 
 function renderActivityFeed(activityData) {
   const feed = document.getElementById('activity-feed');
   if (!feed) return;
@@ -1260,9 +1238,9 @@ function renderActivityFeed(activityData) {
     .sort((a,b) => (b.createdAt||0) - (a.createdAt||0))
     .slice(0, 20);
   if (!acts.length) { feed.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:11px;padding:8px">אין פעילות עדיין</div>'; return; }
-
+ 
   const typeLabel = { item_added:'הוסיף', item_checked:'סימן', item_removed:'מחק', quantity_changed:'שינה כמות', manual_price_added:'הוסיף מחיר' };
-
+ 
   feed.innerHTML = acts.map(a => {
     const m = members[a.userId] || {};
     const av = renderAvatar(m.avatarType||a.avatarType||'emoji', m.avatarValue||a.avatarValue||'👤', m.avatarEmoji, 20);
@@ -1272,7 +1250,7 @@ function renderActivityFeed(activityData) {
     </div>`;
   }).join('');
 }
-
+ 
 async function logActivity(type, itemId, itemName) {
   if (!groupId || !listId) return;
   const m = myProfile || {};
@@ -1289,49 +1267,49 @@ async function logActivity(type, itemId, itemName) {
     });
   } catch (_) {}
 }
-
+ 
 // ══════════════════════════════════════════════════
 // BASKET COMPARE
 // ══════════════════════════════════════════════════
 let basketRadius = 10;
-
+ 
 window.setBasketRadius = function(v) {
   basketRadius = +v;
   document.getElementById('basket-radius-val').textContent = v + ' ק"מ';
 };
-
+ 
 window.openBasketCompare = function() {
   document.getElementById('basket-overlay').classList.add('show');
 };
-
+ 
 window.runBasketCompare = async function() {
   const pending = Object.entries(items).filter(([,v]) => !v.bought);
   if (!pending.length) { toast('⚠️ הרשימה ריקה'); return; }
-
+ 
   const wrap = document.getElementById('basket-results-wrap');
   wrap.innerHTML = `<div class="price-loading"><div class="spin"></div><p>משווה מחירים...</p></div>`;
-
+ 
   // Get user location
   let lat = null, lng = null;
   try {
     const pos = await new Promise((res,rej) => navigator.geolocation.getCurrentPosition(res,rej,{timeout:5000}));
     lat = pos.coords.latitude; lng = pos.coords.longitude;
   } catch (_) { toast('⚠️ לא ניתן לקבל מיקום — מציג ללא סינון מרחק'); }
-
+ 
   // Build items array (use barcode if available, else name)
   const basketItems = pending
     .filter(([,v]) => v.barcode)
     .map(([,v]) => ({ barcode: v.barcode, quantity: v.qty || 1 }));
-
+ 
   if (!basketItems.length) {
     wrap.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">אין פריטים עם ברקוד לשוואה</div>';
     return;
   }
-
+ 
   try {
     const body = { items: basketItems, radiusKm: basketRadius };
     if (lat) { body.lat = lat; body.lng = lng; }
-
+ 
     const res = await fetch('/api/basket-compare', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -1342,21 +1320,21 @@ window.runBasketCompare = async function() {
     wrap.innerHTML = `<div style="text-align:center;padding:20px;color:var(--red)">${esc(e.message)}</div>`;
   }
 };
-
+ 
 function renderBasketResults(data, totalItems) {
   const wrap = document.getElementById('basket-results-wrap');
   const { results, bestFullBasket } = data;
-
+ 
   if (!results?.length) {
     wrap.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">לא נמצאו חנויות בטווח</div>';
     return;
   }
-
+ 
   let html = '';
   if (bestFullBasket) {
     html += `<div style="font-size:10px;font-weight:700;color:var(--green);letter-spacing:.7px;text-transform:uppercase;margin-bottom:6px">🏆 הכי זול לסל המלא</div>`;
   }
-
+ 
   results.forEach(r => {
     const isBest = bestFullBasket && r.storeId === bestFullBasket.storeId && r.chainId === bestFullBasket.chainId;
     const completePct = Math.round((r.availableItems / totalItems) * 100);
@@ -1384,17 +1362,17 @@ function renderBasketResults(data, totalItems) {
       </div>
     </div>`;
   });
-
+ 
   wrap.innerHTML = html;
 }
-
+ 
 // ══════════════════════════════════════════════════
 // ENHANCED SHOPPING LIST ACTIONS WITH ATTRIBUTION + ACTIVITY
 // ══════════════════════════════════════════════════
 // Store listId (default: 'default')
 let listId = 'default';
 let myProfile = null;
-
+ 
 // Override addItem to include attribution and activity
 const _origAddItem = window.addItem;
 window.addItem = function() {
@@ -1417,7 +1395,7 @@ window.addItem = function() {
   input.value = '';
   toast('✅ ' + name + ' נוסף');
 };
-
+ 
 // Override toggleBought to save checkedByUserId
 const _origToggleBought = window.toggleBought;
 window.toggleBought = function(id) {
@@ -1431,7 +1409,7 @@ window.toggleBought = function(id) {
   });
   if (nowBought) logActivity('item_checked', id, item.name);
 };
-
+ 
 // Override deleteItem to log activity
 const _origDeleteItem = window.deleteItem;
 window.deleteItem = function(id) {
@@ -1439,7 +1417,7 @@ window.deleteItem = function(id) {
   if (item) logActivity('item_removed', id, item.name);
   remove(ref(db, `groups/${groupId}/${listId}/items/${id}`));
 };
-
+ 
 // ══════════════════════════════════════════════════
 // PROFILE INIT ON APP LOAD
 // ══════════════════════════════════════════════════
@@ -1449,7 +1427,7 @@ function loadSavedProfile() {
     try { myProfile = JSON.parse(saved); myName = myProfile.displayName || myName; } catch (_) {}
   }
 }
-
+ 
 // ══════════════════════════════════════════════════
 // BASKET COMPARE BUTTON IN HEADER
 // ══════════════════════════════════════════════════
@@ -1465,7 +1443,7 @@ function addBasketButton() {
     hdrR.insertBefore(btn, hdrR.firstChild);
   }
 }
-
+ 
 // ══════════════════════════════════════════════════
 // FIREBASE PATH UPDATE: use shoppingLists/{groupId}/{listId}/items
 // ══════════════════════════════════════════════════
@@ -1486,20 +1464,20 @@ function patchFirebasePaths() {
     renderActivityFeed(snap.val() || {});
   });
 }
-
+ 
 // ══════════════════════════════════════════════════
 // INIT HOOK
 // ══════════════════════════════════════════════════
 const _origInit = window._origInit || null;
 window._profileSystemReady = true;
-
+ 
 // Run after Firebase connected
 const _origConnectFn = connectToGroup;
 window._patchConnectToGroup = function() {
   loadSavedProfile();
   renderProfileSetup();
   addBasketButton();
-
+ 
   // Check if profile is set — if not, show profile screen
   if (!myProfile || !myProfile.displayName) {
     const savedUser = localStorage.getItem('fsl_v2');
@@ -1510,20 +1488,20 @@ window._patchConnectToGroup = function() {
     }
   }
 };
-
+ 
 // Call patch on connect
 const _realConnectToGroup = connectToGroup;
-
+ 
 // SERVICE WORKER
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
-
+ 
 // ── TRANSLATION RESOLVER INTEGRATION ──
 // Dynamically import resolver modules
 let resolverReady = false;
 let resolveProductTerm, confirmResolution, initMemory, loadUserDictionary, setCachedDict;
-
+ 
 async function initResolver() {
   try {
     const resolver  = await import('./js/translation/resolver.js');
@@ -1540,10 +1518,10 @@ async function initResolver() {
   }
 }
 initResolver();
-
+ 
 // Pending resolve callback
 let _resolveCallback = null;
-
+ 
 // Main entry: try to resolve a Hebrew term, show popup if needed
 window.resolveAndSearch = async function(hebrewTerm, onResolved) {
   if (!resolverReady || !resolveProductTerm) {
@@ -1555,9 +1533,9 @@ window.resolveAndSearch = async function(hebrewTerm, onResolved) {
     const userDict = await loadUserDictionary();
     setCachedDict(userDict);
   }
-
+ 
   const result = await resolveProductTerm(hebrewTerm);
-
+ 
   if (result.resolved) {
     // Resolved directly — proceed
     onResolved(result.resolved);
@@ -1572,11 +1550,11 @@ window.resolveAndSearch = async function(hebrewTerm, onResolved) {
     showResolverPopup(hebrewTerm, result.suggestions || [], result.manualOnly);
   }
 };
-
+ 
 function showResolverPopup(term, suggestions, manualOnly) {
   document.getElementById('resolver-term').textContent = term;
   const suggestionsEl = document.getElementById('resolver-suggestions');
-
+ 
   if (manualOnly || suggestions.length === 0) {
     suggestionsEl.innerHTML = `<div style="text-align:center;color:var(--muted);font-size:13px;padding:8px">
       לא נמצאו הצעות אוטומטיות — הכנס ידנית</div>`;
@@ -1589,22 +1567,22 @@ function showResolverPopup(term, suggestions, manualOnly) {
           `<span class="conf">${s.source === 'ai' ? '🤖 AI' : ''}</span>`}
       </button>`).join('');
   }
-
+ 
   document.getElementById('resolver-manual').classList.remove('show');
   document.getElementById('resolver-overlay').classList.add('show');
 }
-
+ 
 window.pickSuggestion = async function(englishTerm) {
   document.getElementById('resolver-overlay').classList.remove('show');
   if (_resolveCallback) { await _resolveCallback(englishTerm); _resolveCallback = null; }
 };
-
+ 
 window.showManualEntry = function() {
   document.getElementById('resolver-none-btn').style.display = 'none';
   document.getElementById('resolver-manual').classList.add('show');
   document.getElementById('resolver-manual-input').focus();
 };
-
+ 
 window.confirmManualEntry = async function() {
   const val = document.getElementById('resolver-manual-input').value.trim();
   if (!val) { toast('⚠️ הכנס שם מוצר'); return; }
@@ -1613,7 +1591,7 @@ window.confirmManualEntry = async function() {
   document.getElementById('resolver-manual-input').value = '';
   if (_resolveCallback) { await _resolveCallback(val); _resolveCallback = null; }
 };
-
+ 
 // INIT
 (function init(){
   const saved=localStorage.getItem('fsl_v2');
@@ -1626,7 +1604,7 @@ window.confirmManualEntry = async function() {
   }
 })();
 </script>
-
+ 
 <!-- ═══ PROFILE SETUP SCREEN ═══ -->
 <div class="screen" id="profile-screen">
   <div style="width:100%;overflow-y:auto;padding:24px 18px 40px;display:flex;flex-direction:column;align-items:center">
@@ -1658,7 +1636,7 @@ window.confirmManualEntry = async function() {
   <button class="btn-p" style="width:100%;margin-top:16px" onclick="saveProfile()">✅ שמור ועבור לרשימה</button>
   </div>
 </div>
-
+ 
 <!-- ═══ BASKET COMPARE MODAL ═══ -->
 <div class="overlay" id="basket-overlay" onclick="closeOL(event,'basket-overlay')">
   <div class="modal">
@@ -1684,6 +1662,6 @@ window.confirmManualEntry = async function() {
     </div>
   </div>
 </div>
-
+ 
 </body>
 </html>
