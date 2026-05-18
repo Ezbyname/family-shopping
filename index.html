@@ -680,6 +680,8 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, push, onValue, update, remove }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getAuth, signInAnonymously, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const FB = {
   apiKey:"AIzaSyC_D-qyOz_N8EkvYUMmt3TAgpi5P9q7sTw",
@@ -709,7 +711,11 @@ window.createGroup=async function(){
   const grp=document.getElementById('cn-group').value.trim();
   if(!name||!grp){toast('⚠️ מלא שם וקבוצה');return;}
   const code=String(Math.floor(100000+Math.random()*900000));
-  groupId=code; groupName=grp; myId='u_'+Date.now(); myName=name;
+  groupId=code; groupName=grp;
+  // Use Firebase Auth UID if available, fallback to generated ID
+  const fbUser = getAuth().currentUser;
+  myId = fbUser ? fbUser.uid : ('u_'+Date.now());
+  myName=name;
   await set(ref(db,`groups/${code}/info`),{name:grp,code});
   await set(ref(db,`groups/${code}/members/${myId}`),{name,id:myId,joined:Date.now()});
   saveLocal(); connectToGroup();
@@ -722,7 +728,11 @@ window.joinGroup=async function(){
   const snap=await get(ref(db,`groups/${code}/info`));
   if(!snap.exists()){toast('❌ קבוצה לא נמצאה');return;}
   const info=snap.val();
-  groupId=code; groupName=info.name; myId='u_'+Date.now(); myName=name;
+  groupId=code; groupName=info.name;
+  // Use Firebase Auth UID if available
+  const fbUser = getAuth().currentUser;
+  myId = fbUser ? fbUser.uid : ('u_'+Date.now());
+  myName=name;
   await set(ref(db,`groups/${code}/members/${myId}`),{name,id:myId,joined:Date.now()});
   saveLocal(); connectToGroup();
 };
@@ -2755,17 +2765,56 @@ window.confirmManualEntry = async function() {
   if (_resolveCallback) { await _resolveCallback(val); _resolveCallback = null; }
 };
 
-// INIT
-(function init(){
-  const saved=localStorage.getItem('fsl_v2');
-  if(saved){
-    const u=JSON.parse(saved);
-    myName=u.myName;myId=u.myId;groupId=u.groupId;groupName=u.groupName;
-    connectToGroup();
+// ── FIREBASE ANONYMOUS AUTH + INIT ──
+const auth = getAuth();
+
+// Wait for auth state before doing anything
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    // User is signed in (anonymous or persistent)
+    // Use Firebase UID as the authoritative user ID
+    const firebaseUid = user.uid;
+    console.log('[auth] signed in, uid:', firebaseUid);
+
+    // Load saved session
+    const saved = localStorage.getItem('fsl_v2');
+    if (saved) {
+      try {
+        const u = JSON.parse(saved);
+        myName = u.myName; myId = firebaseUid; // always use Firebase UID
+        groupId = u.groupId; groupName = u.groupName;
+        // Update stored ID to Firebase UID
+        localStorage.setItem('fsl_v2', JSON.stringify({ ...u, myId: firebaseUid }));
+        loadSavedProfile();
+        connectToGroup();
+      } catch(_) {
+        showScreen('setup-screen');
+      }
+    } else {
+      showScreen('setup-screen');
+    }
   } else {
-    showScreen('setup-screen');
+    // Not signed in — sign in anonymously
+    console.log('[auth] not signed in, signing in anonymously...');
+    try {
+      await signInAnonymously(auth);
+      // onAuthStateChanged will fire again with the user
+    } catch(e) {
+      console.error('[auth] anonymous sign-in failed:', e.message);
+      // Fallback — use local ID
+      const saved = localStorage.getItem('fsl_v2');
+      if (saved) {
+        try {
+          const u = JSON.parse(saved);
+          myName=u.myName; myId=u.myId; groupId=u.groupId; groupName=u.groupName;
+          connectToGroup();
+        } catch(_) { showScreen('setup-screen'); }
+      } else {
+        showScreen('setup-screen');
+      }
+    }
   }
-})();
+});
 </script>
 
 <!-- ═══ PROFILE SETUP SCREEN ═══ -->
