@@ -758,17 +758,9 @@ function connectToGroup(){
   toast('👋 שלום '+myName+'!');
 }
 
-window.addItem=function(){
-  const inp=document.getElementById('new-item-input');
-  const name=inp.value.trim(); if(!name)return;
-  push(ref(db,`groups/${groupId}/items`),{name,qty:1,bought:false,fav:false,addedBy:myName,ts:Date.now()});
-  inp.value=''; toast('✅ '+name+' נוסף');
-};
 
-window.toggleBought=function(id){const i=items[id];update(ref(db,`groups/${groupId}/items/${id}`),{bought:!i.bought})};
 window.toggleFav=function(id){const i=items[id];update(ref(db,`groups/${groupId}/items/${id}`),{fav:!i.fav});toast(i.fav?'הוסר מהמועדפים':'⭐ נוסף למועדפים')};
 window.changeQty=function(id,d){const i=items[id];update(ref(db,`groups/${groupId}/items/${id}`),{qty:Math.max(1,(i.qty||1)+d)})};
-window.deleteItem=function(id){remove(ref(db,`groups/${groupId}/items/${id}`))};
 window.clearBought=function(){Object.entries(items).forEach(([id,i])=>{if(i.bought)remove(ref(db,`groups/${groupId}/items/${id}`))});toast('🗑 נקנים נמחקו')};
 
 window.setTab=function(tab){
@@ -981,13 +973,6 @@ function renderSearchResults(results, query){
   wrap._groups = sorted;
 }
 
-window.selectProduct = function(idx){
-  const wrap = document.getElementById('price-content');
-  const groups = wrap._groups;
-  if(!groups) return;
-  selectedProduct = groups[idx];
-  showProductPrices(selectedProduct);
-};
 
 function showProductPrices(product){
   const wrap = document.getElementById('price-content');
@@ -1695,16 +1680,9 @@ let _scannerStream = null;
 let _barcodeDetector = null;
 let _scanTimer = null;
 
+let _overrideContext = null;
+let _reportContext = null;
 // ── SOURCE BADGE HELPER ──
-function sourceBadge(source, submittedBy, submittedAvatar) {
-  if (source === 'official') return '<span class="badge-official">✅ רשמי</span>';
-  if (source === 'proxy')    return '<span class="badge-proxy">⚡ חי</span>';
-  if (source === 'manual') {
-    const av = submittedAvatar || '👤';
-    return `<span class="badge-manual">📝 ${esc(submittedBy||'משתמש')}</span>`;
-  }
-  return '<span class="badge-none">אין מחיר</span>';
-}
 
 // ── GET ALL PRICES FOR BARCODE (layered) ──
 async function getAllPricesForBarcode(barcode) {
@@ -1742,54 +1720,8 @@ async function getAllPricesForBarcode(barcode) {
 }
 
 // ── OPEN BARCODE SCANNER ──
-window.openScanner = async function() {
-  document.getElementById('scanner-overlay').classList.add('show');
-  const hint = document.getElementById('scanner-hint');
-  const input = document.getElementById('scanner-barcode-input');
-  input.value = '';
 
-  try {
-    _scannerStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1280 } }
-    });
-    const video = document.getElementById('scanner-video');
-    video.srcObject = _scannerStream;
 
-    if ('BarcodeDetector' in window) {
-      _barcodeDetector = new BarcodeDetector({
-        formats: ['ean_13','ean_8','code_128','code_39','upc_a','upc_e']
-      });
-      _scanTimer = setInterval(async () => {
-        if (!video.readyState || video.readyState < 2) return;
-        try {
-          const codes = await _barcodeDetector.detect(video);
-          if (codes.length > 0) {
-            closeScanner();
-            await handleBarcodeScanned(codes[0].rawValue);
-          }
-        } catch (_) {}
-      }, 250);
-      hint.textContent = '📷 כוון את הברקוד למסגרת';
-    } else {
-      hint.textContent = '⌨️ הקלד ברקוד למטה (המצלמה לא תומכת בסריקה אוטומטית)';
-    }
-  } catch (e) {
-    hint.textContent = '❌ אין גישה למצלמה — הכנס ברקוד ידנית';
-  }
-};
-
-window.closeScanner = function() {
-  document.getElementById('scanner-overlay').classList.remove('show');
-  if (_scanTimer) { clearInterval(_scanTimer); _scanTimer = null; }
-  if (_scannerStream) { _scannerStream.getTracks().forEach(t => t.stop()); _scannerStream = null; }
-};
-
-window.submitManualBarcode = async function() {
-  const val = document.getElementById('scanner-barcode-input').value.trim();
-  if (!val || val.length < 4) { toast('⚠️ הכנס ברקוד תקין (4+ ספרות)'); return; }
-  closeScanner();
-  await handleBarcodeScanned(val);
-};
 
 // ── HANDLE SCANNED BARCODE ──
 async function handleBarcodeScanned(barcode) {
@@ -1823,230 +1755,14 @@ async function handleBarcodeScanned(barcode) {
 }
 
 // ── PRICE SUBMIT MODAL ──
-function openPriceSubmitModal(product, official, manual) {
-  _currentScanProduct = product;
-
-  // Product header
-  const info = document.getElementById('ps-product-info');
-  info.innerHTML = `
-    ${product.image
-      ? `<img src="${esc(product.image)}" style="width:52px;height:52px;border-radius:10px;
-           object-fit:contain;background:white;padding:3px;flex-shrink:0"
-           onerror="this.style.display='none'">`
-      : `<div style="width:52px;height:52px;border-radius:10px;background:var(--card2);
-           display:flex;align-items:center;justify-content:center;
-           font-size:24px;flex-shrink:0">🛍</div>`}
-    <div>
-      <div style="font-size:14px;font-weight:700">${esc(product.name)}</div>
-      ${product.brand ? `<div style="font-size:11px;color:var(--muted)">${esc(product.brand)}</div>`:''}
-      ${product.size  ? `<div style="font-size:11px;color:var(--muted)">${esc(product.size)}</div>`:''}
-      <div style="font-size:10px;color:var(--muted);margin-top:2px">🔖 ${esc(product.barcode)}</div>
-    </div>`;
-
-  // Official price note
-  const note = document.getElementById('ps-official-note');
-  if (official.length > 0) {
-    note.style.display = 'block';
-    const cheapest = official[0];
-    note.innerHTML = `✅ מחיר רשמי קיים: ₪${cheapest.price.toFixed(2)} ב${esc(cheapest.chainName||cheapest.store||'')}
-      <br><span style="font-size:9px;opacity:.8">המחיר הרשמי לא יוחלף — הכנסתך תסומן כ"ידני"</span>`;
-  } else {
-    note.style.display = 'none';
-  }
-
-  // Store price inputs — pre-fill from official/manual
-  const inputs = document.getElementById('ps-store-inputs');
-  inputs.innerHTML = STORE_LIST_ALL.map(store => {
-    // Look for existing official price
-    const off = official.find(p => (p.chainName||p.store||'') === store);
-    // Look for existing manual price
-    const man = manual.find(p => (p.chainName||p.storeName||'') === store);
-    const existing = off || man;
-    const val = existing?.price ? existing.price.toFixed(2) : '';
-    const isOfficial = off != null;
-    const isManual = !isOfficial && man != null;
-
-    return `<div class="ps-store-row">
-      <div>
-        <div class="ps-store-name">${store}</div>
-        ${isOfficial
-          ? `<div class="ps-store-existing">✅ רשמי: ₪${off.price.toFixed(2)}</div>`
-          : isManual
-          ? `<div class="ps-store-existing" style="color:var(--accent)">📝 ₪${man.price.toFixed(2)} (${esc(man.submittedByDisplayName||'משתמש')})</div>`
-          : ''}
-      </div>
-      <div class="ps-input-wrap">
-        <span class="ps-currency">₪</span>
-        <input class="ps-input" id="ps-${store.replace(/\s/g,'_')}"
-          type="number" placeholder="0.00" step="0.01" min="0"
-          value="${isOfficial ? '' : val}"
-          ${isOfficial ? 'disabled title="מחיר רשמי קיים — לא ניתן לדרוס"' : ''}>
-      </div>
-    </div>`;
-  }).join('');
-
-  document.getElementById('price-submit-overlay').classList.add('show');
-}
 
 // ── SUBMIT MANUAL PRICES ──
-window.submitManualPrices = async function() {
-  if (!_currentScanProduct) return;
-  const { barcode, name } = _currentScanProduct;
-  const m = myProfile || {};
-  let count = 0;
-
-  for (const store of STORE_LIST_ALL) {
-    const storeKey = store.replace(/\s/g,'_');
-    const input = document.getElementById(`ps-${storeKey}`);
-    if (!input || input.disabled) continue;
-    const val = parseFloat(input.value);
-    if (!val || val <= 0) continue;
-
-    // Never overwrite official prices — save to manualPrices only
-    const entryId = `m_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
-    try {
-      await set(ref(db, `manualPrices/${barcode}/${entryId}`), {
-        barcode,
-        name,
-        price:                  Math.round(val * 100) / 100,
-        chainName:              store,
-        storeName:              store,
-        groupId:                groupId || null,
-        submittedByUserId:      myId,
-        submittedByDisplayName: myName,
-        submittedByAvatarType:  m.avatarType  || 'emoji',
-        submittedByAvatarValue: m.avatarValue || '👤',
-        submittedByAvatarEmoji: m.avatarEmoji || null,
-        submittedAt:            new Date().toISOString(),
-        source:                 'manual',
-      });
-      count++;
-    } catch (e) { console.error('save price error:', e); }
-  }
-
-  if (count === 0) { toast('⚠️ הכנס לפחות מחיר אחד'); return; }
-
-  closeOL2('price-submit-overlay');
-  toast(`✅ ${count} מחירים נשמרו — מתעדכן לכל המשפחה!`);
-  logActivity('manual_price_added', barcode, name);
-
-  // If viewing price tab — refresh
-  if (curTab === 'price') renderPrices();
-};
 
 // ── ENHANCED PRICE DISPLAY in showProductPrices ──
 // Override to show badges per source
 const _origShowProductPrices = window.showProductPrices;
-window.showProductPricesEnhanced = async function(product) {
-  if (!product) return;
-  const barcode = product.barcode;
-  const wrap = document.getElementById('price-content');
-
-  wrap.innerHTML = `<div class="price-loading"><div class="spin"></div>
-    <p>מחפש מחירים...</p></div>`;
-
-  const { official, manual } = barcode
-    ? await getAllPricesForBarcode(barcode)
-    : { official: [], manual: [] };
-
-  // Merge: official first, then manual for stores without official
-  const officialStores = new Set(official.map(p => p.chainName||p.store||''));
-  const manualFiltered = manual.filter(p => !officialStores.has(p.chainName||p.storeName||''));
-  const allPrices = [...official, ...manualFiltered].sort((a,b) => a.price - b.price);
-
-  // Try proxy in background for stores without any price
-  const missingStores = STORE_LIST_ALL.filter(s => !allPrices.some(p => (p.chainName||p.store||'') === s));
-
-  const pricesHTML = allPrices.length
-    ? allPrices.map(p => {
-        const store = p.chainName || p.store || '';
-        const isBest = p.price === allPrices[0].price && allPrices.length > 1;
-        const badge = sourceBadge(p.source, p.submittedByDisplayName, p.submittedByAvatarValue);
-        const submittedLine = p.source === 'manual' && p.submittedByDisplayName
-          ? `<div class="submitted-by"><div class="submitted-av">${p.submittedByAvatarValue||'👤'}</div>
-             <span>${esc(p.submittedByDisplayName)}</span></div>` : '';
-        return `<div class="spr${isBest?' best':''}">
-          <div>
-            <div class="spr-name">${store} ${badge}</div>
-            ${submittedLine}
-          </div>
-          <span style="display:flex;align-items:center;gap:5px">
-            ${isBest&&allPrices.length>1?'<span class="best-badge">הכי זול 🏆</span>':''}
-            <span class="spr-price">₪${p.price.toFixed(2)}</span>
-          </span>
-        </div>`;
-      }).join('')
-    : `<div style="text-align:center;padding:16px;color:var(--muted);font-size:13px">
-         אין מחירים עדיין
-       </div>`;
-
-  // Inputs for missing stores
-  const missingHTML = missingStores.length
-    ? `<div style="margin-top:8px">
-       <div style="font-size:10px;font-weight:700;color:var(--muted);
-         text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">
-         הכנס מחיר ידנית:
-       </div>
-       ${missingStores.map(s => {
-         const key = s.replace(/\s/g,'_');
-         return `<div class="spr no-data" style="gap:8px">
-           <span class="spr-name" style="flex-shrink:0">${s} <span class="badge-none">אין מחיר</span></span>
-           <span style="display:flex;align-items:center;gap:5px;flex:1;justify-content:flex-end;direction:ltr">
-             <span class="ps-currency">₪</span>
-             <input type="number" id="mp-${key}" placeholder="0.00"
-               step="0.01" min="0" class="ps-input">
-             <button onclick="saveSinglePrice('${s}','mp-${key}','${barcode||''}','${esc(product.name)}')"
-               style="background:var(--accent);color:#111;border:none;border-radius:7px;
-                 padding:4px 10px;font-family:'Heebo',sans-serif;font-size:11px;
-                 font-weight:700;cursor:pointer;">שמור</button>
-           </span>
-         </div>`;
-       }).join('')}
-       </div>` : '';
-
-  const savings = allPrices.length > 1
-    ? (allPrices[allPrices.length-1].price - allPrices[0].price).toFixed(2) : null;
-
-  wrap.innerHTML = `
-    <button onclick="backToResults()" style="background:transparent;border:none;
-      color:var(--muted);font-family:'Heebo',sans-serif;font-size:13px;
-      font-weight:600;cursor:pointer;padding:4px 0 8px;display:flex;align-items:center;gap:4px">
-      ← חזרה לתוצאות
-    </button>
-    <div class="compare-card">
-      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
-        ${product.image
-          ? `<img class="product-img" src="${product.image}" loading="lazy"
-               onerror="this.style.display='none'">`
-          : `<div class="product-img-placeholder">🛍</div>`}
-        <div>
-          <div style="font-size:14px;font-weight:700">${esc(product.name)}</div>
-          ${product.brand?`<div style="font-size:11px;color:var(--muted)">${esc(product.brand)}</div>`:''}
-          ${product.size?`<div style="font-size:11px;color:var(--muted)">${esc(product.size)}</div>`:''}
-          ${barcode?`<div style="font-size:10px;color:var(--muted)">🔖 ${esc(barcode)}</div>`:''}
-        </div>
-      </div>
-      <div class="store-prices">${pricesHTML}</div>
-      ${missingHTML}
-      ${savings ? `<div class="savings-bar">💰 חיסכון פוטנציאלי: ₪${savings}</div>` : ''}
-      ${barcode ? `<button onclick="openScannerForProduct('${esc(product.name)}','${barcode}')"
-        class="clear-btn" style="margin-top:10px">
-        📷 סרוק בסופר ועדכן מחיר
-      </button>` : ''}
-    </div>
-    <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:6px">
-      ✅ רשמי = מ-XML ממשלתי &nbsp;|&nbsp; 📝 ידני = מחבר משפחה
-    </div>`;
-};
 
 // Override selectProduct to use enhanced version
-window.selectProduct = function(idx) {
-  const wrap = document.getElementById('price-content');
-  const groups = wrap._groups;
-  if (!groups) return;
-  selectedProduct = groups[idx];
-  window.showProductPricesEnhanced(selectedProduct);
-};
 
 // ── SAVE SINGLE PRICE (from price tab inline input) ──
 window.saveSinglePrice = async function(storeName, inputId, barcode, productName) {
@@ -2081,18 +1797,6 @@ window.openScannerForProduct = function(name, barcode) {
 };
 
 // ── ADD SCAN BUTTON TO HEADER ──
-function addScanButton() {
-  if (document.getElementById('global-scan-btn')) return;
-  const hdrR = document.querySelector('.hdr-r');
-  if (!hdrR) return;
-  const btn = document.createElement('button');
-  btn.id = 'global-scan-btn';
-  btn.className = 'icon-btn';
-  btn.title = 'סרוק ברקוד';
-  btn.textContent = '📷';
-  btn.onclick = openScanner;
-  hdrR.insertBefore(btn, hdrR.firstChild);
-}
 
 // ── PROXY ATTEMPT (experimental, non-blocking) ──
 async function tryProxyFetch(query, storeName) {
@@ -2129,13 +1833,7 @@ async function tryProxyFetch(query, storeName) {
 // Badges: ✅ רשמי | ✏️ תיקון אישי | ⚡ חי | 📝 משפחה | 🚨 אזהרה
 // ══════════════════════════════════════════════════════════════
 
-const STORE_LIST_ALL = ['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב','אושר עד'];
-let _currentScanProduct = null;
-let _scannerStream = null;
-let _barcodeDetector = null;
-let _scanTimer = null;
-let _overrideContext = null;
-let _reportContext = null;
+// STORE_LIST_ALL defined above
 
 // ── Validation ──
 function isValidBarcode(b) { const s=String(b||'').replace(/\D/g,''); return s.length>=4&&s.length<=20; }
