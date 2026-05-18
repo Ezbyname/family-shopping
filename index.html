@@ -579,6 +579,53 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 .av-panel{display:none}
 .av-panel.show{display:block}
 
+
+/* ══ FAVORITES SYSTEM ══ */
+.fav-section-header{display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px 6px;flex-shrink:0}
+.fav-section-title{font-size:13px;font-weight:700;color:var(--muted);
+  letter-spacing:.6px;text-transform:uppercase}
+.add-all-btn{background:var(--accent);color:#111;border:none;border-radius:10px;
+  padding:7px 14px;font-family:'Heebo',sans-serif;font-size:12px;font-weight:700;
+  cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s}
+.add-all-btn:active{opacity:.8;transform:scale(.97)}
+.add-all-btn:disabled{opacity:.4;cursor:default}
+
+.fav-item-card{background:var(--card);border-radius:var(--radius);
+  margin:0 11px 7px;padding:11px 12px;
+  display:flex;align-items:center;gap:10px;
+  border:1.5px solid var(--border);transition:all .15s;position:relative}
+.fav-item-card.in-list{border-color:rgba(52,211,153,.35);
+  background:rgba(52,211,153,.04)}
+.fav-item-info{flex:1;min-width:0}
+.fav-item-name{font-size:14px;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fav-item-meta{font-size:10px;color:var(--muted);margin-top:2px;
+  display:flex;align-items:center;gap:6px}
+.fav-in-list-badge{background:rgba(52,211,153,.15);color:var(--green);
+  border:1px solid rgba(52,211,153,.3);border-radius:5px;
+  padding:1px 6px;font-size:9px;font-weight:700}
+.fav-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.fav-add-btn{background:var(--accent);color:#111;border:none;border-radius:9px;
+  width:32px;height:32px;font-size:16px;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;transition:all .15s;font-weight:700}
+.fav-add-btn:active{transform:scale(.9)}
+.fav-add-btn.in-list{background:var(--green);font-size:13px}
+.fav-remove-btn{background:transparent;border:1.5px solid var(--border);
+  border-radius:9px;width:32px;height:32px;font-size:14px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--muted);transition:all .15s}
+.fav-remove-btn:active{background:rgba(248,113,113,.1);border-color:var(--red);color:var(--red)}
+
+.fav-star-btn{background:transparent;border:none;font-size:18px;
+  cursor:pointer;padding:2px 4px;transition:transform .15s;line-height:1}
+.fav-star-btn:active{transform:scale(1.3)}
+.fav-star-btn.starred{filter:drop-shadow(0 0 3px gold)}
+
+.fav-empty{text-align:center;padding:40px 20px;color:var(--muted)}
+.fav-empty .fav-em{font-size:40px;margin-bottom:10px}
+.fav-empty p{font-size:13px;line-height:1.5}
+
 </style>
 </head>
 <body>
@@ -651,6 +698,24 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   <div id="list-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
     <div class="list-wrap" id="list-content"></div>
   </div>
+
+  <!-- ══ FAVORITES PANEL ══ -->
+  <div id="fav-panel" style="display:none;flex:1;flex-direction:column;overflow:hidden">
+    <div class="fav-section-header">
+      <div class="fav-section-title">
+        ⭐ מועדפים
+        <span id="fav-count-badge"
+          style="font-size:11px;opacity:.7;font-weight:500;margin-right:4px"></span>
+      </div>
+      <button class="add-all-btn" id="add-all-fav-btn"
+        onclick="addAllFavoritesToList()" disabled>
+        ➕ הוסף הכל
+      </button>
+    </div>
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch"
+      id="fav-list-content"></div>
+  </div>
+
   <div id="price-panel" style="flex:1;overflow:hidden;display:none;flex-direction:column">
     <div class="price-search-bar">
       <input class="price-search-input" id="price-search-input" placeholder="חפש מוצר... (קורנפלקס, חלב...)"
@@ -724,7 +789,7 @@ const app = initializeApp(FB);
 const db  = getDatabase(app);
 
 let myName='', myId='', groupId='', groupName='';
-let items={}, members={}, prices={};
+let items={}, members={}, prices={}, favorites={};
 let curTab='all', priceRadius=10;
 const STORES=['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב','אושר עד'];
 let activeStores=new Set(STORES);
@@ -783,6 +848,14 @@ function connectToGroup(){
   onValue(ref(db,`groups/${groupId}/prices`),snap=>{
     prices=snap.val()||{}; if(curTab==='price')renderPrices();
   });
+  // Favorites real-time listener
+  onValue(ref(db, `favorites/${groupId}`), snap => {
+    favorites = snap.val() || {};
+    if (curTab === 'fav') renderFavoritesPanel();
+    renderList(); // refresh stars on list items
+    updateCounts();
+  });
+
   toast('👋 שלום '+myName+'!');
 }
 
@@ -803,11 +876,19 @@ window.setTab=function(tab){
   else if(tab==='fav'){document.getElementById('nav-fav').classList.add('active');}
   else{document.getElementById('nav-list').classList.add('active');}
 
-  const isPrice=tab==='price';
-  document.getElementById('add-bar').style.display=isPrice?'none':'flex';
-  document.getElementById('list-panel').style.display=isPrice?'none':'flex';
-  document.getElementById('price-panel').style.display=isPrice?'flex':'none';
-  if(isPrice)renderPrices(); else renderList();
+  const isPrice = tab === 'price';
+  const isFav   = tab === 'fav';
+
+  document.getElementById('add-bar').style.display   = isPrice ? 'none' : 'flex';
+  document.getElementById('list-panel').style.display = (isPrice || isFav) ? 'none' : 'flex';
+  document.getElementById('price-panel').style.display = isPrice ? 'flex' : 'none';
+
+  const favPanel = document.getElementById('fav-panel');
+  if (favPanel) favPanel.style.display = isFav ? 'flex' : 'none';
+
+  if (isPrice) renderPrices();
+  else if (isFav) renderFavoritesPanel();
+  else renderList();
 };
 
 function renderList(){
@@ -838,10 +919,10 @@ function renderList(){
 
 function updateCounts(){
   const all=Object.keys(items).length;
-  const fav=Object.values(items).filter(i=>i.fav).length;
+  const favCount=Object.keys(favorites).length;
   const bought=Object.values(items).filter(i=>i.bought).length;
   document.getElementById('cnt-all').textContent=all;
-  document.getElementById('cnt-fav').textContent=fav;
+  document.getElementById('cnt-fav').textContent=favCount;
   document.getElementById('cnt-bought').textContent=bought;
 }
 
@@ -1387,6 +1468,8 @@ const _origItemHTML = window.itemHTML || null;
 function itemHTML(item) {
   const byMe = item.addedByUserId === myId || item.addedByDisplayName === myName;
   const isFavTab = curTab === 'fav';
+  // Check if this item name is saved in favorites
+  const isFavSaved = isItemInFavorites(item.name, item.barcode);
 
   // Try live member profile
   const addedMember = members[item.addedByUserId] || null;
@@ -1415,7 +1498,10 @@ function itemHTML(item) {
       </div>
     </div>
     <div class="item-acts">
-      <button class="act-btn${item.fav?' fav-on':''}" onclick="toggleFav('${item.id}')">⭐</button>
+      <button class="fav-star-btn${isFavSaved?' starred':''}"
+        onclick="toggleSavedFavorite('${item.id}','${esc(item.name)}','${item.barcode||''}')"
+        title="${isFavSaved?'הסר ממועדפים':'שמור במועדפים'}"
+      >${isFavSaved?'⭐':'☆'}</button>
       <button class="act-btn del" onclick="deleteItem('${item.id}')">✕</button>
     </div>
   </div>`;
@@ -2545,6 +2631,270 @@ function updateHeaderAvatar() {
   }
 }
 
+
+// ══════════════════════════════════════════════════
+// FAVORITES SYSTEM v1.0
+// Firebase path: favorites/{groupId}/{itemId}
+// Source of truth: favorites collection only
+// ══════════════════════════════════════════════════
+
+// ── UTILS ──
+
+// Normalize name for duplicate detection
+function normalizeName(name) {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\u0591-\u05C7]/g, '') // strip Hebrew niqqud
+    .replace(/\s+/g, '')
+    .replace(/[^\w\u0590-\u05FF]/g, '');
+}
+
+// Check if an item name/barcode is already in favorites
+function isItemInFavorites(name, barcode) {
+  const norm = normalizeName(name);
+  return Object.values(favorites).some(f =>
+    (barcode && f.barcode && f.barcode === barcode) ||
+    normalizeName(f.name) === norm
+  );
+}
+
+// Check if an item name/barcode exists in the active shopping list
+function isItemInActiveList(name, barcode) {
+  const norm = normalizeName(name);
+  return Object.values(items).some(i =>
+    !i.bought && (
+      (barcode && i.barcode && i.barcode === barcode) ||
+      normalizeName(i.name) === norm
+    )
+  );
+}
+
+// Find existing shopping list item by name/barcode
+function findExistingListItem(name, barcode) {
+  const norm = normalizeName(name);
+  const entry = Object.entries(items).find(([, i]) =>
+    !i.bought && (
+      (barcode && i.barcode && i.barcode === barcode) ||
+      normalizeName(i.name) === norm
+    )
+  );
+  return entry ? { id: entry[0], ...entry[1] } : null;
+}
+
+// ── TOGGLE SAVED FAVORITE (from shopping list item star button) ──
+window.toggleSavedFavorite = async function(itemId, name, barcode) {
+  if (!groupId) return;
+  const alreadySaved = isItemInFavorites(name, barcode);
+
+  if (alreadySaved) {
+    // Remove from favorites — find its key
+    const entry = Object.entries(favorites).find(([, f]) =>
+      (barcode && f.barcode === barcode) ||
+      normalizeName(f.name) === normalizeName(name)
+    );
+    if (entry) {
+      try {
+        await remove(ref(db, `favorites/${groupId}/${entry[0]}`));
+        toast('☆ הוסר ממועדפים');
+        console.log('[favorites] removed:', name);
+      } catch (e) { toast('❌ ' + e.message); }
+    }
+  } else {
+    // Add to favorites
+    const item = items[itemId] || {};
+    const favId = 'fav_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    try {
+      await set(ref(db, `favorites/${groupId}/${favId}`), {
+        itemId:         favId,
+        name:           sanitize(name, 200),
+        normalizedName: normalizeName(name),
+        barcode:        barcode || null,
+        defaultQty:     item.qty || 1,
+        unit:           item.unit || null,
+        category:       item.category || null,
+        addedBy:        myId,
+        addedByName:    myName,
+        addedAt:        Date.now(),
+        updatedAt:      Date.now(),
+      });
+      toast('⭐ נוסף למועדפים!');
+      console.log('[favorites] saved:', name);
+    } catch (e) { toast('❌ ' + e.message); }
+  }
+};
+
+// ── ADD SINGLE FAVORITE TO SHOPPING LIST ──
+window.addFavoriteToList = async function(favId) {
+  const fav = favorites[favId];
+  if (!fav || !groupId) return;
+
+  // Duplicate detection — prefer increasing quantity
+  const existing = findExistingListItem(fav.name, fav.barcode);
+
+  if (existing) {
+    // STRATEGY A: increase quantity
+    const newQty = (existing.qty || 1) + (fav.defaultQty || 1);
+    try {
+      await update(ref(db, `groups/${groupId}/items/${existing.id}`), { qty: newQty });
+      toast(`➕ כמות עודכנה: ${esc(fav.name)} × ${newQty}`);
+      console.log('[favorites] qty increased:', fav.name, '->', newQty);
+    } catch (e) { toast('❌ ' + e.message); }
+    return;
+  }
+
+  // Add as new item
+  const m = myProfile || {};
+  const newRef = push(ref(db, `groups/${groupId}/items`));
+  try {
+    await set(newRef, {
+      name:               fav.name,
+      barcode:            fav.barcode || null,
+      qty:                fav.defaultQty || 1,
+      bought:             false,
+      fav:                false,
+      addedByUserId:      myId,
+      addedByDisplayName: myName,
+      addedByAvatarType:  m.avatarType  || 'emoji',
+      addedByAvatarValue: m.avatarValue || '👤',
+      addedByAvatarEmoji: m.avatarEmoji || null,
+      addedAt:            Date.now(),
+      ts:                 Date.now(),
+    });
+    toast(`✅ ${esc(fav.name)} נוסף לרשימה`);
+    console.log('[favorites] added to list:', fav.name);
+
+    // Switch to list tab to show the item
+    window.setTab('all');
+  } catch (e) { toast('❌ ' + e.message); }
+};
+
+// ── ADD ALL FAVORITES TO SHOPPING LIST ──
+window.addAllFavoritesToList = async function() {
+  const favList = Object.entries(favorites);
+  if (!favList.length) return;
+
+  const btn = document.getElementById('add-all-fav-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ מוסיף...'; }
+
+  let added = 0, updated = 0;
+  const m = myProfile || {};
+
+  for (const [favId, fav] of favList) {
+    const existing = findExistingListItem(fav.name, fav.barcode);
+    if (existing) {
+      // Increase quantity for already-in-list items
+      const newQty = (existing.qty || 1) + (fav.defaultQty || 1);
+      try {
+        await update(ref(db, `groups/${groupId}/items/${existing.id}`), { qty: newQty });
+        updated++;
+      } catch (e) { console.warn('[favorites] qty update failed:', e.message); }
+    } else {
+      const newRef = push(ref(db, `groups/${groupId}/items`));
+      try {
+        await set(newRef, {
+          name:               fav.name,
+          barcode:            fav.barcode || null,
+          qty:                fav.defaultQty || 1,
+          bought:             false,
+          fav:                false,
+          addedByUserId:      myId,
+          addedByDisplayName: myName,
+          addedByAvatarType:  m.avatarType  || 'emoji',
+          addedByAvatarValue: m.avatarValue || '👤',
+          addedByAvatarEmoji: m.avatarEmoji || null,
+          addedAt:            Date.now(),
+          ts:                 Date.now(),
+        });
+        added++;
+      } catch (e) { console.warn('[favorites] add failed:', e.message); }
+    }
+  }
+
+  if (btn) { btn.disabled = false; btn.textContent = '➕ הוסף הכל'; }
+
+  const parts = [];
+  if (added > 0)   parts.push(`✅ ${added} נוספו`);
+  if (updated > 0) parts.push(`➕ ${updated} עודכנו`);
+  toast(parts.join(' · ') || '✅ הכל ברשימה');
+
+  console.log('[favorites] addAll:', { added, updated });
+
+  // Switch to list
+  window.setTab('all');
+};
+
+// ── REMOVE FROM FAVORITES ──
+window.removeFavorite = async function(favId) {
+  const fav = favorites[favId];
+  if (!fav) return;
+  try {
+    await remove(ref(db, `favorites/${groupId}/${favId}`));
+    toast('☆ הוסר ממועדפים');
+    console.log('[favorites] removed:', fav.name);
+  } catch (e) { toast('❌ ' + e.message); }
+};
+
+// ── RENDER FAVORITES PANEL ──
+function renderFavoritesPanel() {
+  const wrap = document.getElementById('fav-list-content');
+  const badge = document.getElementById('fav-count-badge');
+  const addAllBtn = document.getElementById('add-all-fav-btn');
+  if (!wrap) return;
+
+  const favList = Object.entries(favorites)
+    .map(([id, f]) => ({ ...f, _id: id }))
+    .sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+
+  // Update count badge
+  if (badge) badge.textContent = favList.length ? `(${favList.length})` : '';
+
+  // Enable/disable add-all button
+  if (addAllBtn) addAllBtn.disabled = favList.length === 0;
+
+  if (!favList.length) {
+    wrap.innerHTML = `
+      <div class="fav-empty">
+        <div class="fav-em">⭐</div>
+        <p>אין מועדפים עדיין<br>
+          <span style="font-size:11px;opacity:.7">
+            לחץ ☆ ליד פריט ברשימה כדי לשמור אותו כמועדף
+          </span>
+        </p>
+      </div>`;
+    return;
+  }
+
+  wrap.innerHTML = favList.map(fav => {
+    const inList  = isItemInActiveList(fav.name, fav.barcode);
+    return `
+      <div class="fav-item-card${inList ? ' in-list' : ''}">
+        <div class="fav-item-info">
+          <div class="fav-item-name">${esc(fav.name)}</div>
+          <div class="fav-item-meta">
+            ${fav.defaultQty > 1 ? `<span>×${fav.defaultQty}</span>` : ''}
+            ${fav.category ? `<span>${esc(fav.category)}</span>` : ''}
+            ${inList
+              ? `<span class="fav-in-list-badge">✅ ברשימה</span>`
+              : ''}
+          </div>
+        </div>
+        <div class="fav-actions">
+          <button class="fav-add-btn${inList ? ' in-list' : ''}"
+            onclick="addFavoriteToList('${fav._id}')"
+            title="${inList ? 'הוסף עוד אחד' : 'הוסף לרשימה'}">
+            ${inList ? '➕' : '+'}
+          </button>
+          <button class="fav-remove-btn"
+            onclick="removeFavorite('${fav._id}')"
+            title="הסר ממועדפים">
+            ✕
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
 // SERVICE WORKER
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -2756,20 +3106,6 @@ onAuthStateChanged(auth, async (user) => {
   </div>
 </div>
 
-
-    <div class="modal-title">💰 הוסף מחיר מהסופר</div>
-    <div id="price-submit-product-info" style="display:flex;align-items:center;gap:10px;
-      background:var(--card);border-radius:12px;padding:10px;margin-bottom:12px"></div>
-    <div class="store-price-inputs" id="store-price-inputs"></div>
-    <div style="font-size:10px;color:var(--muted);text-align:center;margin:10px 0">
-      <span class="realtime-badge">🔴 LIVE</span> המחירים יתעדכנו מיד לכל המשפחה
-    </div>
-    <div class="modal-row">
-      <button class="mbtn primary" onclick="submitPrices()">💾 שמור מחירים</button>
-      <button class="mbtn ghost" onclick="closeOL2('price-submit-overlay')">סגור</button>
-    </div>
-  </div>
-</div>
 
 
 <!-- ═══ BARCODE SCANNER ═══ -->
