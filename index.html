@@ -1724,35 +1724,6 @@ async function getAllPricesForBarcode(barcode) {
 
 
 // ── HANDLE SCANNED BARCODE ──
-async function handleBarcodeScanned(barcode) {
-  toast(`🔍 מחפש ${barcode}...`);
-
-  // 1. Fetch product info from Open Food Facts
-  let product = { barcode, name: barcode, brand: '', size: '', image: '' };
-  try {
-    const res = await fetch(
-      `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`,
-      { headers: { 'User-Agent': 'FamilyShoppingIL/5.0' }, signal: AbortSignal.timeout(8000) }
-    );
-    const data = await res.json();
-    if (data.status === 1 && data.product) {
-      const p = data.product;
-      product = {
-        barcode,
-        name:  p.product_name_he || p.product_name || barcode,
-        brand: p.brands   || '',
-        size:  p.quantity  || '',
-        image: p.image_small_url || '',
-      };
-    }
-  } catch (_) {}
-
-  // 2. Fetch existing prices (all layers)
-  const { official, manual } = await getAllPricesForBarcode(barcode);
-
-  // 3. Open price submit modal
-  openPriceSubmitModal(product, official, manual);
-}
 
 // ── PRICE SUBMIT MODAL ──
 
