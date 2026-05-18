@@ -1,11 +1,12 @@
-// api/basket-compare.js — v1.0.0
+// api/basket-compare.js — v2.0.0
 // POST /api/basket-compare
-// Compares full shopping basket price across nearby stores
+// Uses official XML prices first.
+// Clearly marks items using proxy/manual fallback.
 
-import { getDB, haversine, cors } from './_firebase.js'; // getDB is now async
+import { getDB, haversine, setCors, isValidBarcode } from './_firebase.js';
 
 export default async function handler(req, res) {
-  cors(res);
+  setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
@@ -13,102 +14,146 @@ export default async function handler(req, res) {
   try { body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body; }
   catch (_) { return res.status(400).json({ error: 'Invalid JSON' }); }
 
-  const { items, lat, lng, radiusKm } = body || {};
-
-  if (!Array.isArray(items) || items.length === 0)
+  const { items, lat, lng, radiusKm, groupId } = body || {};
+  if (!Array.isArray(items) || !items.length)
     return res.status(400).json({ error: 'items array required' });
 
-  const userLat  = parseFloat(lat  || '');
-  const userLng  = parseFloat(lng  || '');
-  const radius   = parseFloat(radiusKm || '10');
-  const hasLoc   = !isNaN(userLat) && !isNaN(userLng);
+  const userLat = parseFloat(lat || '');
+  const userLng = parseFloat(lng || '');
+  const radius  = parseFloat(radiusKm || '10');
+  const hasLoc  = !isNaN(userLat) && !isNaN(userLng);
 
-  // Validate items
   const validItems = items
-    .map(i => ({ barcode: String(i.barcode||'').replace(/\D/g,''), quantity: parseInt(i.quantity||1) }))
-    .filter(i => i.barcode.length >= 4 && i.quantity > 0);
+    .map(i => ({ barcode: String(i.barcode || '').replace(/\D/g, ''), qty: Math.max(1, parseInt(i.quantity || 1)) }))
+    .filter(i => isValidBarcode(i.barcode));
 
-  if (!validItems.length) return res.status(400).json({ error: 'No valid items' });
+  if (!validItems.length) return res.status(400).json({ error: 'No valid barcodes' });
 
   const db = await getDB();
+  if (!db) return res.status(503).json({ error: 'Database unavailable' });
 
-  // 1. Load store index (only stores with coordinates if location provided)
-  const storeIndex = await loadStores(db);
-  const nearbyStores = hasLoc
-    ? Object.entries(storeIndex)
-        .filter(([, s]) => s.hasCoords)
-        .map(([key, s]) => ({ key, ...s, distanceKm: haversine(userLat, userLng, s.latitude, s.longitude) }))
-        .filter(s => s.distanceKm <= radius)
-        .sort((a, b) => a.distanceKm - b.distanceKm)
-    : Object.entries(storeIndex).map(([key, s]) => ({ key, ...s, distanceKm: null }));
+  // Load stores
+  let storeIndex = {};
+  try {
+    const snap = await db.ref('stores').get();
+    if (snap.exists()) storeIndex = snap.val();
+  } catch (_) {}
 
-  if (nearbyStores.length === 0)
-    return res.status(200).json({ radiusKm: radius, results: [], message: 'No stores found in radius' });
+  // Filter nearby stores
+  const allStoreKeys = Object.keys(storeIndex);
+  const nearbyKeys = hasLoc
+    ? allStoreKeys.filter(k => {
+        const s = storeIndex[k];
+        if (!s?.hasCoords) return false;
+        return haversine(userLat, userLng, s.latitude, s.longitude) <= radius;
+      })
+    : allStoreKeys;
 
-  // 2. Fetch prices for all barcodes in parallel
-  const priceMap = {}; // barcode → { storeKey → price }
+  // Fetch all prices for all barcodes in parallel
+  const priceMap = {}; // barcode → { storeKey → priceEntry }
   await Promise.all(validItems.map(async ({ barcode }) => {
-    try {
-      const snap = await db.ref(`prices/${barcode}`).get();
-      if (snap.exists()) priceMap[barcode] = snap.val();
-    } catch (_) {}
+    const snaps = await Promise.allSettled([
+      db.ref(`prices/${barcode}`).get(),                          // official
+      db.ref(`proxyCache/${barcode}`).get(),                      // proxy
+      groupId ? db.ref(`manualPrices/${groupId}/${barcode}`).get() : Promise.resolve(null), // manual
+    ]);
+
+    priceMap[barcode] = {};
+    const now = Date.now();
+
+    // Official (highest priority per store)
+    if (snaps[0].status === 'fulfilled' && snaps[0].value?.exists()) {
+      Object.entries(snaps[0].value.val()).forEach(([k, p]) => {
+        if (p?.price > 0) priceMap[barcode][k] = { ...p, source: 'official' };
+      });
+    }
+
+    // Proxy — only for stores not covered by official
+    if (snaps[1].status === 'fulfilled' && snaps[1].value?.exists()) {
+      Object.entries(snaps[1].value.val()).forEach(([k, p]) => {
+        if (p?.price > 0 && !priceMap[barcode][k] && (now - (p.fetchedAt||0)) < 3_600_000) {
+          priceMap[barcode][k] = { ...p, source: 'proxy' };
+        }
+      });
+    }
+
+    // Manual — only for stores not covered by official or proxy
+    if (snaps[2].status === 'fulfilled' && snaps[2].value?.exists()) {
+      // Group by chain, use cheapest
+      const byChain = {};
+      Object.values(snaps[2].value.val()).forEach(p => {
+        if (!p?.price) return;
+        const k = (p.chainName || '').replace(/\s/g, '_') + '_0';
+        if (!byChain[k] || p.price < byChain[k].price) {
+          byChain[k] = { ...p, source: 'manual' };
+        }
+      });
+      Object.entries(byChain).forEach(([k, p]) => {
+        if (!priceMap[barcode][k]) priceMap[barcode][k] = p;
+      });
+    }
   }));
 
-  // 3. Calculate basket total per store
-  const storeResults = nearbyStores.map(store => {
-    const storeKey = store.key;
+  // Calculate basket per store
+  const storeResults = nearbyKeys.map(storeKey => {
+    const store = storeIndex[storeKey] || {};
     const foundItems = [], missingBarcodes = [];
-    let total = 0;
+    let total = 0, hasFallback = false;
 
-    validItems.forEach(({ barcode, quantity }) => {
-      const storePrice = priceMap[barcode]?.[storeKey];
-      if (storePrice?.price > 0) {
-        const unitPrice = storePrice.price;
-        const totalPrice = Math.round(unitPrice * quantity * 100) / 100;
-        total += totalPrice;
-        foundItems.push({ barcode, name: storePrice.name, quantity, unitPrice, totalPrice });
+    validItems.forEach(({ barcode, qty }) => {
+      const p = priceMap[barcode]?.[storeKey];
+      if (p?.price > 0) {
+        const lineTotal = Math.round(p.price * qty * 100) / 100;
+        total += lineTotal;
+        if (p.source !== 'official') hasFallback = true;
+        foundItems.push({
+          barcode, name: p.name || barcode, quantity: qty,
+          unitPrice: p.price, totalPrice: lineTotal,
+          source: p.source || 'official',
+          isFallback: p.source !== 'official',
+        });
       } else {
         missingBarcodes.push(barcode);
       }
     });
 
     total = Math.round(total * 100) / 100;
+    if (!foundItems.length) return null;
+
+    const dist = (hasLoc && store.hasCoords)
+      ? Math.round(haversine(userLat, userLng, store.latitude, store.longitude) * 10) / 10
+      : null;
 
     return {
-      chainId:        store.chainId,
-      chainName:      store.chainName,
-      storeId:        store.storeId,
-      storeName:      store.storeName,
-      city:           store.city || '',
-      address:        store.address || '',
-      distanceKm:     store.distanceKm ? Math.round(store.distanceKm * 10) / 10 : null,
+      chainId:        store.chainId    || '',
+      chainName:      store.chainName  || storeKey,
+      storeId:        store.storeId    || '',
+      storeName:      store.storeName  || '',
+      city:           store.city       || '',
+      address:        store.address    || '',
+      distanceKm:     dist,
       total,
       availableItems: foundItems.length,
       missingItems:   missingBarcodes.length,
       totalItems:     validItems.length,
-      completeness:   Math.round((foundItems.length / validItems.length) * 100),
+      completeness:   Math.round(foundItems.length / validItems.length * 100),
+      hasFallbackData: hasFallback,
       items:          foundItems,
       missingBarcodes,
     };
-  });
+  }).filter(Boolean);
 
-  // 4. Sort: full basket first by price, then partial by completeness+price
-  const full    = storeResults.filter(s => s.missingItems === 0).sort((a,b) => a.total - b.total);
-  const partial = storeResults.filter(s => s.missingItems > 0  && s.availableItems > 0)
+  // Sort: full basket by price first, then partial
+  const full    = storeResults.filter(s => s.missingItems === 0).sort((a, b) => a.total - b.total);
+  const partial = storeResults.filter(s => s.missingItems > 0 && s.availableItems > 0)
     .sort((a, b) => b.completeness - a.completeness || a.total - b.total);
 
   return res.status(200).json({
-    radiusKm: radius,
+    version:        '2.0.0',
+    radiusKm:       radius,
     itemsRequested: validItems.length,
     bestFullBasket: full[0] || null,
-    results: [...full, ...partial].slice(0, 20),
+    results:        [...full, ...partial].slice(0, 20),
+    note: 'Items marked isFallback:true use proxy/manual prices — official XML sync pending',
   });
-}
-
-async function loadStores(db) {
-  if (!db) return {};
-  try {
-    const snap = await db.ref('stores').get();
-    return snap.exists() ? snap.val() : {};
-  } catch (_) { return {}; }
 }
