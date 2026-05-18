@@ -461,6 +461,104 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   padding:2px 8px;font-size:9px;font-weight:700;display:inline-flex;
   align-items:center;gap:3px;}
 
+
+/* ══ PRICE SOURCE BADGES ══ */
+.badge-official{background:rgba(52,211,153,.15);color:var(--green);
+  border:1px solid rgba(52,211,153,.3);border-radius:5px;
+  padding:1px 6px;font-size:9px;font-weight:700;display:inline-flex;align-items:center;gap:3px}
+.badge-manual{background:var(--accent-dim);color:var(--accent);
+  border:1px solid rgba(240,180,41,.3);border-radius:5px;
+  padding:1px 6px;font-size:9px;font-weight:700;display:inline-flex;align-items:center;gap:3px}
+.badge-proxy{background:var(--blue-dim);color:var(--blue);
+  border:1px solid rgba(96,165,250,.3);border-radius:5px;
+  padding:1px 6px;font-size:9px;font-weight:700;display:inline-flex;align-items:center;gap:3px}
+.badge-none{background:var(--card2);color:var(--muted);
+  border:1px solid var(--border);border-radius:5px;
+  padding:1px 6px;font-size:9px;font-weight:700}
+.submitted-by{font-size:9px;color:var(--muted);margin-top:2px;
+  display:flex;align-items:center;gap:3px}
+.submitted-av{width:14px;height:14px;border-radius:50%;
+  background:var(--accent-dim);display:flex;align-items:center;
+  justify-content:center;font-size:9px;flex-shrink:0}
+
+/* ══ SCANNER ══ */
+.scan-btn{background:var(--card);color:var(--text);
+  border:1.5px solid var(--border);border-radius:11px;
+  padding:0 12px;height:40px;font-family:'Heebo',sans-serif;
+  font-size:13px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;gap:5px;flex-shrink:0;
+  transition:all .15s;}
+.scan-btn:active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+
+.scanner-overlay{display:none;position:fixed;inset:0;
+  background:#000;z-index:600;flex-direction:column;
+  align-items:center;justify-content:flex-start;padding-top:0}
+.scanner-overlay.show{display:flex}
+.scanner-video-wrap{position:relative;width:100%;flex:1;
+  display:flex;align-items:center;justify-content:center;overflow:hidden}
+.scanner-video{width:100%;height:100%;object-fit:cover}
+.scanner-frame{position:absolute;width:220px;height:220px;
+  border:3px solid var(--accent);border-radius:16px;
+  box-shadow:0 0 0 9999px rgba(0,0,0,.55);}
+.scanner-bottom{width:100%;background:var(--surface);
+  padding:20px 18px calc(20px + var(--safe-b));
+  display:flex;flex-direction:column;align-items:center;gap:10px}
+.scanner-hint{color:var(--text);font-size:13px;font-weight:600;text-align:center}
+.scanner-close-btn{position:absolute;top:16px;right:16px;
+  background:rgba(0,0,0,.5);border:none;color:white;
+  border-radius:50%;width:38px;height:38px;font-size:18px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10}
+.scanner-manual-wrap{display:flex;gap:8px;width:100%}
+.scanner-barcode-input{flex:1;background:var(--card);border:1.5px solid var(--border);
+  border-radius:12px;padding:10px 14px;color:var(--text);
+  font-family:'Heebo',sans-serif;font-size:15px;outline:none;
+  letter-spacing:2px;text-align:center;}
+.scanner-barcode-input:focus{border-color:var(--accent)}
+
+/* ══ PRICE SUBMIT MODAL ══ */
+.ps-product{display:flex;align-items:center;gap:10px;
+  background:var(--card);border-radius:12px;padding:10px;margin-bottom:12px}
+.ps-store-row{display:flex;align-items:center;justify-content:space-between;
+  background:var(--card2);border-radius:10px;padding:8px 12px;margin-bottom:6px}
+.ps-store-name{font-size:13px;font-weight:600}
+.ps-store-existing{font-size:10px;color:var(--green);margin-top:1px}
+.ps-input-wrap{display:flex;align-items:center;gap:5px;direction:ltr}
+.ps-currency{font-size:14px;font-weight:800;color:var(--accent)}
+.ps-input{width:80px;background:var(--card);border:1.5px solid var(--border);
+  border-radius:8px;padding:5px 8px;color:var(--text);
+  font-family:'Heebo',sans-serif;font-size:13px;text-align:center;
+  outline:none;direction:ltr}
+.ps-input:focus{border-color:var(--accent)}
+.realtime-note{text-align:center;font-size:11px;color:var(--muted);margin:8px 0;
+  display:flex;align-items:center;justify-content:center;gap:6px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--red);
+  animation:pulse-red 1.5s ease infinite;flex-shrink:0}
+@keyframes pulse-red{0%,100%{opacity:.4;transform:scale(1)}50%{opacity:1;transform:scale(1.2)}}
+
+
+/* ══ PRICE OVERRIDE & REPORTS ══ */
+.badge-override{background:rgba(96,165,250,.15);color:var(--blue);
+  border:1px solid rgba(96,165,250,.3);border-radius:5px;
+  padding:1px 6px;font-size:9px;font-weight:700;display:inline-flex;align-items:center;gap:3px}
+.badge-report{background:rgba(248,113,113,.12);color:var(--red);
+  border:1px solid rgba(248,113,113,.3);border-radius:5px;
+  padding:1px 6px;font-size:9px;font-weight:700;display:inline-flex;align-items:center;gap:3px}
+.community-warning{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);
+  border-radius:10px;padding:8px 11px;margin-top:6px;font-size:11px;color:var(--red)}
+.community-warning strong{font-weight:700}
+.spr-official-struck{text-decoration:line-through;opacity:.5;font-size:11px;margin-right:4px}
+.override-actions{display:flex;gap:6px;margin-top:6px}
+.override-btn{flex:1;background:var(--card2);border:1px solid var(--border);
+  border-radius:8px;padding:6px;font-family:'Heebo',sans-serif;font-size:11px;
+  font-weight:600;color:var(--muted);cursor:pointer;transition:all .15s}
+.override-btn.primary{background:var(--blue-dim);color:var(--blue);border-color:rgba(96,165,250,.3)}
+.override-btn.danger{background:rgba(248,113,113,.1);color:var(--red);border-color:rgba(248,113,113,.3)}
+.report-form{background:var(--card2);border-radius:10px;padding:12px;margin-top:8px}
+.report-form textarea{width:100%;background:var(--card);border:1px solid var(--border);
+  border-radius:8px;padding:8px;color:var(--text);font-family:'Heebo',sans-serif;
+  font-size:12px;outline:none;resize:none;direction:rtl}
+.report-form textarea:focus{border-color:var(--accent)}
+
 </style>
 </head>
 <body>
@@ -1572,138 +1670,207 @@ window._patchConnectToGroup = function() {
 const _realConnectToGroup = connectToGroup;
 
 
+
+
 // ══════════════════════════════════════════════════
-// BARCODE SCANNER + REAL-TIME PRICE SYSTEM
+// PRICE SYSTEM — LAYERED ARCHITECTURE
+// Layer 1: Official XML (GitHub Actions → Firebase) — primary
+// Layer 2: Proxy (Vercel Edge) — experimental fallback
+// Layer 3: Manual (Barcode scan + user input) — always available
 // ══════════════════════════════════════════════════
 
-const STORE_LIST = ['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב','אושר עד'];
+const STORE_LIST_ALL = ['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב','אושר עד'];
+let _currentScanProduct = null;
 let _scannerStream = null;
 let _barcodeDetector = null;
-let _scanInterval = null;
-let _currentProduct = null; // product being priced
+let _scanTimer = null;
 
-// ── OPEN SCANNER ──
+// ── SOURCE BADGE HELPER ──
+function sourceBadge(source, submittedBy, submittedAvatar) {
+  if (source === 'official') return '<span class="badge-official">✅ רשמי</span>';
+  if (source === 'proxy')    return '<span class="badge-proxy">⚡ חי</span>';
+  if (source === 'manual') {
+    const av = submittedAvatar || '👤';
+    return `<span class="badge-manual">📝 ${esc(submittedBy||'משתמש')}</span>`;
+  }
+  return '<span class="badge-none">אין מחיר</span>';
+}
+
+// ── GET ALL PRICES FOR BARCODE (layered) ──
+async function getAllPricesForBarcode(barcode) {
+  if (!barcode) return { official: [], manual: [], proxy: [] };
+
+  // Layer 1: Official from Firebase (synced from XML)
+  let official = [];
+  try {
+    const snap = await get(ref(db, `prices/${barcode}`));
+    if (snap.exists()) {
+      official = Object.values(snap.val())
+        .filter(p => p?.price > 0 && p?.source !== 'manual')
+        .map(p => ({ ...p, source: 'official' }))
+        .sort((a,b) => a.price - b.price);
+    }
+  } catch (_) {}
+
+  // Layer 2: Manual prices from Firebase
+  let manual = [];
+  try {
+    const snap = await get(ref(db, `manualPrices/${barcode}`));
+    if (snap.exists()) {
+      manual = Object.values(snap.val())
+        .filter(p => p?.price > 0)
+        .map(p => ({ ...p, source: 'manual' }))
+        .sort((a,b) => a.price - b.price);
+    }
+  } catch (_) {}
+
+  // Layer 3: Proxy (experimental — non-blocking)
+  let proxy = [];
+  // Proxy attempt runs in background — don't await here for speed
+
+  return { official, manual, proxy };
+}
+
+// ── OPEN BARCODE SCANNER ──
 window.openScanner = async function() {
-  const overlay = document.getElementById('scanner-overlay');
-  overlay.classList.add('show');
+  document.getElementById('scanner-overlay').classList.add('show');
+  const hint = document.getElementById('scanner-hint');
+  const input = document.getElementById('scanner-barcode-input');
+  input.value = '';
 
   try {
     _scannerStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      video: { facingMode: 'environment', width: { ideal: 1280 } }
     });
     const video = document.getElementById('scanner-video');
     video.srcObject = _scannerStream;
 
-    // Try BarcodeDetector API (Chrome Android)
     if ('BarcodeDetector' in window) {
-      _barcodeDetector = new BarcodeDetector({ formats: ['ean_13','ean_8','code_128','code_39'] });
-      _scanInterval = setInterval(async () => {
+      _barcodeDetector = new BarcodeDetector({
+        formats: ['ean_13','ean_8','code_128','code_39','upc_a','upc_e']
+      });
+      _scanTimer = setInterval(async () => {
+        if (!video.readyState || video.readyState < 2) return;
         try {
-          const barcodes = await _barcodeDetector.detect(video);
-          if (barcodes.length > 0) {
-            const barcode = barcodes[0].rawValue;
+          const codes = await _barcodeDetector.detect(video);
+          if (codes.length > 0) {
             closeScanner();
-            await handleBarcodeFound(barcode);
+            await handleBarcodeScanned(codes[0].rawValue);
           }
         } catch (_) {}
-      }, 300);
+      }, 250);
+      hint.textContent = '📷 כוון את הברקוד למסגרת';
     } else {
-      // Fallback — manual entry only
-      document.querySelector('.scanner-hint').textContent = '📷 המצלמה פעילה — הכנס ברקוד ידנית למטה';
+      hint.textContent = '⌨️ הקלד ברקוד למטה (המצלמה לא תומכת בסריקה אוטומטית)';
     }
   } catch (e) {
-    console.warn('Camera error:', e);
-    document.querySelector('.scanner-hint').textContent = '❌ אין גישה למצלמה — הכנס ברקוד ידנית';
+    hint.textContent = '❌ אין גישה למצלמה — הכנס ברקוד ידנית';
   }
 };
 
 window.closeScanner = function() {
   document.getElementById('scanner-overlay').classList.remove('show');
-  if (_scanInterval) { clearInterval(_scanInterval); _scanInterval = null; }
+  if (_scanTimer) { clearInterval(_scanTimer); _scanTimer = null; }
   if (_scannerStream) { _scannerStream.getTracks().forEach(t => t.stop()); _scannerStream = null; }
-  document.getElementById('scanner-manual-barcode').value = '';
 };
 
 window.submitManualBarcode = async function() {
-  const val = document.getElementById('scanner-manual-barcode').value.trim();
-  if (!val || val.length < 4) { toast('⚠️ הכנס ברקוד תקין'); return; }
+  const val = document.getElementById('scanner-barcode-input').value.trim();
+  if (!val || val.length < 4) { toast('⚠️ הכנס ברקוד תקין (4+ ספרות)'); return; }
   closeScanner();
-  await handleBarcodeFound(val);
+  await handleBarcodeScanned(val);
 };
 
-// ── HANDLE FOUND BARCODE ──
-async function handleBarcodeFound(barcode) {
-  toast(`🔍 מחפש ברקוד ${barcode}...`);
+// ── HANDLE SCANNED BARCODE ──
+async function handleBarcodeScanned(barcode) {
+  toast(`🔍 מחפש ${barcode}...`);
 
-  // Search Open Food Facts by barcode
-  let product = null;
+  // 1. Fetch product info from Open Food Facts
+  let product = { barcode, name: barcode, brand: '', size: '', image: '' };
   try {
     const res = await fetch(
       `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`,
       { headers: { 'User-Agent': 'FamilyShoppingIL/5.0' }, signal: AbortSignal.timeout(8000) }
     );
     const data = await res.json();
-    if (data.status === 1) {
+    if (data.status === 1 && data.product) {
       const p = data.product;
       product = {
         barcode,
-        name: p.product_name_he || p.product_name || barcode,
-        brand: p.brands || '',
-        size: p.quantity || '',
+        name:  p.product_name_he || p.product_name || barcode,
+        brand: p.brands   || '',
+        size:  p.quantity  || '',
         image: p.image_small_url || '',
       };
     }
   } catch (_) {}
 
-  if (!product) product = { barcode, name: `מוצר ${barcode}`, brand: '', size: '', image: '' };
+  // 2. Fetch existing prices (all layers)
+  const { official, manual } = await getAllPricesForBarcode(barcode);
 
-  // Check existing prices in Firebase
-  let existingPrices = {};
-  try {
-    const snap = await get(ref(db, `prices/${barcode}`));
-    if (snap.exists()) existingPrices = snap.val();
-  } catch (_) {}
-
-  // Show price entry modal
-  openPriceSubmit(product, existingPrices);
+  // 3. Open price submit modal
+  openPriceSubmitModal(product, official, manual);
 }
 
 // ── PRICE SUBMIT MODAL ──
-function openPriceSubmit(product, existingPrices) {
-  _currentProduct = product;
+function openPriceSubmitModal(product, official, manual) {
+  _currentScanProduct = product;
 
-  // Product info header
-  const info = document.getElementById('price-submit-product-info');
+  // Product header
+  const info = document.getElementById('ps-product-info');
   info.innerHTML = `
     ${product.image
-      ? `<img src="${product.image}" style="width:52px;height:52px;border-radius:10px;object-fit:contain;background:white;padding:3px;flex-shrink:0">`
-      : `<div style="width:52px;height:52px;border-radius:10px;background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">🛍</div>`}
+      ? `<img src="${esc(product.image)}" style="width:52px;height:52px;border-radius:10px;
+           object-fit:contain;background:white;padding:3px;flex-shrink:0"
+           onerror="this.style.display='none'">`
+      : `<div style="width:52px;height:52px;border-radius:10px;background:var(--card2);
+           display:flex;align-items:center;justify-content:center;
+           font-size:24px;flex-shrink:0">🛍</div>`}
     <div>
       <div style="font-size:14px;font-weight:700">${esc(product.name)}</div>
-      ${product.brand ? `<div style="font-size:11px;color:var(--muted)">${esc(product.brand)}</div>` : ''}
-      ${product.size  ? `<div style="font-size:11px;color:var(--muted)">${esc(product.size)}</div>` : ''}
-      <div style="font-size:10px;color:var(--muted);margin-top:2px">ברקוד: ${esc(product.barcode)}</div>
+      ${product.brand ? `<div style="font-size:11px;color:var(--muted)">${esc(product.brand)}</div>`:''}
+      ${product.size  ? `<div style="font-size:11px;color:var(--muted)">${esc(product.size)}</div>`:''}
+      <div style="font-size:10px;color:var(--muted);margin-top:2px">🔖 ${esc(product.barcode)}</div>
     </div>`;
 
-  // Store price inputs with existing values
-  const inputs = document.getElementById('store-price-inputs');
-  inputs.innerHTML = STORE_LIST.map(store => {
-    const storeKey = store.replace(/\s/g,'_');
-    // Find existing price for this store
-    const existing = Object.values(existingPrices).find(p =>
-      p.chainName === store || p.store === store
-    );
+  // Official price note
+  const note = document.getElementById('ps-official-note');
+  if (official.length > 0) {
+    note.style.display = 'block';
+    const cheapest = official[0];
+    note.innerHTML = `✅ מחיר רשמי קיים: ₪${cheapest.price.toFixed(2)} ב${esc(cheapest.chainName||cheapest.store||'')}
+      <br><span style="font-size:9px;opacity:.8">המחיר הרשמי לא יוחלף — הכנסתך תסומן כ"ידני"</span>`;
+  } else {
+    note.style.display = 'none';
+  }
+
+  // Store price inputs — pre-fill from official/manual
+  const inputs = document.getElementById('ps-store-inputs');
+  inputs.innerHTML = STORE_LIST_ALL.map(store => {
+    // Look for existing official price
+    const off = official.find(p => (p.chainName||p.store||'') === store);
+    // Look for existing manual price
+    const man = manual.find(p => (p.chainName||p.storeName||'') === store);
+    const existing = off || man;
     const val = existing?.price ? existing.price.toFixed(2) : '';
-    const isRecent = existing?.syncedAt && (Date.now() - existing.syncedAt < 7 * 24 * 3600 * 1000);
-    return `<div class="spi-row">
+    const isOfficial = off != null;
+    const isManual = !isOfficial && man != null;
+
+    return `<div class="ps-store-row">
       <div>
-        <div class="spi-store">${store}</div>
-        ${isRecent ? `<div style="font-size:9px;color:var(--green)">✓ עודכן לאחרונה</div>` : ''}
+        <div class="ps-store-name">${store}</div>
+        ${isOfficial
+          ? `<div class="ps-store-existing">✅ רשמי: ₪${off.price.toFixed(2)}</div>`
+          : isManual
+          ? `<div class="ps-store-existing" style="color:var(--accent)">📝 ₪${man.price.toFixed(2)} (${esc(man.submittedByDisplayName||'משתמש')})</div>`
+          : ''}
       </div>
-      <div class="spi-right">
-        <span class="spi-currency">₪</span>
-        <input class="spi-input" id="spi-${storeKey}" type="number"
-          placeholder="0.00" step="0.01" min="0" value="${val}">
+      <div class="ps-input-wrap">
+        <span class="ps-currency">₪</span>
+        <input class="ps-input" id="ps-${store.replace(/\s/g,'_')}"
+          type="number" placeholder="0.00" step="0.01" min="0"
+          value="${isOfficial ? '' : val}"
+          ${isOfficial ? 'disabled title="מחיר רשמי קיים — לא ניתן לדרוס"' : ''}>
       </div>
     </div>`;
   }).join('');
@@ -1711,108 +1878,782 @@ function openPriceSubmit(product, existingPrices) {
   document.getElementById('price-submit-overlay').classList.add('show');
 }
 
-window.submitPrices = async function() {
-  if (!_currentProduct) return;
-  const barcode = _currentProduct.barcode;
-  const updates = {};
+// ── SUBMIT MANUAL PRICES ──
+window.submitManualPrices = async function() {
+  if (!_currentScanProduct) return;
+  const { barcode, name } = _currentScanProduct;
+  const m = myProfile || {};
   let count = 0;
 
-  STORE_LIST.forEach(store => {
+  for (const store of STORE_LIST_ALL) {
     const storeKey = store.replace(/\s/g,'_');
-    const input = document.getElementById(`spi-${storeKey}`);
-    const val = parseFloat(input?.value);
-    if (!val || val <= 0) return;
+    const input = document.getElementById(`ps-${storeKey}`);
+    if (!input || input.disabled) continue;
+    const val = parseFloat(input.value);
+    if (!val || val <= 0) continue;
 
-    const key = `prices/${barcode}/${storeKey}`;
-    updates[key] = {
-      barcode,
-      name: _currentProduct.name,
-      chainId: storeKey,
-      chainName: store,
-      storeId: '',
-      price: Math.round(val * 100) / 100,
-      unit: _currentProduct.size || '',
-      updatedAt: new Date().toISOString(),
-      source: 'user',
-      submittedBy: myName || 'user',
-      submittedAt: Date.now(),
-      syncedAt: Date.now(),
-    };
-    count++;
-  });
+    // Never overwrite official prices — save to manualPrices only
+    const entryId = `m_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+    try {
+      await set(ref(db, `manualPrices/${barcode}/${entryId}`), {
+        barcode,
+        name,
+        price:                  Math.round(val * 100) / 100,
+        chainName:              store,
+        storeName:              store,
+        groupId:                groupId || null,
+        submittedByUserId:      myId,
+        submittedByDisplayName: myName,
+        submittedByAvatarType:  m.avatarType  || 'emoji',
+        submittedByAvatarValue: m.avatarValue || '👤',
+        submittedByAvatarEmoji: m.avatarEmoji || null,
+        submittedAt:            new Date().toISOString(),
+        source:                 'manual',
+      });
+      count++;
+    } catch (e) { console.error('save price error:', e); }
+  }
 
   if (count === 0) { toast('⚠️ הכנס לפחות מחיר אחד'); return; }
 
-  try {
-    await update(ref(db, '/'), updates);
-    closeOL2('price-submit-overlay');
-    toast(`✅ ${count} מחירים נשמרו ועודכנו לכל המשפחה!`);
+  closeOL2('price-submit-overlay');
+  toast(`✅ ${count} מחירים נשמרו — מתעדכן לכל המשפחה!`);
+  logActivity('manual_price_added', barcode, name);
 
-    // Log activity
-    if (groupId && listId) {
-      logActivity('manual_price_added', barcode, _currentProduct.name);
-    }
-
-    // If currently showing this product in price tab — refresh
-    if (curTab === 'price') renderPrices();
-
-  } catch (e) {
-    toast('❌ שגיאה בשמירה: ' + e.message);
-  }
+  // If viewing price tab — refresh
+  if (curTab === 'price') renderPrices();
 };
 
-// ── ADD SCAN BUTTON TO PRICE SEARCH BAR ──
+// ── ENHANCED PRICE DISPLAY in showProductPrices ──
+// Override to show badges per source
+const _origShowProductPrices = window.showProductPrices;
+window.showProductPricesEnhanced = async function(product) {
+  if (!product) return;
+  const barcode = product.barcode;
+  const wrap = document.getElementById('price-content');
+
+  wrap.innerHTML = `<div class="price-loading"><div class="spin"></div>
+    <p>מחפש מחירים...</p></div>`;
+
+  const { official, manual } = barcode
+    ? await getAllPricesForBarcode(barcode)
+    : { official: [], manual: [] };
+
+  // Merge: official first, then manual for stores without official
+  const officialStores = new Set(official.map(p => p.chainName||p.store||''));
+  const manualFiltered = manual.filter(p => !officialStores.has(p.chainName||p.storeName||''));
+  const allPrices = [...official, ...manualFiltered].sort((a,b) => a.price - b.price);
+
+  // Try proxy in background for stores without any price
+  const missingStores = STORE_LIST_ALL.filter(s => !allPrices.some(p => (p.chainName||p.store||'') === s));
+
+  const pricesHTML = allPrices.length
+    ? allPrices.map(p => {
+        const store = p.chainName || p.store || '';
+        const isBest = p.price === allPrices[0].price && allPrices.length > 1;
+        const badge = sourceBadge(p.source, p.submittedByDisplayName, p.submittedByAvatarValue);
+        const submittedLine = p.source === 'manual' && p.submittedByDisplayName
+          ? `<div class="submitted-by"><div class="submitted-av">${p.submittedByAvatarValue||'👤'}</div>
+             <span>${esc(p.submittedByDisplayName)}</span></div>` : '';
+        return `<div class="spr${isBest?' best':''}">
+          <div>
+            <div class="spr-name">${store} ${badge}</div>
+            ${submittedLine}
+          </div>
+          <span style="display:flex;align-items:center;gap:5px">
+            ${isBest&&allPrices.length>1?'<span class="best-badge">הכי זול 🏆</span>':''}
+            <span class="spr-price">₪${p.price.toFixed(2)}</span>
+          </span>
+        </div>`;
+      }).join('')
+    : `<div style="text-align:center;padding:16px;color:var(--muted);font-size:13px">
+         אין מחירים עדיין
+       </div>`;
+
+  // Inputs for missing stores
+  const missingHTML = missingStores.length
+    ? `<div style="margin-top:8px">
+       <div style="font-size:10px;font-weight:700;color:var(--muted);
+         text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">
+         הכנס מחיר ידנית:
+       </div>
+       ${missingStores.map(s => {
+         const key = s.replace(/\s/g,'_');
+         return `<div class="spr no-data" style="gap:8px">
+           <span class="spr-name" style="flex-shrink:0">${s} <span class="badge-none">אין מחיר</span></span>
+           <span style="display:flex;align-items:center;gap:5px;flex:1;justify-content:flex-end;direction:ltr">
+             <span class="ps-currency">₪</span>
+             <input type="number" id="mp-${key}" placeholder="0.00"
+               step="0.01" min="0" class="ps-input">
+             <button onclick="saveSinglePrice('${s}','mp-${key}','${barcode||''}','${esc(product.name)}')"
+               style="background:var(--accent);color:#111;border:none;border-radius:7px;
+                 padding:4px 10px;font-family:'Heebo',sans-serif;font-size:11px;
+                 font-weight:700;cursor:pointer;">שמור</button>
+           </span>
+         </div>`;
+       }).join('')}
+       </div>` : '';
+
+  const savings = allPrices.length > 1
+    ? (allPrices[allPrices.length-1].price - allPrices[0].price).toFixed(2) : null;
+
+  wrap.innerHTML = `
+    <button onclick="backToResults()" style="background:transparent;border:none;
+      color:var(--muted);font-family:'Heebo',sans-serif;font-size:13px;
+      font-weight:600;cursor:pointer;padding:4px 0 8px;display:flex;align-items:center;gap:4px">
+      ← חזרה לתוצאות
+    </button>
+    <div class="compare-card">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+        ${product.image
+          ? `<img class="product-img" src="${product.image}" loading="lazy"
+               onerror="this.style.display='none'">`
+          : `<div class="product-img-placeholder">🛍</div>`}
+        <div>
+          <div style="font-size:14px;font-weight:700">${esc(product.name)}</div>
+          ${product.brand?`<div style="font-size:11px;color:var(--muted)">${esc(product.brand)}</div>`:''}
+          ${product.size?`<div style="font-size:11px;color:var(--muted)">${esc(product.size)}</div>`:''}
+          ${barcode?`<div style="font-size:10px;color:var(--muted)">🔖 ${esc(barcode)}</div>`:''}
+        </div>
+      </div>
+      <div class="store-prices">${pricesHTML}</div>
+      ${missingHTML}
+      ${savings ? `<div class="savings-bar">💰 חיסכון פוטנציאלי: ₪${savings}</div>` : ''}
+      ${barcode ? `<button onclick="openScannerForProduct('${esc(product.name)}','${barcode}')"
+        class="clear-btn" style="margin-top:10px">
+        📷 סרוק בסופר ועדכן מחיר
+      </button>` : ''}
+    </div>
+    <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:6px">
+      ✅ רשמי = מ-XML ממשלתי &nbsp;|&nbsp; 📝 ידני = מחבר משפחה
+    </div>`;
+};
+
+// Override selectProduct to use enhanced version
+window.selectProduct = function(idx) {
+  const wrap = document.getElementById('price-content');
+  const groups = wrap._groups;
+  if (!groups) return;
+  selectedProduct = groups[idx];
+  window.showProductPricesEnhanced(selectedProduct);
+};
+
+// ── SAVE SINGLE PRICE (from price tab inline input) ──
+window.saveSinglePrice = async function(storeName, inputId, barcode, productName) {
+  const val = parseFloat(document.getElementById(inputId)?.value);
+  if (!val || val <= 0) { toast('⚠️ הכנס מחיר תקין'); return; }
+  const m = myProfile || {};
+  const entryId = `m_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+  try {
+    await set(ref(db, `manualPrices/${barcode}/${entryId}`), {
+      barcode, name: productName,
+      price: Math.round(val*100)/100,
+      chainName: storeName, storeName,
+      groupId: groupId||null,
+      submittedByUserId:      myId,
+      submittedByDisplayName: myName,
+      submittedByAvatarType:  m.avatarType  || 'emoji',
+      submittedByAvatarValue: m.avatarValue || '👤',
+      submittedAt: new Date().toISOString(),
+      source: 'manual',
+    });
+    toast(`💰 מחיר נשמר: ₪${val.toFixed(2)} ב${storeName}`);
+    // Refresh display
+    if (selectedProduct) window.showProductPricesEnhanced(selectedProduct);
+  } catch(e) { toast('❌ ' + e.message); }
+};
+
+// ── OPEN SCANNER FOR SPECIFIC PRODUCT ──
+window.openScannerForProduct = function(name, barcode) {
+  _currentScanProduct = { name, barcode, brand:'', size:'', image:'' };
+  openPriceSubmitModal(_currentScanProduct, [], []);
+  document.getElementById('price-submit-overlay').classList.add('show');
+};
+
+// ── ADD SCAN BUTTON TO HEADER ──
 function addScanButton() {
-  const bar = document.getElementById('add-bar');
-  if (bar && !document.getElementById('scan-btn')) {
-    const btn = document.createElement('button');
-    btn.id = 'scan-btn';
-    btn.className = 'scan-btn';
-    btn.innerHTML = '📷 סרוק';
-    btn.onclick = openScanner;
-    bar.appendChild(btn);
-  }
-  // Also add to price search bar
-  const priceBar = document.querySelector('.price-search-bar');
-  if (priceBar && !document.getElementById('price-scan-btn')) {
-    const btn2 = document.createElement('button');
-    btn2.id = 'price-scan-btn';
-    btn2.className = 'scan-btn';
-    btn2.innerHTML = '📷';
-    btn2.onclick = openScanner;
-    priceBar.appendChild(btn2);
-  }
+  if (document.getElementById('global-scan-btn')) return;
+  const hdrR = document.querySelector('.hdr-r');
+  if (!hdrR) return;
+  const btn = document.createElement('button');
+  btn.id = 'global-scan-btn';
+  btn.className = 'icon-btn';
+  btn.title = 'סרוק ברקוד';
+  btn.textContent = '📷';
+  btn.onclick = openScanner;
+  hdrR.insertBefore(btn, hdrR.firstChild);
 }
 
-// ── PROXY PRICE ATTEMPT ──
-// Try to fetch live prices via Edge proxy
-window.tryProxyPrice = async function(storeName, query) {
-  const storeMap = { 'שופרסל':'shufersal', 'רמי לוי':'ramilevi' };
+// ── PROXY ATTEMPT (experimental, non-blocking) ──
+async function tryProxyFetch(query, storeName) {
+  const storeMap = {'שופרסל':'shufersal','רמי לוי':'ramilevi'};
   const storeId = storeMap[storeName];
   if (!storeId) return null;
   try {
-    const res = await fetch(`/api/proxy-prices?q=${encodeURIComponent(query)}&store=${storeId}`,
-      { signal: AbortSignal.timeout(6000) });
+    const res = await fetch(
+      `/api/proxy-prices?q=${encodeURIComponent(query)}&store=${storeId}`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    if (!res.ok) return null;
     const data = await res.json();
-    if (data.ok && data.data?.results?.length) {
-      return data.data.results[0]?.price || null;
+    if (data?.ok && data?.data?.results?.[0]?.price) {
+      return { price: data.data.results[0].price, source: 'proxy' };
     }
   } catch (_) {}
   return null;
-};
-
-// ── REAL-TIME FIREBASE PRICE LISTENER ──
-// Watch prices/{barcode} and update UI when anyone submits a price
-function watchBarcodePrices(barcode, onUpdate) {
-  if (!db || !barcode) return;
-  return onValue(ref(db, `prices/${barcode}`), snap => {
-    if (snap.exists()) onUpdate(snap.val());
-  });
 }
 
-// ── INIT SCAN BUTTON ──
-// Called after connect
-window._scanButtonAdded = false;
+
+
+
+// ══════════════════════════════════════════════════════════════
+// PRICE PRIORITY SYSTEM v3.0
+//
+// Priority (deterministic, per barcode+chain):
+//   A. userPriceOverrides/{userId}/{barcode}/{key}     personal only
+//   B. prices/{barcode}/{chainId_storeId}              official XML  ← primary source of truth
+//   C. proxyCache/{barcode}/{chainKey}                 proxy TTL 1h  only if no official
+//   D. manualPrices/{groupId}/{barcode}/{entryId}      family-scoped only if no B/C
+//   E. priceReports → warning signal only, never real price
+//
+// Badges: ✅ רשמי | ✏️ תיקון אישי | ⚡ חי | 📝 משפחה | 🚨 אזהרה
+// ══════════════════════════════════════════════════════════════
+
+const STORE_LIST_ALL = ['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב','אושר עד'];
+let _currentScanProduct = null;
+let _scannerStream = null;
+let _barcodeDetector = null;
+let _scanTimer = null;
+let _overrideContext = null;
+let _reportContext = null;
+
+// ── Validation ──
+function isValidBarcode(b) { const s=String(b||'').replace(/\D/g,''); return s.length>=4&&s.length<=20; }
+function isValidPrice(p)   { const n=parseFloat(p); return !isNaN(n)&&n>0&&n<10000; }
+function sanitize(s,max=200) { return String(s||'').trim().replace(/[<>]/g,'').substring(0,max); }
+
+// ── SOURCE BADGE ──
+function sourceBadge(source, submittedBy) {
+  if (source==='official')     return '<span class="badge-official">✅ רשמי</span>';
+  if (source==='user_override') return '<span class="badge-override">✏️ תיקון אישי</span>';
+  if (source==='proxy')        return '<span class="badge-proxy">⚡ חי</span>';
+  if (source==='manual')       return `<span class="badge-manual">📝 ${esc(submittedBy||'משפחה')}</span>`;
+  return '<span class="badge-none">אין מחיר</span>';
+}
+
+// ── FETCH ALL PRICE LAYERS ──
+async function fetchAllPriceLayers(barcode) {
+  if (!db || !isValidBarcode(barcode)) return { official:[], proxy:[], manual:[], overrides:{}, reports:{} };
+  console.log(`[prices] fetching layers for ${barcode}`);
+
+  const tasks = {
+    official: get(ref(db, `prices/${barcode}`)),
+    proxy:    get(ref(db, `proxyCache/${barcode}`)),
+    reports:  get(ref(db, `priceReports/${barcode}`)),
+    overrides: myId ? get(ref(db, `userPriceOverrides/${myId}/${barcode}`)) : Promise.resolve(null),
+    manual:    groupId ? get(ref(db, `manualPrices/${groupId}/${barcode}`)) : Promise.resolve(null),
+  };
+
+  const snaps = {};
+  await Promise.all(Object.entries(tasks).map(async ([k,p]) => {
+    try { snaps[k] = await p; } catch (e) { console.warn(`[prices] ${k} fetch failed:`, e.message); snaps[k] = null; }
+  }));
+
+  const now = Date.now();
+  const overrides = snaps.overrides?.exists() ? snaps.overrides.val() : {};
+
+  // B. Official XML
+  const official = snaps.official?.exists()
+    ? Object.entries(snaps.official.val())
+        .filter(([,p]) => p?.price > 0)
+        .map(([key,p]) => ({
+          ...p, _key: key, source: 'official',
+          displayPrice: overrides[key]?.overridePrice ?? p.price,
+          override: overrides[key] || null,
+          sourceDisplay: overrides[key] ? 'user_override' : 'official',
+        }))
+        .sort((a,b) => a.displayPrice - b.displayPrice)
+    : [];
+
+  // C. Proxy (TTL 1h) — only used when no official
+  const proxy = snaps.proxy?.exists()
+    ? Object.values(snaps.proxy.val())
+        .filter(p => p?.price>0 && (now-(p.fetchedAt||0))<3_600_000)
+        .map(p => ({ ...p, source:'proxy', displayPrice:p.price, sourceDisplay:'proxy' }))
+    : [];
+
+  // D. Manual family prices — latest per chain
+  const manualRaw = snaps.manual?.exists()
+    ? Object.values(snaps.manual.val()).filter(p=>p?.price>0).map(p=>({...p,source:'manual',displayPrice:p.price,sourceDisplay:'manual'}))
+    : [];
+  const manualByChain = {};
+  manualRaw.forEach(p => {
+    const k = p.chainName||p.storeName||'';
+    if (!manualByChain[k]||new Date(p.submittedAt)>new Date(manualByChain[k].submittedAt)) manualByChain[k]=p;
+  });
+  const manual = Object.values(manualByChain);
+
+  // E. Reports (warning only)
+  const reports = snaps.reports?.exists() ? snaps.reports.val() : {};
+
+  return { official, proxy, manual, overrides, reports };
+}
+
+// ── BUILD DISPLAY PRICES (deterministic priority) ──
+function buildDisplayPrices(layers) {
+  const { official, proxy, manual, reports } = layers;
+
+  // Start with official (highest priority)
+  const result = [...official];
+  const coveredChains = new Set(official.map(p => p.chainName||p.chainId||''));
+
+  // Add proxy only for chains without official
+  proxy.filter(p => !coveredChains.has(p.chainName||p.chainId||'')).forEach(p => {
+    result.push(p);
+    coveredChains.add(p.chainName||p.chainId||'');
+  });
+
+  // Add manual only for chains without official or proxy
+  manual.filter(p => !coveredChains.has(p.chainName||p.storeName||'')).forEach(p => result.push(p));
+
+  // Sort: cheapest first
+  result.sort((a,b) => a.displayPrice - b.displayPrice);
+
+  // Attach community warnings (reports only as signal, never as price)
+  const warnings = buildCommunityWarnings(reports, official);
+
+  return { prices: result, warnings };
+}
+
+function buildCommunityWarnings(reports, official) {
+  const warnings = [];
+  const thirtyDaysAgo = Date.now() - 30*24*3600*1000;
+  Object.entries(reports).forEach(([chainKey, chainReports]) => {
+    if (!chainReports) return;
+    const recent = Object.values(chainReports)
+      .filter(r => r?.reportedAt && new Date(r.reportedAt).getTime() > thirtyDaysAgo);
+    if (recent.length < 2) return;
+    const prices = recent.map(r=>r.reportedPrice).filter(isValidPrice);
+    if (!prices.length) return;
+    const minP = Math.min(...prices), maxP = Math.max(...prices);
+    const offMatch = official.find(p => `${p.chainId||''}_${p.storeId||''}` === chainKey);
+    warnings.push({
+      chainKey,
+      chainName: offMatch?.chainName || '',
+      officialPrice: offMatch?.price,
+      reportCount: recent.length,
+      reportedMin: minP,
+      reportedMax: maxP,
+    });
+  });
+  return warnings;
+}
+
+// ── RENDER PRICE ROW ──
+function renderPriceRow(p, isFirst, total, warnings) {
+  const store = p.chainName||p.storeName||p.store||'';
+  const chainKey = `${p.chainId||store.replace(/\s/g,'_')}_${p.storeId||'0'}`;
+  const isBest = isFirst && total > 1;
+  const badge = sourceBadge(p.sourceDisplay||p.source, p.submittedByDisplayName);
+
+  let submittedLine = '';
+  if ((p.source==='manual'||p.sourceDisplay==='manual') && p.submittedByDisplayName) {
+    const av = p.submittedByAvatarValue||'👤';
+    submittedLine = `<div class="submitted-by"><div class="submitted-av">${av}</div><span>${esc(p.submittedByDisplayName)}</span></div>`;
+  }
+
+  let overrideLine = '';
+  if (p.override) {
+    overrideLine = `<div style="font-size:10px;color:var(--muted);margin-top:1px">
+      <span class="spr-official-struck">₪${p.price.toFixed(2)}</span>
+      <span style="color:var(--blue)"> → ₪${p.displayPrice.toFixed(2)} (תיקון אישי)</span>
+      <button onclick="removeOverride('${chainKey}','${esc(store)}')"
+        style="background:transparent;border:none;color:var(--red);cursor:pointer;font-size:10px;margin-right:6px">✕ בטל</button>
+    </div>`;
+  }
+
+  // Community warning (reports signal)
+  const warn = warnings?.find(w => w.chainKey===chainKey);
+  let warnLine = '';
+  if (warn) {
+    warnLine = `<div class="community-warning">
+      ⚠️ <strong>${warn.reportCount} משתמשים</strong> דיווחו: ₪${warn.reportedMin.toFixed(2)}${warn.reportedMin!==warn.reportedMax?`–₪${warn.reportedMax.toFixed(2)}`:''}
+    </div>`;
+  }
+
+  // Action buttons — only for official/override
+  let actions = '';
+  if (p.source==='official'||p.source==='user_override') {
+    const pname = sanitize(_currentScanProduct?.name||selectedProduct?.name||'');
+    actions = `<div class="override-actions">
+      <button class="override-btn primary" onclick="openOverrideModal('${chainKey}','${esc(store)}','${p.price}','${esc(pname)}')">✏️ תקן אישי</button>
+      <button class="override-btn" onclick="openReportModal('${chainKey}','${esc(store)}','${p.price}','${esc(pname)}')">🚨 דווח שגיאה</button>
+    </div>`;
+  }
+
+  return `<div class="spr${isBest?' best':''}">
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+        <span class="spr-name">${esc(store)}</span> ${badge}
+        ${isBest&&total>1?'<span class="best-badge">הכי זול 🏆</span>':''}
+      </div>
+      ${submittedLine}${overrideLine}${warnLine}${actions}
+    </div>
+    <span class="spr-price" style="flex-shrink:0;margin-right:8px">₪${p.displayPrice.toFixed(2)}</span>
+  </div>`;
+}
+
+// ── showProductPricesEnhanced ──
+window.showProductPricesEnhanced = async function(product) {
+  if (!product) return;
+  const wrap = document.getElementById('price-content');
+  wrap.innerHTML = `<div class="price-loading"><div class="spin"></div><p>טוען מחירים...</p></div>`;
+  const barcode = product.barcode || '';
+
+  let layers = { official:[], proxy:[], manual:[], overrides:{}, reports:{} };
+  if (isValidBarcode(barcode)) layers = await fetchAllPriceLayers(barcode);
+
+  const { prices, warnings } = buildDisplayPrices(layers);
+  const coveredChains = new Set(prices.map(p=>p.chainName||p.storeName||p.store||''));
+  const missing = STORE_LIST_ALL.filter(s=>!coveredChains.has(s));
+
+  const pricesHTML = prices.length
+    ? prices.map((p,i)=>renderPriceRow(p,i===0,prices.length,warnings)).join('')
+    : `<div style="text-align:center;padding:16px;color:var(--muted);font-size:13px">אין מחירים עדיין</div>`;
+
+  const missingHTML = missing.length ? `
+    <div style="margin-top:10px">
+      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">📝 הכנס מחיר ידנית:</div>
+      ${missing.map(s=>`<div class="spr no-data">
+        <span class="spr-name" style="flex-shrink:0">${s} <span class="badge-none">אין מחיר</span></span>
+        <span style="display:flex;align-items:center;gap:5px;direction:ltr">
+          <span class="ps-currency">₪</span>
+          <input type="number" id="mp-${s.replace(/\s/g,'_')}" placeholder="0.00" step="0.01" min="0" class="ps-input">
+          <button onclick="saveSingleManualPrice('${s}','mp-${s.replace(/\s/g,'_')}','${barcode}','${esc(product.name||'')}')"
+            style="background:var(--accent);color:#111;border:none;border-radius:7px;padding:4px 10px;font-family:'Heebo',sans-serif;font-size:11px;font-weight:700;cursor:pointer">שמור</button>
+        </span>
+      </div>`).join('')}
+    </div>` : '';
+
+  const savings = prices.length > 1
+    ? (prices[prices.length-1].displayPrice - prices[0].displayPrice).toFixed(2) : null;
+
+  wrap.innerHTML = `
+    <button onclick="backToResults()" style="background:transparent;border:none;color:var(--muted);font-family:'Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;padding:4px 0 10px;display:flex;align-items:center;gap:4px">← חזרה לתוצאות</button>
+    <div class="compare-card">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+        ${product.image?`<img class="product-img" src="${esc(product.image)}" loading="lazy" onerror="this.style.display='none'">`:
+          `<div class="product-img-placeholder">🛍</div>`}
+        <div>
+          <div style="font-size:14px;font-weight:700">${esc(product.name||'')}</div>
+          ${product.brand?`<div style="font-size:11px;color:var(--muted)">${esc(product.brand)}</div>`:''}
+          ${product.size?`<div style="font-size:11px;color:var(--muted)">${esc(product.size)}</div>`:''}
+          ${barcode?`<div style="font-size:10px;color:var(--muted)">🔖 ${esc(barcode)}</div>`:''}
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">
+        <span class="badge-official">✅ רשמי</span> XML ממשלתי &nbsp;
+        <span class="badge-proxy">⚡ חי</span> Proxy &nbsp;
+        <span class="badge-manual">📝</span> משפחה &nbsp;
+        <span class="badge-override">✏️</span> תיקון אישי שלך
+      </div>
+      <div class="store-prices">${pricesHTML}</div>
+      ${missingHTML}
+      ${savings&&parseFloat(savings)>0?`<div class="savings-bar">💰 חיסכון פוטנציאלי: ₪${savings}</div>`:''}
+      ${barcode?`<button onclick="openScanner()" class="clear-btn" style="margin-top:10px">📷 סרוק בסופר ועדכן מחיר</button>`:''}
+    </div>
+    <div style="font-size:10px;color:var(--muted);text-align:center;padding:8px 0">
+      ✏️ תיקון אישי גלוי רק לך · 🚨 דיווח מוצג לאחרי 2+ דיווחים · 📝 מחיר משפחה גלוי לקבוצה בלבד
+    </div>`;
+};
+
+window.selectProduct = function(idx) {
+  const groups = document.getElementById('price-content')._groups;
+  if (!groups) return;
+  selectedProduct = groups[idx];
+  _currentScanProduct = selectedProduct;
+  window.showProductPricesEnhanced(selectedProduct);
+};
+
+// ── SAVE SINGLE MANUAL PRICE ──
+window.saveSingleManualPrice = async function(storeName, inputId, barcode, productName) {
+  const val = parseFloat(document.getElementById(inputId)?.value);
+  if (!isValidPrice(val)) { toast('⚠️ הכנס מחיר תקין'); return; }
+  if (!isValidBarcode(barcode)) { toast('⚠️ ברקוד לא תקין'); return; }
+  if (!groupId) { toast('⚠️ לא חובר לקבוצה'); return; }
+
+  const m = myProfile || {};
+  const entryId = `m_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+  console.log(`[manual] saving ${barcode}/${storeName} ₪${val}`);
+
+  try {
+    // Save to manualPrices/{groupId}/{barcode} — NEVER to prices/
+    await set(ref(db, `manualPrices/${groupId}/${barcode}/${entryId}`), {
+      barcode, name: sanitize(productName),
+      price: Math.round(val*100)/100,
+      chainName: storeName, storeName,
+      groupId,
+      submittedByUserId:      myId,
+      submittedByDisplayName: myName,
+      submittedByAvatarType:  m.avatarType  || 'emoji',
+      submittedByAvatarValue: m.avatarValue || '👤',
+      submittedByAvatarEmoji: m.avatarEmoji || null,
+      submittedAt: new Date().toISOString(),
+      source: 'manual',
+    });
+    toast(`💰 ₪${val.toFixed(2)} ב${storeName} נשמר`);
+    if (selectedProduct) window.showProductPricesEnhanced(selectedProduct);
+  } catch(e) { console.error('[manual] error:', e.message); toast('❌ ' + e.message); }
+};
+
+// ── OVERRIDE SYSTEM ──
+window.openOverrideModal = function(chainKey, storeName, officialPrice, productName) {
+  _overrideContext = { chainKey, storeName, officialPrice: parseFloat(officialPrice), productName };
+  document.getElementById('override-product-info').innerHTML =
+    `<strong>${esc(storeName)}</strong> · מחיר רשמי: ₪${parseFloat(officialPrice).toFixed(2)}<br>
+     <span style="font-size:11px;color:var(--muted)">${esc(productName)}</span>`;
+  document.getElementById('override-price-input').value = '';
+  document.getElementById('override-reason-input').value = '';
+  document.getElementById('override-overlay').classList.add('show');
+};
+
+window.saveOverride = async function() {
+  if (!_overrideContext) return;
+  const { chainKey, storeName, officialPrice, productName } = _overrideContext;
+  const price = parseFloat(document.getElementById('override-price-input').value);
+  const reason = sanitize(document.getElementById('override-reason-input').value, 300);
+  if (!isValidPrice(price)) { toast('⚠️ הכנס מחיר תקין'); return; }
+  const barcode = _currentScanProduct?.barcode || selectedProduct?.barcode || '';
+  if (!isValidBarcode(barcode)) { toast('⚠️ ברקוד חסר'); return; }
+  const now = new Date().toISOString();
+  console.log(`[override] ${barcode}/${chainKey} ₪${price}`);
+  try {
+    await set(ref(db, `userPriceOverrides/${myId}/${barcode}/${chainKey}`), {
+      barcode, chainId: chainKey.split('_')[0]||'', chainName: storeName,
+      storeId: chainKey.split('_')[1]||'', storeName,
+      officialPrice, overridePrice: Math.round(price*100)/100,
+      reason: reason||null, createdAt: now, updatedAt: now, source: 'user_override',
+    });
+    closeOL2('override-overlay');
+    toast(`✏️ תיקון אישי נשמר ב${storeName}`);
+    if (selectedProduct) window.showProductPricesEnhanced(selectedProduct);
+  } catch(e) { console.error('[override]', e.message); toast('❌ '+e.message); }
+};
+
+window.removeOverride = async function(chainKey, storeName) {
+  const barcode = _currentScanProduct?.barcode || selectedProduct?.barcode || '';
+  if (!barcode) return;
+  try {
+    await remove(ref(db, `userPriceOverrides/${myId}/${barcode}/${chainKey}`));
+    toast(`↩️ חזרת למחיר הרשמי ב${storeName}`);
+    if (selectedProduct) window.showProductPricesEnhanced(selectedProduct);
+  } catch(e) { toast('❌ '+e.message); }
+};
+
+// ── REPORT SYSTEM ──
+window.openReportModal = function(chainKey, storeName, officialPrice, productName) {
+  _reportContext = { chainKey, storeName, officialPrice: parseFloat(officialPrice), productName };
+  document.getElementById('report-product-info').innerHTML =
+    `<strong>${esc(storeName)}</strong> · מחיר רשמי: ₪${parseFloat(officialPrice).toFixed(2)}<br>
+     <span style="font-size:11px;color:var(--muted)">${esc(productName)}</span>`;
+  document.getElementById('report-price-input').value = '';
+  document.getElementById('report-note-input').value = '';
+  document.getElementById('report-overlay').classList.add('show');
+};
+
+window.submitReport = async function() {
+  if (!_reportContext) return;
+  const { chainKey, storeName, officialPrice } = _reportContext;
+  const price = parseFloat(document.getElementById('report-price-input').value);
+  const note  = sanitize(document.getElementById('report-note-input').value, 300);
+  if (!isValidPrice(price)) { toast('⚠️ הכנס מחיר שראיתי'); return; }
+  const barcode = _currentScanProduct?.barcode || selectedProduct?.barcode || '';
+  if (!isValidBarcode(barcode)) { toast('⚠️ ברקוד חסר'); return; }
+  const m = myProfile || {};
+  const rid = `r_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+  console.log(`[report] ${barcode}/${chainKey} ₪${price}`);
+  try {
+    await set(ref(db, `priceReports/${barcode}/${chainKey}/${rid}`), {
+      barcode, chainId: chainKey.split('_')[0]||'', chainName: storeName,
+      storeId: chainKey.split('_')[1]||'', storeName,
+      officialPrice, reportedPrice: Math.round(price*100)/100,
+      reportedByUserId: myId, reportedByDisplayName: myName,
+      reportedAt: new Date().toISOString(),
+      note: note||null, evidenceType: 'user_report', status: 'pending',
+    });
+    closeOL2('report-overlay');
+    toast('📢 תודה! הדיווח נשמר');
+    if (selectedProduct) window.showProductPricesEnhanced(selectedProduct);
+  } catch(e) { console.error('[report]', e.message); toast('❌ '+e.message); }
+};
+
+// ── BARCODE SCANNER ──
+window.openScanner = async function() {
+  document.getElementById('scanner-overlay').classList.add('show');
+  const hint = document.getElementById('scanner-hint');
+  document.getElementById('scanner-barcode-input').value = '';
+  try {
+    _scannerStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
+    document.getElementById('scanner-video').srcObject = _scannerStream;
+    if ('BarcodeDetector' in window) {
+      _barcodeDetector = new BarcodeDetector({ formats:['ean_13','ean_8','code_128','upc_a'] });
+      const video = document.getElementById('scanner-video');
+      _scanTimer = setInterval(async () => {
+        if (video.readyState < 2) return;
+        try {
+          const codes = await _barcodeDetector.detect(video);
+          if (codes.length > 0) { closeScanner(); await handleBarcodeScanned(codes[0].rawValue); }
+        } catch(_){}
+      }, 250);
+      hint.textContent = '📷 כוון את הברקוד למסגרת';
+    } else {
+      hint.textContent = '⌨️ הכנס ברקוד ידנית למטה';
+    }
+  } catch(e) {
+    hint.textContent = '❌ אין גישה למצלמה — הכנס ברקוד ידנית';
+  }
+};
+
+window.closeScanner = function() {
+  document.getElementById('scanner-overlay').classList.remove('show');
+  if (_scanTimer) { clearInterval(_scanTimer); _scanTimer = null; }
+  if (_scannerStream) { _scannerStream.getTracks().forEach(t=>t.stop()); _scannerStream=null; }
+};
+
+window.submitManualBarcode = async function() {
+  const val = document.getElementById('scanner-barcode-input').value.trim();
+  if (!isValidBarcode(val)) { toast('⚠️ הכנס ברקוד תקין'); return; }
+  closeScanner();
+  await handleBarcodeScanned(val);
+};
+
+async function handleBarcodeScanned(barcode) {
+  toast(`🔍 מחפש ברקוד ${barcode}...`);
+  let product = { barcode, name: barcode, brand:'', size:'', image:'' };
+  try {
+    const r = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`,
+      { headers:{'User-Agent':'FamilyShoppingIL/3.0'}, signal:AbortSignal.timeout(8000) });
+    const d = await r.json();
+    if (d.status===1&&d.product) {
+      const p = d.product;
+      product = { barcode, name:p.product_name_he||p.product_name||barcode,
+        brand:p.brands||'', size:p.quantity||'', image:p.image_small_url||'' };
+    }
+  } catch(_){}
+
+  const layers = await fetchAllPriceLayers(barcode);
+  _currentScanProduct = product;
+  selectedProduct = product;
+
+  // Open price submit with existing data
+  openPriceSubmitModal(product, layers);
+}
+
+function openPriceSubmitModal(product, layers) {
+  const { official, manual } = layers;
+  const info = document.getElementById('ps-product-info');
+  info.innerHTML = `
+    ${product.image
+      ?`<img src="${esc(product.image)}" style="width:52px;height:52px;border-radius:10px;object-fit:contain;background:white;padding:3px;flex-shrink:0" onerror="this.style.display='none'">`
+      :`<div style="width:52px;height:52px;border-radius:10px;background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">🛍</div>`}
+    <div>
+      <div style="font-size:14px;font-weight:700">${esc(product.name)}</div>
+      ${product.brand?`<div style="font-size:11px;color:var(--muted)">${esc(product.brand)}</div>`:''}
+      <div style="font-size:10px;color:var(--muted)">🔖 ${esc(product.barcode)}</div>
+    </div>`;
+
+  const note = document.getElementById('ps-official-note');
+  if (official.length > 0) {
+    note.style.display='block';
+    note.innerHTML=`✅ מחיר רשמי קיים: ₪${official[0].price.toFixed(2)} — הכנסתך תסומן "ידני" ולא תחליף את הרשמי`;
+  } else { note.style.display='none'; }
+
+  const officialChains = new Set(official.map(p=>p.chainName||p.chainId||''));
+  document.getElementById('ps-store-inputs').innerHTML = STORE_LIST_ALL.map(store => {
+    const off = official.find(p=>(p.chainName||p.chainId||'')===store);
+    const man = manual.find(p=>(p.chainName||p.storeName||'')===store);
+    const existing = man?.price;
+    return `<div class="ps-store-row">
+      <div>
+        <div class="ps-store-name">${store}</div>
+        ${off?`<div style="font-size:9px;color:var(--green)">✅ רשמי: ₪${off.price.toFixed(2)}</div>`:''}
+        ${!off&&man?`<div style="font-size:9px;color:var(--accent)">📝 ₪${man.price.toFixed(2)} (${esc(man.submittedByDisplayName||'משפחה')})</div>`:''}
+      </div>
+      <div class="ps-input-wrap">
+        <span class="ps-currency">₪</span>
+        <input class="ps-input" id="ps-${store.replace(/\s/g,'_')}"
+          type="number" placeholder="0.00" step="0.01" min="0"
+          value="${existing?existing.toFixed(2):''}">
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('price-submit-overlay').classList.add('show');
+}
+
+window.submitManualPrices = async function() {
+  if (!_currentScanProduct) return;
+  const { barcode, name } = _currentScanProduct;
+  if (!isValidBarcode(barcode)) { toast('⚠️ ברקוד לא תקין'); return; }
+  if (!groupId) { toast('⚠️ לא חובר לקבוצה'); return; }
+
+  const m = myProfile || {};
+  let count = 0;
+
+  for (const store of STORE_LIST_ALL) {
+    const input = document.getElementById(`ps-${store.replace(/\s/g,'_')}`);
+    const val = parseFloat(input?.value);
+    if (!isValidPrice(val)) continue;
+    const entryId = `m_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+    try {
+      // ALWAYS to manualPrices/{groupId}/... NEVER to prices/
+      await set(ref(db, `manualPrices/${groupId}/${barcode}/${entryId}`), {
+        barcode, name: sanitize(name),
+        price: Math.round(val*100)/100,
+        chainName: store, storeName: store, groupId,
+        submittedByUserId:      myId,
+        submittedByDisplayName: myName,
+        submittedByAvatarType:  m.avatarType  || 'emoji',
+        submittedByAvatarValue: m.avatarValue || '👤',
+        submittedByAvatarEmoji: m.avatarEmoji || null,
+        submittedAt: new Date().toISOString(),
+        source: 'manual',
+      });
+      count++;
+    } catch(e) { console.error('[manual]', e.message); }
+  }
+
+  if (!count) { toast('⚠️ הכנס לפחות מחיר אחד'); return; }
+  closeOL2('price-submit-overlay');
+  toast(`✅ ${count} מחירים ידניים נשמרו לקבוצה`);
+  logActivity('manual_price_added', barcode, name);
+  if (curTab==='price') renderPrices();
+};
+
+// ── PROXY (experimental, non-blocking) ──
+async function tryProxy(query, chainName) {
+  const map = {'שופרסל':'shufersal','רמי לוי':'ramilevi'};
+  const storeId = map[chainName];
+  if (!storeId) return null;
+  try {
+    const r = await fetch(`/api/proxy-prices?q=${encodeURIComponent(query)}&store=${storeId}`,
+      { signal:AbortSignal.timeout(5000) });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d.ok && d.results?.length ? d.results[0] : null;
+  } catch(_) { return null; } // fail silently
+}
+
+// ── ADD SCAN BUTTON ──
+function addScanButton() {
+  if (document.getElementById('global-scan-btn')) return;
+  const hdrR = document.querySelector('.hdr-r');
+  if (!hdrR) return;
+  const btn = document.createElement('button');
+  btn.id='global-scan-btn'; btn.className='icon-btn'; btn.title='סרוק ברקוד';
+  btn.textContent='📷'; btn.onclick=openScanner;
+  hdrR.insertBefore(btn, hdrR.firstChild);
+}
 
 // SERVICE WORKER
 if('serviceWorker' in navigator){
@@ -1986,25 +2827,6 @@ window.confirmManualEntry = async function() {
 </div>
 
 
-<!-- ═══ BARCODE SCANNER ═══ -->
-<div class="scanner-overlay" id="scanner-overlay">
-  <button class="scanner-close" onclick="closeScanner()">✕</button>
-  <div style="position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:60vh">
-    <video id="scanner-video" class="scanner-video" autoplay playsinline muted></video>
-    <div class="scanner-frame"></div>
-  </div>
-  <div class="scanner-hint">📷 כוון את הברקוד למסגרת</div>
-  <input class="scanner-manual-barcode" id="scanner-manual-barcode"
-    placeholder="או הכנס ברקוד ידנית" type="number"
-    onkeydown="if(event.key==='Enter')submitManualBarcode()">
-  <button class="mbtn primary" style="margin-top:10px;width:240px"
-    onclick="submitManualBarcode()">חפש לפי ברקוד</button>
-</div>
-
-<!-- ═══ PRICE SUBMIT MODAL ═══ -->
-<div class="overlay" id="price-submit-overlay" onclick="closeOL(event,'price-submit-overlay')">
-  <div class="modal" style="max-height:85vh;overflow-y:auto">
-    <div class="modal-handle"></div>
     <div class="modal-title">💰 הוסף מחיר מהסופר</div>
     <div id="price-submit-product-info" style="display:flex;align-items:center;gap:10px;
       background:var(--card);border-radius:12px;padding:10px;margin-bottom:12px"></div>
@@ -2015,6 +2837,121 @@ window.confirmManualEntry = async function() {
     <div class="modal-row">
       <button class="mbtn primary" onclick="submitPrices()">💾 שמור מחירים</button>
       <button class="mbtn ghost" onclick="closeOL2('price-submit-overlay')">סגור</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ BARCODE SCANNER ═══ -->
+<div class="scanner-overlay" id="scanner-overlay">
+  <button class="scanner-close-btn" onclick="closeScanner()">✕</button>
+  <div class="scanner-video-wrap">
+    <video id="scanner-video" class="scanner-video" autoplay playsinline muted></video>
+    <div class="scanner-frame"></div>
+  </div>
+  <div class="scanner-bottom">
+    <div class="scanner-hint" id="scanner-hint">📷 כוון את הברקוד למסגרת הצהובה</div>
+    <div class="scanner-manual-wrap">
+      <input class="scanner-barcode-input" id="scanner-barcode-input"
+        placeholder="ברקוד ידנית..." type="number" inputmode="numeric"
+        onkeydown="if(event.key==='Enter')submitManualBarcode()">
+      <button class="add-btn" onclick="submitManualBarcode()">←</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PRICE SUBMIT MODAL ═══ -->
+<div class="overlay" id="price-submit-overlay" onclick="closeOL(event,'price-submit-overlay')">
+  <div class="modal" style="max-height:88vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div class="modal-title">💰 הוסף מחיר מהסופר</div>
+    <div id="ps-product-info" class="ps-product"></div>
+    <div id="ps-official-note" style="display:none;background:var(--green-dim);
+      border:1px solid rgba(52,211,153,.3);border-radius:10px;padding:8px 12px;
+      font-size:11px;color:var(--green);margin-bottom:10px;text-align:center"></div>
+    <div id="ps-store-inputs"></div>
+    <div class="realtime-note">
+      <div class="live-dot"></div>
+      מחירים יתעדכנו מיד לכל המשפחה בזמן אמת
+    </div>
+    <div class="modal-row">
+      <button class="mbtn primary" onclick="submitManualPrices()">💾 שמור</button>
+      <button class="mbtn ghost" onclick="closeOL2('price-submit-overlay')">סגור</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ PRICE OVERRIDE MODAL ═══ -->
+<div class="overlay" id="override-overlay" onclick="closeOL(event,'override-overlay')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">✏️ תיקון מחיר אישי</div>
+    <div id="override-product-info" style="background:var(--card);border-radius:12px;
+      padding:10px;margin-bottom:12px;font-size:13px"></div>
+    <div class="field">
+      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">
+        המחיר שראיתי בחנות
+      </label>
+      <div style="display:flex;align-items:center;gap:8px;direction:ltr">
+        <span style="font-size:15px;font-weight:800;color:var(--accent)">₪</span>
+        <input id="override-price-input" type="number" step="0.01" min="0"
+          placeholder="0.00" style="flex:1;background:var(--card);border:1.5px solid var(--border);
+          border-radius:11px;padding:10px;color:var(--text);font-family:'Heebo',sans-serif;
+          font-size:15px;outline:none;text-align:left;direction:ltr">
+      </div>
+    </div>
+    <div class="field" style="margin-top:8px">
+      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">
+        הערה (אופציונלי)
+      </label>
+      <textarea id="override-reason-input" rows="2" class="add-input"
+        style="width:100%;resize:none;height:auto"
+        placeholder="למשל: המחיר על המדף שונה..."></textarea>
+    </div>
+    <div style="font-size:10px;color:var(--muted);text-align:center;margin:8px 0">
+      התיקון גלוי רק לך • המחיר הרשמי נשאר למשתמשים אחרים
+    </div>
+    <div class="modal-row">
+      <button class="mbtn primary" onclick="saveOverride()">💾 שמור תיקון</button>
+      <button class="mbtn ghost" onclick="closeOL2('override-overlay')">סגור</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ REPORT PRICE MODAL ═══ -->
+<div class="overlay" id="report-overlay" onclick="closeOL(event,'report-overlay')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🚨 דיווח על מחיר שגוי</div>
+    <div id="report-product-info" style="background:var(--card);border-radius:12px;
+      padding:10px;margin-bottom:12px;font-size:13px"></div>
+    <div class="field">
+      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">
+        המחיר שראיתי בפועל
+      </label>
+      <div style="display:flex;align-items:center;gap:8px;direction:ltr">
+        <span style="font-size:15px;font-weight:800;color:var(--accent)">₪</span>
+        <input id="report-price-input" type="number" step="0.01" min="0"
+          placeholder="0.00" style="flex:1;background:var(--card);border:1.5px solid var(--border);
+          border-radius:11px;padding:10px;color:var(--text);font-family:'Heebo',sans-serif;
+          font-size:15px;outline:none;text-align:left;direction:ltr">
+      </div>
+    </div>
+    <div class="field" style="margin-top:8px">
+      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">
+        הערה
+      </label>
+      <textarea id="report-note-input" rows="2" class="add-input"
+        style="width:100%;resize:none;height:auto"
+        placeholder="למשל: מחיר שונה על המדף..."></textarea>
+    </div>
+    <div style="font-size:10px;color:var(--muted);text-align:center;margin:8px 0">
+      הדיווח יוצג למשתמשים אחרים • אינו משנה את המחיר הרשמי
+    </div>
+    <div class="modal-row">
+      <button class="mbtn primary" onclick="submitReport()">📢 שלח דיווח</button>
+      <button class="mbtn ghost" onclick="closeOL2('report-overlay')">סגור</button>
     </div>
   </div>
 </div>
