@@ -559,6 +559,26 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   font-size:12px;outline:none;resize:none;direction:rtl}
 .report-form textarea:focus{border-color:var(--accent)}
 
+
+/* ══ PROFILE EDIT MODAL ══ */
+.profile-edit-header{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:16px}
+.profile-edit-avatar{width:80px;height:80px;border-radius:50%;background:var(--card);
+  border:3px solid var(--accent);display:flex;align-items:center;justify-content:center;
+  font-size:34px;cursor:pointer;position:relative;overflow:hidden;flex-shrink:0}
+.profile-edit-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.profile-edit-avatar .edit-overlay{position:absolute;inset:0;background:rgba(0,0,0,.45);
+  display:flex;align-items:center;justify-content:center;opacity:0;transition:.15s;
+  border-radius:50%;font-size:18px}
+.profile-edit-avatar:hover .edit-overlay{opacity:1}
+.profile-edit-name{font-size:18px;font-weight:800;color:var(--text)}
+.avatar-type-tabs{display:flex;gap:6px;width:100%;margin-bottom:10px}
+.av-tab{flex:1;background:var(--card);border:1.5px solid var(--border);border-radius:10px;
+  padding:8px 4px;text-align:center;cursor:pointer;transition:all .15s;
+  font-size:11px;font-weight:600;color:var(--muted)}
+.av-tab.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+.av-panel{display:none}
+.av-panel.show{display:block}
+
 </style>
 </head>
 <body>
@@ -600,9 +620,14 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 <div class="screen" id="main-screen">
   <div class="header">
     <div class="header-top">
-      <div class="group-info">
-        <div class="group-name" id="hdr-group-name">משפחה</div>
-        <div class="group-code">קוד: <span id="hdr-group-code">------</span></div>
+      <div class="group-info" style="display:flex;align-items:center;gap:9px;cursor:pointer" onclick="openProfileEdit()">
+        <div id="hdr-my-avatar" style="width:34px;height:34px;border-radius:50%;
+          background:var(--accent-dim);display:flex;align-items:center;justify-content:center;
+          font-size:18px;flex-shrink:0;border:2px solid var(--accent);overflow:hidden">👤</div>
+        <div>
+          <div class="group-name" id="hdr-group-name">משפחה</div>
+          <div class="group-code">קוד: <span id="hdr-group-code">------</span></div>
+        </div>
       </div>
       <div class="hdr-r">
         <div class="online-dot" id="online-dot" style="opacity:.3"></div>
@@ -648,6 +673,9 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-title">👥 המשפחה שלנו</div>
+    <button onclick="openProfileEdit()" class="clear-btn" style="margin-bottom:10px;width:100%">
+      ✏️ ערוך את הפרופיל שלי
+    </button>
     <div class="invite-box">
       <div style="font-size:10px;color:var(--muted);margin-bottom:5px">קוד הצטרפות</div>
       <div class="invite-code" id="modal-code">------</div>
@@ -2334,6 +2362,189 @@ function addScanButton() {
   hdrR.insertBefore(btn, hdrR.firstChild);
 }
 
+
+// ══════════════════════════════════════════════════
+// PROFILE EDIT SYSTEM
+// ══════════════════════════════════════════════════
+
+let _peAvatar = { type: 'emoji', value: '🛒', emoji: null }; // working copy during edit
+
+// ── OPEN PROFILE EDIT MODAL ──
+window.openProfileEdit = function() {
+  const m = myProfile || {};
+
+  // Pre-fill name
+  const nameInput = document.getElementById('pe-name-input');
+  nameInput.value = myName || '';
+  document.getElementById('pe-name-preview').textContent = myName || 'שמך';
+
+  // Pre-fill avatar
+  _peAvatar = {
+    type:  m.avatarType  || 'emoji',
+    value: m.avatarValue || '🛒',
+    emoji: m.avatarEmoji || null,
+  };
+  updatePeAvatarPreview();
+
+  // Render grids
+  renderPeEmojiGrid();
+  renderPeCartoonGrid();
+
+  // Switch to current tab
+  switchAvTab(_peAvatar.type, null);
+
+  // Close members modal first
+  closeOL2('members-overlay');
+  document.getElementById('profile-edit-overlay').classList.add('show');
+};
+
+// ── SWITCH AVATAR TAB ──
+window.switchAvTab = function(type, clickedEl) {
+  // Update tab styles
+  document.querySelectorAll('.av-tab').forEach(t => t.classList.remove('active'));
+  if (clickedEl) clickedEl.classList.add('active');
+  else {
+    // Activate by type
+    const tabs = document.querySelectorAll('.av-tab');
+    const map = { emoji: 0, cartoon: 1, photo: 2 };
+    if (tabs[map[type]]) tabs[map[type]].classList.add('active');
+  }
+  // Show/hide panels
+  document.getElementById('pe-emoji-panel').classList.toggle('show',   type === 'emoji');
+  document.getElementById('pe-cartoon-panel').classList.toggle('show', type === 'cartoon');
+  document.getElementById('pe-photo-panel').classList.toggle('show',   type === 'photo');
+};
+
+// ── RENDER EMOJI GRID ──
+function renderPeEmojiGrid() {
+  const grid = document.getElementById('pe-emoji-grid');
+  if (!grid || grid.dataset.rendered) return;
+  grid.innerHTML = EMOJIS.map(e =>
+    `<button class="emoji-btn${_peAvatar.value===e&&_peAvatar.type==='emoji'?' sel':''}"
+      onclick="pickPeEmoji('${e}')">${e}</button>`
+  ).join('');
+  grid.dataset.rendered = '1';
+}
+
+function renderPeCartoonGrid() {
+  const grid = document.getElementById('pe-cartoon-grid');
+  if (!grid || grid.dataset.rendered) return;
+  grid.innerHTML = CARTOONS.map(c =>
+    `<button class="cartoon-btn${_peAvatar.value===c.id&&_peAvatar.type==='cartoon'?' sel':''}"
+      onclick="pickPeCartoon('${c.id}','${c.e}')">${c.e}</button>`
+  ).join('');
+  grid.dataset.rendered = '1';
+}
+
+window.pickPeEmoji = function(emoji) {
+  _peAvatar = { type: 'emoji', value: emoji, emoji: null };
+  updatePeAvatarPreview();
+  document.querySelectorAll('#pe-emoji-grid .emoji-btn').forEach(b =>
+    b.classList.toggle('sel', b.textContent === emoji));
+};
+
+window.pickPeCartoon = function(id, emoji) {
+  _peAvatar = { type: 'cartoon', value: id, emoji };
+  updatePeAvatarPreview();
+  document.querySelectorAll('#pe-cartoon-grid .cartoon-btn').forEach(b =>
+    b.classList.toggle('sel', b.textContent === emoji));
+};
+
+window.handleProfilePhotoEdit = async function(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { toast('⚠️ תמונה גדולה מדי (מקס 5MB)'); return; }
+  const dataUrl = await compressImage(file, 200);
+  _peAvatar = { type: 'photo', value: dataUrl, isBlob: true, file };
+  updatePeAvatarPreview();
+  document.getElementById('pe-photo-preview').textContent = '✅ תמונה נטענה — לחץ "שמור" לאישור';
+};
+
+function updatePeAvatarPreview() {
+  const wrap    = document.getElementById('pe-avatar-preview');
+  const content = document.getElementById('pe-avatar-content');
+  if (!wrap || !content) return;
+
+  if (_peAvatar.type === 'photo' && _peAvatar.value) {
+    const src = _peAvatar.value;
+    content.innerHTML = `<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+  } else {
+    const e = _peAvatar.type === 'cartoon' ? (_peAvatar.emoji || '🧑') : (_peAvatar.value || '🛒');
+    content.innerHTML = `<span style="font-size:34px">${e}</span>`;
+  }
+}
+
+// ── SAVE PROFILE EDIT ──
+window.saveProfileEdit = async function() {
+  const name = document.getElementById('pe-name-input').value.trim();
+  if (!name) { toast('⚠️ הכנס שם תצוגה'); return; }
+
+  let avatarValue = _peAvatar.value;
+  let avatarType  = _peAvatar.type;
+  let avatarEmoji = _peAvatar.emoji || null;
+
+  // Upload photo if new blob
+  if (avatarType === 'photo' && _peAvatar.isBlob && _peAvatar.file) {
+    toast('⬆️ מעלה תמונה...');
+    try {
+      avatarValue = await uploadAvatarPhoto(_peAvatar.file);
+    } catch (e) {
+      console.warn('[profile-edit] photo upload failed, keeping local:', e.message);
+      // Keep base64 as fallback
+    }
+  }
+
+  const updatedProfile = {
+    displayName: name,
+    avatarType,
+    avatarValue,
+    avatarEmoji,
+  };
+
+  // Update local state
+  myName    = name;
+  myProfile = { ...myProfile, ...updatedProfile };
+  localStorage.setItem('fsl_profile', JSON.stringify(myProfile));
+
+  // Update in Firebase groups/{groupId}/members/{myId}
+  if (db && groupId && myId) {
+    try {
+      await update(ref(db, `groups/${groupId}/members/${myId}`), {
+        displayName: name,
+        avatarType,
+        avatarValue,
+        avatarEmoji,
+        updatedAt: Date.now(),
+      });
+      console.log('[profile-edit] Firebase member updated');
+    } catch (e) {
+      console.warn('[profile-edit] Firebase update failed:', e.message);
+    }
+  }
+
+  // Update header avatar display
+  updateHeaderAvatar();
+
+  closeOL2('profile-edit-overlay');
+  toast(`✅ פרופיל עודכן — שלום ${name}!`);
+
+  // Re-render list to show updated attribution
+  renderList();
+};
+
+// ── UPDATE HEADER AVATAR ──
+function updateHeaderAvatar() {
+  const hdrAv = document.getElementById('hdr-my-avatar');
+  if (!hdrAv) return;
+  const m = myProfile || {};
+  if (m.avatarType === 'photo' && m.avatarValue) {
+    hdrAv.innerHTML = `<img src="${m.avatarValue}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+  } else {
+    const e = m.avatarType === 'cartoon' ? (m.avatarEmoji || '🧑') : (m.avatarValue || '👤');
+    hdrAv.textContent = e;
+  }
+}
+
 // SERVICE WORKER
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -2456,6 +2667,7 @@ onAuthStateChanged(auth, async (user) => {
         localStorage.setItem('fsl_v2', JSON.stringify({ ...u, myId: firebaseUid }));
         loadSavedProfile();
         connectToGroup();
+        setTimeout(updateHeaderAvatar, 300);
       } catch(_) {
         showScreen('setup-screen');
       }
@@ -2670,6 +2882,69 @@ onAuthStateChanged(auth, async (user) => {
     <div class="modal-row">
       <button class="mbtn primary" onclick="submitReport()">📢 שלח דיווח</button>
       <button class="mbtn ghost" onclick="closeOL2('report-overlay')">סגור</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ PROFILE EDIT MODAL ═══ -->
+<div class="overlay" id="profile-edit-overlay" onclick="closeOL(event,'profile-edit-overlay')">
+  <div class="modal" style="max-height:88vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+
+    <!-- Live preview header -->
+    <div class="profile-edit-header">
+      <div class="profile-edit-avatar" id="pe-avatar-preview" onclick="document.getElementById('pe-avatar-tabs').scrollIntoView({behavior:'smooth'})">
+        <span id="pe-avatar-content" style="font-size:34px">🛒</span>
+        <div class="edit-overlay">✏️</div>
+      </div>
+      <div class="profile-edit-name" id="pe-name-preview">שמך</div>
+    </div>
+
+    <!-- Name field -->
+    <div class="field" style="margin-bottom:14px">
+      <div class="field-label">✏️ שם תצוגה</div>
+      <input id="pe-name-input" class="add-input" maxlength="20"
+        placeholder="השם שלך..."
+        oninput="document.getElementById('pe-name-preview').textContent=this.value||'שמך'">
+    </div>
+
+    <!-- Avatar type tabs -->
+    <div class="field-label" style="margin-bottom:6px">🎨 אווטאר</div>
+    <div class="avatar-type-tabs" id="pe-avatar-tabs">
+      <div class="av-tab active" onclick="switchAvTab('emoji',this)">😀 אמוג'י</div>
+      <div class="av-tab" onclick="switchAvTab('cartoon',this)">🎨 קריקטורה</div>
+      <div class="av-tab" onclick="switchAvTab('photo',this)">📷 תמונה</div>
+    </div>
+
+    <!-- Emoji panel -->
+    <div class="av-panel show" id="pe-emoji-panel">
+      <div class="emoji-grid" id="pe-emoji-grid"></div>
+    </div>
+
+    <!-- Cartoon panel -->
+    <div class="av-panel" id="pe-cartoon-panel">
+      <div class="cartoon-grid" id="pe-cartoon-grid"></div>
+    </div>
+
+    <!-- Photo panel -->
+    <div class="av-panel" id="pe-photo-panel" style="padding:10px 0">
+      <div style="display:flex;gap:10px">
+        <button class="mbtn primary" style="flex:1" onclick="document.getElementById('pe-camera-input').click()">
+          📷 צלם
+        </button>
+        <button class="mbtn ghost" style="flex:1" onclick="document.getElementById('pe-gallery-input').click()">
+          🖼️ גלריה
+        </button>
+      </div>
+      <input type="file" id="pe-camera-input"  accept="image/*" capture="environment" style="display:none" onchange="handleProfilePhotoEdit(this)">
+      <input type="file" id="pe-gallery-input" accept="image/*" style="display:none" onchange="handleProfilePhotoEdit(this)">
+      <div id="pe-photo-preview" style="margin-top:10px;text-align:center;color:var(--muted);font-size:12px"></div>
+    </div>
+
+    <div class="modal-row" style="margin-top:14px">
+      <button class="mbtn primary" onclick="saveProfileEdit()">💾 שמור שינויים</button>
+      <button class="mbtn ghost" onclick="closeOL2('profile-edit-overlay')">סגור</button>
     </div>
   </div>
 </div>
