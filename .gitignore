@@ -1,0 +1,7 @@
+node_modules/
+workers/prices/.env
+.env
+package-lock.json
+*.log
+.DS_Store
+Thumbs.db
