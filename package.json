@@ -1,8 +1,28 @@
 {
-  "name": "family-shopping",
-  "version": "1.0.0",
+  "name": "israeli-price-worker",
+  "version": "2.0.0",
+  "description": "Israeli supermarket price sync worker — runs on Israeli VPS",
   "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "sync": "node index.js",
+    "sync:chain": "node index.js",
+    "test:config": "node -e \"import('./config.js').then(m=>m.loadConfig()).then(c=>console.log('Config OK, project:', c.firebase.projectId)).catch(e=>console.error('Config ERROR:', e.message))\"",
+    "test:firebase": "node -e \"import('./config.js').then(m=>m.loadConfig()).then(async c=>{const {initFirebase,getDB}=await import('./firebaseWriter.js');initFirebase(c.firebase);const db=getDB();const s=await db.ref('syncSummary').get();console.log('Firebase OK, syncSummary:', s.val());process.exit(0)}).catch(e=>{console.error('FAILED:',e.message);process.exit(1)})\"",
+    "check:ip": "node check-ip.js",
+    "check:ip:silent": "node check-ip.js --silent",
+    "test:curl": "bash -c \"echo Testing Shufersal... && curl -s -o /dev/null -w \\\"HTTP %{http_code} from %{url_effective}\\n\\\" -L --max-time 10 https://prices.shufersal.co.il/ && echo Testing Rami Levy... && curl -s -o /dev/null -w \\\"HTTP %{http_code} from %{url_effective}\\n\\\" -L --max-time 10 https://url.retail.pe.il/MF/latest/ && echo Done.\"",
+    "test": "node tests/run-tests.js",
+    "sync:dry-run": "DRY_RUN=true node index.js",
+    "sync:dry-run:chain": "DRY_RUN=true node index.js"
+  },
   "dependencies": {
-    "firebase-admin": "^12.1.0"
+    "firebase-admin": "^12.1.0",
+    "node-fetch": "^3.3.2",
+    "sax": "^1.4.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }
