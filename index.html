@@ -626,6 +626,112 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 .fav-empty .fav-em{font-size:40px;margin-bottom:10px}
 .fav-empty p{font-size:13px;line-height:1.5}
 
+
+/* ══ MULTI-GROUP DROPDOWN ══ */
+.group-switcher{position:relative;display:flex;align-items:center;gap:6px;cursor:pointer}
+.group-switcher-arrow{font-size:10px;color:var(--muted);transition:transform .2s;flex-shrink:0}
+.group-switcher-arrow.open{transform:rotate(180deg)}
+
+.group-dropdown{position:absolute;top:calc(100% + 8px);right:0;left:0;
+  background:var(--surface);border:1.5px solid var(--border);border-radius:14px;
+  box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:300;min-width:200px;
+  overflow:hidden;display:none}
+.group-dropdown.show{display:block}
+
+.gdrop-header{font-size:9px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.8px;padding:10px 14px 4px}
+.gdrop-item{display:flex;align-items:center;gap:9px;padding:10px 14px;
+  cursor:pointer;transition:background .12s}
+.gdrop-item:active,.gdrop-item:hover{background:var(--card)}
+.gdrop-item.active-group{background:var(--accent-dim)}
+.gdrop-item-dot{width:8px;height:8px;border-radius:50%;
+  background:var(--border);flex-shrink:0}
+.gdrop-item.active-group .gdrop-item-dot{background:var(--accent)}
+.gdrop-item-name{font-size:13px;font-weight:600;flex:1}
+.gdrop-item-code{font-size:10px;color:var(--muted)}
+.gdrop-divider{height:1px;background:var(--border);margin:4px 0}
+.gdrop-action{display:flex;align-items:center;gap:8px;padding:10px 14px;
+  cursor:pointer;font-size:13px;color:var(--muted);transition:background .12s}
+.gdrop-action:active,.gdrop-action:hover{background:var(--card);color:var(--text)}
+.gdrop-action-icon{font-size:16px;width:20px;text-align:center}
+
+
+/* ══ DELETE CONFIRMATION MODAL ══ */
+.confirm-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);
+  z-index:700;display:flex;align-items:flex-end;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .2s}
+.confirm-modal-overlay.show{opacity:1;pointer-events:all}
+.confirm-modal{background:var(--surface);border-radius:20px 20px 0 0;
+  padding:20px 18px 32px;width:100%;max-width:480px;
+  transform:translateY(100%);transition:transform .25s cubic-bezier(.4,0,.2,1)}
+.confirm-modal-overlay.show .confirm-modal{transform:translateY(0)}
+.confirm-modal-handle{width:40px;height:4px;border-radius:2px;
+  background:var(--border);margin:0 auto 18px}
+.confirm-modal-icon{font-size:36px;text-align:center;margin-bottom:8px}
+.confirm-modal-title{font-size:17px;font-weight:800;text-align:center;margin-bottom:6px}
+.confirm-modal-item{font-size:15px;font-weight:600;text-align:center;
+  color:var(--accent);margin-bottom:4px}
+.confirm-modal-by{font-size:12px;color:var(--muted);text-align:center;
+  display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:20px}
+.confirm-modal-by-av{width:18px;height:18px;border-radius:50%;
+  background:var(--card2);display:flex;align-items:center;justify-content:center;
+  font-size:11px;overflow:hidden;flex-shrink:0}
+.confirm-modal-by-av img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.confirm-btns{display:flex;gap:10px}
+.confirm-btn-cancel{flex:1;background:var(--card2);border:1.5px solid var(--border);
+  border-radius:13px;padding:13px;font-family:'Heebo',sans-serif;font-size:15px;
+  font-weight:700;color:var(--text);cursor:pointer;transition:all .12s}
+.confirm-btn-cancel:active{opacity:.7}
+.confirm-btn-delete{flex:1;background:var(--red);border:none;
+  border-radius:13px;padding:13px;font-family:'Heebo',sans-serif;font-size:15px;
+  font-weight:700;color:#fff;cursor:pointer;transition:all .12s}
+.confirm-btn-delete:active{opacity:.8;transform:scale(.97)}
+
+/* ══ NOTIFICATION BELL ══ */
+.notif-btn{position:relative;width:34px;height:34px;border-radius:50%;
+  border:none;background:var(--card);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+  transition:background .15s}
+.notif-btn:active{background:var(--card2)}
+.notif-badge{position:absolute;top:-2px;right:-2px;background:var(--red);
+  color:#fff;border-radius:50%;min-width:16px;height:16px;
+  font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;
+  padding:0 3px;border:2px solid var(--surface);display:none}
+.notif-badge.show{display:flex}
+
+/* ══ NOTIFICATION PANEL ══ */
+.notif-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);
+  z-index:600;display:none;align-items:flex-end;justify-content:center}
+.notif-overlay.show{display:flex}
+.notif-panel{background:var(--surface);border-radius:20px 20px 0 0;
+  width:100%;max-width:480px;max-height:75vh;display:flex;flex-direction:column;
+  padding-bottom:env(safe-area-inset-bottom,0)}
+.notif-panel-header{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
+.notif-panel-title{font-size:16px;font-weight:800}
+.notif-mark-all{background:transparent;border:none;color:var(--accent);
+  font-family:'Heebo',sans-serif;font-size:12px;font-weight:700;cursor:pointer}
+.notif-list{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
+.notif-item{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;
+  border-bottom:1px solid var(--border);transition:background .12s;cursor:pointer}
+.notif-item:active{background:var(--card)}
+.notif-item.unread{background:rgba(240,180,41,.06)}
+.notif-item.unread::before{content:'';position:absolute;right:0;top:50%;
+  transform:translateY(-50%);width:4px;height:60%;border-radius:2px;
+  background:var(--accent)}
+.notif-item{position:relative}
+.notif-av{width:36px;height:36px;border-radius:50%;background:var(--card2);
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+  flex-shrink:0;overflow:hidden}
+.notif-av img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.notif-body{flex:1;min-width:0}
+.notif-text{font-size:13px;line-height:1.4;color:var(--text)}
+.notif-text strong{font-weight:700}
+.notif-time{font-size:10px;color:var(--muted);margin-top:3px}
+.notif-empty{text-align:center;padding:50px 20px;color:var(--muted)}
+.notif-empty .ne-icon{font-size:40px;margin-bottom:10px}
+.notif-empty p{font-size:13px}
+
 </style>
 </head>
 <body>
@@ -667,18 +773,44 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 <div class="screen" id="main-screen">
   <div class="header">
     <div class="header-top">
-      <div class="group-info" style="display:flex;align-items:center;gap:9px;cursor:pointer" onclick="openProfileEdit()">
-        <div id="hdr-my-avatar" style="width:34px;height:34px;border-radius:50%;
-          background:var(--accent-dim);display:flex;align-items:center;justify-content:center;
-          font-size:18px;flex-shrink:0;border:2px solid var(--accent);overflow:hidden">👤</div>
-        <div>
-          <div class="group-name" id="hdr-group-name">משפחה</div>
-          <div class="group-code">קוד: <span id="hdr-group-code">------</span></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <!-- Avatar — click to edit profile -->
+        <div id="hdr-my-avatar"
+          onclick="openProfileEdit()"
+          style="width:34px;height:34px;border-radius:50%;background:var(--accent-dim);
+            display:flex;align-items:center;justify-content:center;font-size:18px;
+            flex-shrink:0;border:2px solid var(--accent);overflow:hidden;cursor:pointer"
+          title="ערוך פרופיל">👤</div>
+
+        <!-- Group switcher dropdown -->
+        <div class="group-switcher" id="group-switcher" onclick="toggleGroupDropdown()">
+          <div>
+            <div class="group-name" id="hdr-group-name">משפחה</div>
+            <div class="group-code">קוד: <span id="hdr-group-code">------</span></div>
+          </div>
+          <span class="group-switcher-arrow" id="gdrop-arrow">▾</span>
+
+          <!-- Dropdown -->
+          <div class="group-dropdown" id="group-dropdown" onclick="event.stopPropagation()">
+            <div class="gdrop-header">הקבוצות שלי</div>
+            <div id="gdrop-list"></div>
+            <div class="gdrop-divider"></div>
+            <div class="gdrop-action" onclick="openJoinGroupPanel()">
+              <span class="gdrop-action-icon">🔗</span> הצטרף לקבוצה נוספת
+            </div>
+            <div class="gdrop-action" onclick="openCreateGroupPanel()">
+              <span class="gdrop-action-icon">✨</span> צור קבוצה חדשה
+            </div>
+          </div>
         </div>
       </div>
       <div class="hdr-r">
         <div class="online-dot" id="online-dot" style="opacity:.3"></div>
         <div class="av-stack" id="av-stack"></div>
+        <button class="notif-btn" id="notif-btn" onclick="openNotifications()" title="התראות">
+          🔔
+          <span class="notif-badge" id="notif-badge"></span>
+        </button>
         <button class="icon-btn" onclick="openMembers()">👥</button>
         <button class="icon-btn" onclick="openShare()">📤</button>
       </div>
@@ -832,29 +964,29 @@ window.joinGroup=async function(){
 
 function connectToGroup(){
   showScreen('main-screen');
+  // Cleanup old notifications silently (>30 days)
+  setTimeout(() => cleanupOldNotifications(), 5000);
   document.getElementById('hdr-group-name').textContent=groupName;
   document.getElementById('hdr-group-code').textContent=groupId;
-  document.getElementById('modal-code').textContent=groupId;
+  if(document.getElementById('modal-code'))
+    document.getElementById('modal-code').textContent=groupId;
 
+  // Connection status listener (global, not group-scoped)
   onValue(ref(db,'.info/connected'),snap=>{
     document.getElementById('online-dot').style.opacity=snap.val()?'1':'.3';
   });
-  onValue(ref(db,`groups/${groupId}/items`),snap=>{
-    items=snap.val()||{}; renderList(); renderPrices(); updateCounts();
-  });
-  onValue(ref(db,`groups/${groupId}/members`),snap=>{
-    members=snap.val()||{}; renderAvatars();
-  });
-  onValue(ref(db,`groups/${groupId}/prices`),snap=>{
-    prices=snap.val()||{}; if(curTab==='price')renderPrices();
-  });
-  // Favorites real-time listener
-  onValue(ref(db, `favorites/${groupId}`), snap => {
-    favorites = snap.val() || {};
-    if (curTab === 'fav') renderFavoritesPanel();
-    renderList(); // refresh stars on list items
-    updateCounts();
-  });
+
+  // Attach all group-scoped listeners (detaches previous ones automatically)
+  attachGroupListeners();
+
+  // Save active group to localStorage
+  localStorage.setItem('activeGroupId', groupId);
+
+  // Ensure member record + users/{userId}/groups entry
+  ensureGroupMembership(groupId, groupName);
+
+  // Load header avatar
+  setTimeout(updateHeaderAvatar, 300);
 
   toast('👋 שלום '+myName+'!');
 }
@@ -928,8 +1060,17 @@ function updateCounts(){
 
 function renderAvatars(){
   const stack=document.getElementById('av-stack');
-  stack.innerHTML=Object.values(members).slice(0,4).map(m=>
-    `<div class="av" title="${esc(m.name)}">${m.name.charAt(0)}</div>`).join('');
+  if(!stack) return;
+  stack.innerHTML=Object.values(members).slice(0,4).map(m=>{
+    const name = m.displayName || m.name || '?';
+    if(m.avatarType==='photo'&&m.avatarValue&&!m.avatarValue.startsWith('blob:')) {
+      return `<div class="av" title="${esc(name)}" style="overflow:hidden;padding:0">
+        <img src="${esc(m.avatarValue)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">
+      </div>`;
+    }
+    const e = m.avatarType==='cartoon'?(m.avatarEmoji||'🧑'):(m.avatarValue||name.charAt(0)||'?');
+    return `<div class="av" title="${esc(name)}">${e}</div>`;
+  }).join('');
 }
 
 // ── LIVE PRICE SEARCH ──
@@ -1438,14 +1579,38 @@ window.saveProfile = async function() {
 };
 
 async function uploadAvatarPhoto(file) {
-  // Dynamic import Firebase Storage
-  const { getStorage, ref: storRef, uploadBytes, getDownloadURL } = 
+  const { getStorage, ref: storRef, uploadBytes, getDownloadURL } =
     await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js');
   const storage = getStorage();
+  // Unique path per user — overwrites previous photo automatically
   const path = `avatars/${groupId}/${myId}/profile.jpg`;
   const sRef = storRef(storage, path);
-  await uploadBytes(sRef, file, { contentType: 'image/jpeg' });
-  return await getDownloadURL(sRef);
+  // Compress before upload
+  const compressed = await compressImageToBlob(file, 300);
+  await uploadBytes(sRef, compressed, { contentType: 'image/jpeg' });
+  const url = await getDownloadURL(sRef);
+  console.log('[avatar] uploaded, URL:', url.substring(0, 60) + '...');
+  return url;
+}
+
+// Compress image file → Blob (for Storage upload, not base64)
+async function compressImageToBlob(file, maxPx) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = e => {
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ratio = Math.min(maxPx / img.width, maxPx / img.height, 1);
+        canvas.width  = Math.round(img.width  * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.85);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 // ══════════════════════════════════════════════════
@@ -1471,12 +1636,12 @@ function itemHTML(item) {
   // Check if this item name is saved in favorites
   const isFavSaved = isItemInFavorites(item.name, item.barcode);
 
-  // Try live member profile
-  const addedMember = members[item.addedByUserId] || null;
+  // Live member data is PRIMARY source — snapshot is FALLBACK only
+  const addedMember = item.addedByUserId ? (members[item.addedByUserId] || null) : null;
   const displayName = addedMember?.displayName || item.addedByDisplayName || item.addedBy || '?';
   const avatarType  = addedMember?.avatarType  || item.addedByAvatarType  || 'emoji';
   const avatarValue = addedMember?.avatarValue || item.addedByAvatarValue || '👤';
-  const avatarEmoji = addedMember?.avatarEmoji || null;
+  const avatarEmoji = addedMember?.avatarEmoji || item.addedByAvatarEmoji || null;
 
   const checkBtn  = isFavTab ? '' : `<button class="check-btn" onclick="toggleBought('${item.id}')">${item.bought?'✓':''}</button>`;
   const boughtBtn = isFavTab ? '' : `<span class="${item.bought?'bought-tag':'pending-tag'}" onclick="toggleBought('${item.id}')">${item.bought?'✅ קניתי':'קניתי'}</span>`;
@@ -1684,25 +1849,45 @@ window.addItem = function() {
 
 // Override toggleBought to save checkedByUserId
 const _origToggleBought = window.toggleBought;
-window.toggleBought = function(id) {
+window.toggleBought = async function(id) {
   const item = items[id];
   if (!item) return;
   const nowBought = !item.bought;
-  update(ref(db, `groups/${groupId}/items/${id}`), {
-    bought: nowBought,
+
+  await update(ref(db, `groups/${groupId}/items/${id}`), {
+    bought:          nowBought,
     checkedByUserId: nowBought ? myId : null,
     checkedAt:       nowBought ? Date.now() : null,
   });
-  if (nowBought) logActivity('item_checked', id, item.name);
+
+  if (nowBought) {
+    logActivity('item_checked', id, item.name);
+    // Notify item owner if different user
+    const isOther = item.addedByUserId && item.addedByUserId !== myId;
+    if (isOther) {
+      const targets = {};
+      targets[item.addedByUserId] = true;
+      await createNotification({
+        type: 'item_bought', itemId: id,
+        itemName: item.name, targetUsersObj: targets,
+      });
+    }
+  } else {
+    logActivity('item_unbought', id, item.name);
+    const isOther = item.addedByUserId && item.addedByUserId !== myId;
+    if (isOther) {
+      const targets = {};
+      targets[item.addedByUserId] = true;
+      await createNotification({
+        type: 'item_unbought', itemId: id,
+        itemName: item.name, targetUsersObj: targets,
+      });
+    }
+  }
 };
 
 // Override deleteItem to log activity
 const _origDeleteItem = window.deleteItem;
-window.deleteItem = function(id) {
-  const item = items[id];
-  if (item) logActivity('item_removed', id, item.name);
-  remove(ref(db, `groups/${groupId}/items/${id}`));
-};
 
 // ══════════════════════════════════════════════════
 // PROFILE INIT ON APP LOAD
@@ -2592,20 +2777,37 @@ window.saveProfileEdit = async function() {
   myProfile = { ...myProfile, ...updatedProfile };
   localStorage.setItem('fsl_profile', JSON.stringify(myProfile));
 
-  // Update in Firebase groups/{groupId}/members/{myId}
+  // Validate: do not store blob: URLs or data: URLs in Firebase
+  if (avatarType === 'photo' && avatarValue && avatarValue.startsWith('blob:')) {
+    toast('⚠️ שגיאה בהעלאת תמונה — נסה שוב'); return;
+  }
+
+  // Update groups/{groupId}/members/{myId} — triggers onValue → re-render
   if (db && groupId && myId) {
     try {
       await update(ref(db, `groups/${groupId}/members/${myId}`), {
+        userId:      myId,
         displayName: name,
         avatarType,
         avatarValue,
         avatarEmoji,
+        role:      'member',
         updatedAt: Date.now(),
       });
       console.log('[profile-edit] Firebase member updated');
     } catch (e) {
       console.warn('[profile-edit] Firebase update failed:', e.message);
     }
+  }
+
+  // Also update users/{myId}/groups/{groupId} entry
+  if (db && myId && groupId) {
+    try {
+      await update(ref(db, `users/${myId}/groups/${groupId}`), {
+        groupName,
+        role: 'member',
+      });
+    } catch (_) {}
   }
 
   // Update header avatar display
@@ -2893,6 +3095,584 @@ function renderFavoritesPanel() {
         </div>
       </div>`;
   }).join('');
+}
+
+
+// ══════════════════════════════════════════════════
+// MULTI-GROUP SYSTEM v1.0
+// Firebase: users/{userId}/groups/{groupId}
+//           groups/{groupId}/members/{userId}
+// ══════════════════════════════════════════════════
+
+// Active Firebase listeners — stored so we can detach when switching groups
+let _groupListeners = []; // array of unsubscribe functions
+
+// My groups map: groupId → { groupId, groupName, role, joinedAt }
+let myGroups = {};
+
+// ── DETACH ALL GROUP LISTENERS ──
+function detachGroupListeners() {
+  _groupListeners.forEach(unsub => { try { unsub(); } catch(_) {} });
+  _groupListeners = [];
+  // Also stop notification listener for previous group
+  stopNotificationListener();
+  _allNotifications = {};
+  updateNotifBadge();
+  console.log('[multi-group] listeners detached');
+}
+
+// ── ATTACH GROUP LISTENERS (replaces connectToGroup body) ──
+function attachGroupListeners() {
+  detachGroupListeners();
+
+  const unsubItems = onValue(ref(db, `groups/${groupId}/items`), snap => {
+    items = snap.val() || {};
+    renderList(); renderPrices(); updateCounts();
+  });
+  const unsubMembers = onValue(ref(db, `groups/${groupId}/members`), snap => {
+    members = snap.val() || {};
+    renderAvatars();
+    renderList();      // ← live avatar update on all items
+    renderProfile();   // ← update header avatar if own profile changed
+    updateHeaderAvatar();
+  });
+  const unsubPrices = onValue(ref(db, `groups/${groupId}/prices`), snap => {
+    prices = snap.val() || {};
+    if (curTab === 'price') renderPrices();
+  });
+  const unsubFavs = onValue(ref(db, `favorites/${groupId}`), snap => {
+    favorites = snap.val() || {};
+    if (curTab === 'fav') renderFavoritesPanel();
+    renderList();
+    updateCounts();
+  });
+  const unsubMyGroups = onValue(ref(db, `users/${myId}/groups`), snap => {
+    myGroups = snap.val() || {};
+    renderGroupDropdown();
+  });
+
+  _groupListeners.push(unsubItems, unsubMembers, unsubPrices, unsubFavs, unsubMyGroups);
+  console.log('[multi-group] listeners attached for', groupId);
+
+  // Start notification listener for new group
+  startGroupNotifications();
+}
+
+// ── SWITCH TO A DIFFERENT GROUP ──
+window.switchGroup = async function(newGroupId) {
+  if (newGroupId === groupId) { closeGroupDropdown(); return; }
+
+  // Look up group name from myGroups or Firebase
+  let newGroupName = myGroups[newGroupId]?.groupName || '';
+  if (!newGroupName) {
+    try {
+      const snap = await get(ref(db, `groups/${newGroupId}/info`));
+      if (snap.exists()) newGroupName = snap.val().name || newGroupId;
+    } catch(_) { newGroupName = newGroupId; }
+  }
+
+  console.log('[multi-group] switching to', newGroupId, newGroupName);
+
+  // Update state
+  groupId   = newGroupId;
+  groupName = newGroupName;
+  items = {}; members = {}; prices = {}; favorites = {};
+
+  // Persist active group
+  localStorage.setItem('activeGroupId', groupId);
+  saveLocal();
+
+  // Update header
+  document.getElementById('hdr-group-name').textContent = groupName;
+  document.getElementById('hdr-group-code').textContent = groupId;
+  if (document.getElementById('modal-code'))
+    document.getElementById('modal-code').textContent = groupId;
+
+  // Ensure we're in the members list for this group
+  await ensureGroupMembership(newGroupId, newGroupName);
+
+  // Reattach listeners
+  attachGroupListeners();
+
+  // Reset tab to list
+  setTab('all');
+  closeGroupDropdown();
+  toast(`📂 עברת לקבוצה: ${groupName}`);
+};
+
+// ── ENSURE MEMBERSHIP in the group ──
+async function ensureGroupMembership(gId, gName) {
+  const m = myProfile || {};
+  try {
+    // Add to groups/{groupId}/members
+    await update(ref(db, `groups/${gId}/members/${myId}`), {
+      userId:      myId,
+      displayName: myName,
+      avatarType:  m.avatarType  || 'emoji',
+      avatarValue: m.avatarValue || '👤',
+      avatarEmoji: m.avatarEmoji || null,
+      role:        'member',
+      updatedAt:   Date.now(),
+    });
+    // Add to users/{userId}/groups
+    await set(ref(db, `users/${myId}/groups/${gId}`), {
+      groupId:   gId,
+      groupName: gName,
+      role:      'member',
+      joinedAt:  Date.now(),
+    });
+  } catch(e) { console.warn('[multi-group] ensureMembership failed:', e.message); }
+}
+
+// ── RENDER GROUP DROPDOWN ──
+function renderGroupDropdown() {
+  const list = document.getElementById('gdrop-list');
+  if (!list) return;
+
+  const groupList = Object.values(myGroups)
+    .sort((a, b) => (b.joinedAt || 0) - (a.joinedAt || 0));
+
+  if (!groupList.length) {
+    list.innerHTML = `<div style="padding:8px 14px;font-size:12px;color:var(--muted)">
+      אין קבוצות</div>`;
+    return;
+  }
+
+  list.innerHTML = groupList.map(g => `
+    <div class="gdrop-item${g.groupId === groupId ? ' active-group' : ''}"
+      onclick="switchGroup('${g.groupId}')">
+      <div class="gdrop-item-dot"></div>
+      <div class="gdrop-item-name">${esc(g.groupName || g.groupId)}</div>
+      <div class="gdrop-item-code">${g.groupId}</div>
+    </div>`).join('');
+}
+
+// ── TOGGLE DROPDOWN ──
+window.toggleGroupDropdown = function() {
+  const dd    = document.getElementById('group-dropdown');
+  const arrow = document.getElementById('gdrop-arrow');
+  if (!dd) return;
+  const isOpen = dd.classList.toggle('show');
+  if (arrow) arrow.classList.toggle('open', isOpen);
+  if (isOpen) {
+    renderGroupDropdown();
+    // Close on outside click
+    setTimeout(() => {
+      document.addEventListener('click', closeGroupDropdownOnOutside, { once: true });
+    }, 0);
+  }
+};
+
+function closeGroupDropdownOnOutside(e) {
+  const dd = document.getElementById('group-dropdown');
+  const sw = document.getElementById('group-switcher');
+  if (dd && !sw?.contains(e.target)) closeGroupDropdown();
+}
+
+function closeGroupDropdown() {
+  const dd    = document.getElementById('group-dropdown');
+  const arrow = document.getElementById('gdrop-arrow');
+  dd?.classList.remove('show');
+  arrow?.classList.remove('open');
+}
+
+// ── OPEN JOIN/CREATE PANEL from dropdown ──
+window.openJoinGroupPanel = function() {
+  closeGroupDropdown();
+  switchAddGroupTab('join');
+  document.getElementById('add-group-overlay').classList.add('show');
+};
+
+window.openCreateGroupPanel = function() {
+  closeGroupDropdown();
+  switchAddGroupTab('create');
+  document.getElementById('add-group-overlay').classList.add('show');
+};
+
+window.switchAddGroupTab = function(tab) {
+  document.getElementById('ag-join-panel').style.display   = tab === 'join'   ? 'block' : 'none';
+  document.getElementById('ag-create-panel').style.display = tab === 'create' ? 'block' : 'none';
+  document.getElementById('agtab-join').className    = 'mbtn ' + (tab === 'join'   ? 'primary' : 'ghost');
+  document.getElementById('agTab-create').className = 'mbtn ' + (tab === 'create' ? 'primary' : 'ghost');
+};
+
+// ── JOIN ANOTHER GROUP ──
+window.joinAnotherGroup = async function() {
+  const code = document.getElementById('ag-join-code').value.trim();
+  if (!code || code.length !== 6) { toast('⚠️ קוד חייב להיות 6 ספרות'); return; }
+  try {
+    const snap = await get(ref(db, `groups/${code}/info`));
+    if (!snap.exists()) { toast('❌ קבוצה לא נמצאה'); return; }
+    const info = snap.val();
+    const newName = info.name || code;
+    closeOL2('add-group-overlay');
+    await switchGroup(code);
+    toast(`✅ הצטרפת לקבוצה: ${newName}`);
+  } catch(e) { toast('❌ ' + e.message); }
+};
+
+// ── CREATE ANOTHER GROUP ──
+window.createAnotherGroup = async function() {
+  const name = document.getElementById('ag-create-name').value.trim();
+  if (!name) { toast('⚠️ הכנס שם קבוצה'); return; }
+  const newCode = String(Math.floor(100000 + Math.random() * 900000));
+  try {
+    await set(ref(db, `groups/${newCode}/info`), { name, code: newCode });
+    closeOL2('add-group-overlay');
+    await switchGroup(newCode);
+    toast(`✨ קבוצה נוצרה: ${name}`);
+  } catch(e) { toast('❌ ' + e.message); }
+};
+
+// ── renderProfile (called on members update) ──
+function renderProfile() {
+  const live = members[myId];
+  if (!live) return;
+  // Update local profile from Firebase if changed
+  if (live.displayName && live.displayName !== myName) {
+    myName = live.displayName;
+  }
+  if (live.avatarValue && myProfile) {
+    myProfile.avatarType  = live.avatarType  || myProfile.avatarType;
+    myProfile.avatarValue = live.avatarValue || myProfile.avatarValue;
+    myProfile.avatarEmoji = live.avatarEmoji || myProfile.avatarEmoji;
+    localStorage.setItem('fsl_profile', JSON.stringify(myProfile));
+  }
+  updateHeaderAvatar();
+}
+
+
+// ══════════════════════════════════════════════════
+// NOTIFICATION SYSTEM v1.0
+// Firebase: notifications/{groupId}/{notifId}
+// Architecture ready for FCM, activity feed, mentions
+// ══════════════════════════════════════════════════
+
+// ── TYPES ──
+const NOTIF_TYPES = {
+  item_deleted:  { icon: '🗑',  verb: 'מחק את'        },
+  item_bought:   { icon: '✅',  verb: 'סימן כנקנה את' },
+  item_unbought: { icon: '↩️',  verb: 'ביטל קנייה של' },
+  item_added:    { icon: '➕',  verb: 'הוסיף את'       },
+  item_updated:  { icon: '✏️',  verb: 'עדכן את'        },
+};
+
+// ── NOTIFICATION LISTENER ──
+let _notifListener = null;
+let _allNotifications = {}; // { notifId: notifObj }
+
+function startNotificationListener() {
+  if (!db || !groupId || !myId) return;
+  if (_notifListener) { _notifListener(); _notifListener = null; }
+
+  _notifListener = onValue(
+    ref(db, `notifications/${groupId}`),
+    snap => {
+      _allNotifications = snap.val() || {};
+      updateNotifBadge();
+    }
+  );
+  console.log('[notif] listener started for group', groupId);
+}
+
+function stopNotificationListener() {
+  if (_notifListener) { _notifListener(); _notifListener = null; }
+}
+
+// ── UNREAD COUNT ──
+function getUnreadCount() {
+  return Object.values(_allNotifications).filter(n =>
+    n.targetUsers?.[myId] &&           // addressed to me
+    !n.readBy?.[myId] &&               // not read by me
+    n.createdBy !== myId               // not my own action
+  ).length;
+}
+
+function updateNotifBadge() {
+  const badge = document.getElementById('notif-badge');
+  if (!badge) return;
+  const count = getUnreadCount();
+  badge.textContent = count > 9 ? '9+' : count;
+  badge.classList.toggle('show', count > 0);
+}
+
+// ── CREATE NOTIFICATION ──
+// Reusable — call this from any action
+async function createNotification({ type, itemId, itemName, targetUsersObj }) {
+  if (!groupId || !myId || !itemName) return;
+  // Don't notify if no other group members
+  const otherMembers = Object.keys(members).filter(uid => uid !== myId);
+  if (!otherMembers.length && !targetUsersObj) return;
+
+  const targets = targetUsersObj || {};
+  otherMembers.forEach(uid => { targets[uid] = true; });
+
+  const m = myProfile || {};
+  const notifId = `n_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+
+  const notif = {
+    type,
+    itemId:          itemId || null,
+    itemName:        sanitize(itemName, 200),
+    createdBy:       myId,
+    createdByName:   myName,
+    createdByAvatar: m.avatarValue || '👤',
+    createdByAvatarType: m.avatarType || 'emoji',
+    targetUsers:     targets,
+    readBy:          {},
+    createdAt:       Date.now(),
+  };
+
+  try {
+    await set(ref(db, `notifications/${groupId}/${notifId}`), notif);
+    console.log('[notif] created:', type, itemName);
+  } catch(e) {
+    console.warn('[notif] create failed:', e.message);
+  }
+}
+
+// ── MARK AS READ ──
+async function markNotificationRead(notifId) {
+  if (!notifId || !myId) return;
+  try {
+    await set(ref(db, `notifications/${groupId}/${notifId}/readBy/${myId}`), true);
+  } catch(e) { console.warn('[notif] markRead failed:', e.message); }
+}
+
+window.markAllNotificationsRead = async function() {
+  const unread = Object.keys(_allNotifications).filter(id => {
+    const n = _allNotifications[id];
+    return n.targetUsers?.[myId] && !n.readBy?.[myId] && n.createdBy !== myId;
+  });
+  await Promise.all(unread.map(id => markNotificationRead(id)));
+  renderNotificationList();
+};
+
+// ── OPEN / CLOSE NOTIFICATIONS ──
+window.openNotifications = function() {
+  document.getElementById('notif-overlay').classList.add('show');
+  renderNotificationList();
+  // Mark visible notifications as read after a short delay
+  setTimeout(() => {
+    Object.keys(_allNotifications).forEach(id => {
+      const n = _allNotifications[id];
+      if (n.targetUsers?.[myId] && !n.readBy?.[myId] && n.createdBy !== myId) {
+        markNotificationRead(id);
+      }
+    });
+  }, 1200);
+};
+
+window.closeNotifications = function() {
+  document.getElementById('notif-overlay').classList.remove('show');
+};
+
+// ── RENDER NOTIFICATION LIST ──
+function renderNotificationList() {
+  const list = document.getElementById('notif-list');
+  if (!list) return;
+
+  const myNotifs = Object.entries(_allNotifications)
+    .map(([id, n]) => ({ ...n, _id: id }))
+    .filter(n => n.targetUsers?.[myId] && n.createdBy !== myId)
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    .slice(0, 50);
+
+  if (!myNotifs.length) {
+    list.innerHTML = `
+      <div class="notif-empty">
+        <div class="ne-icon">🔔</div>
+        <p>אין התראות עדיין</p>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = myNotifs.map(n => {
+    const isUnread = !n.readBy?.[myId];
+    const meta = NOTIF_TYPES[n.type] || { icon: '📣', verb: 'עדכן' };
+    const timeStr = formatNotifTime(n.createdAt);
+
+    // Avatar
+    let avHTML = '';
+    if (n.createdByAvatarType === 'photo' && n.createdByAvatar &&
+        !n.createdByAvatar.startsWith('blob:')) {
+      avHTML = `<div class="notif-av">
+        <img src="${esc(n.createdByAvatar)}" loading="lazy"></div>`;
+    } else {
+      const e = n.createdByAvatarType === 'cartoon'
+        ? (n.createdByAvatar || '🧑')
+        : (n.createdByAvatar || '👤');
+      avHTML = `<div class="notif-av">${e}</div>`;
+    }
+
+    return `<div class="notif-item${isUnread ? ' unread' : ''}"
+      onclick="markNotificationRead('${n._id}');this.classList.remove('unread')">
+      ${avHTML}
+      <div class="notif-body">
+        <div class="notif-text">
+          <strong>${esc(n.createdByName || 'מישהו')}</strong>
+          ${meta.verb} <strong>${esc(n.itemName)}</strong>
+          ${meta.icon}
+        </div>
+        <div class="notif-time">${timeStr}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── TIME FORMATTER ──
+function formatNotifTime(ts) {
+  if (!ts) return '';
+  const diff = Date.now() - ts;
+  if (diff < 60000)  return 'עכשיו';
+  if (diff < 3600000) return `לפני ${Math.round(diff/60000)} דקות`;
+  if (diff < 86400000) return `לפני ${Math.round(diff/3600000)} שעות`;
+  return new Date(ts).toLocaleDateString('he-IL');
+}
+
+// ── Hook notification listener into group connect/switch ──
+// Called from attachGroupListeners
+function startGroupNotifications() {
+  startNotificationListener();
+}
+
+// ══════════════════════════════════════════════════
+// DELETE CONFIRMATION SYSTEM
+// ══════════════════════════════════════════════════
+
+let _pendingDeleteId   = null;
+let _pendingDeleteItem = null;
+
+// ── SHOW CONFIRM DELETE MODAL ──
+window.deleteItem = function(id) {
+  const item = items[id];
+  if (!item) return;
+
+  _pendingDeleteId   = id;
+  _pendingDeleteItem = item;
+
+  // Populate modal
+  document.getElementById('confirm-item-name').textContent = item.name || 'פריט';
+
+  // Show who added it
+  const addedMember  = members[item.addedByUserId] || null;
+  const adderName    = addedMember?.displayName || item.addedByDisplayName || item.addedBy || '';
+  const adderAvType  = addedMember?.avatarType  || item.addedByAvatarType  || 'emoji';
+  const adderAvValue = addedMember?.avatarValue || item.addedByAvatarValue || '👤';
+  const adderEmoji   = addedMember?.avatarEmoji || item.addedByAvatarEmoji || null;
+  const isOtherUser  = item.addedByUserId && item.addedByUserId !== myId;
+
+  const byEl = document.getElementById('confirm-item-by');
+  if (adderName && isOtherUser) {
+    // Build avatar
+    let avHTML = '';
+    if (adderAvType === 'photo' && adderAvValue && !adderAvValue.startsWith('blob:')) {
+      avHTML = `<div class="confirm-modal-by-av">
+        <img src="${esc(adderAvValue)}" style="width:100%;height:100%;object-fit:cover"></div>`;
+    } else {
+      const e = adderAvType === 'cartoon' ? (adderEmoji || '🧑') : (adderAvValue || '👤');
+      avHTML = `<div class="confirm-modal-by-av">${e}</div>`;
+    }
+    byEl.innerHTML = `${avHTML}<span>הוסף על ידי ${esc(adderName)}</span>`;
+    byEl.style.display = 'flex';
+  } else {
+    byEl.style.display = 'none';
+  }
+
+  // Open modal
+  document.getElementById('confirm-delete-overlay').classList.add('show');
+
+  // ESC key support
+  document.addEventListener('keydown', handleDeleteEsc, { once: true });
+};
+
+function handleDeleteEsc(e) {
+  if (e.key === 'Escape') closeConfirmDelete();
+}
+
+window.closeConfirmDelete = function() {
+  document.getElementById('confirm-delete-overlay').classList.remove('show');
+  _pendingDeleteId   = null;
+  _pendingDeleteItem = null;
+};
+
+// ── CONFIRM AND EXECUTE DELETE ──
+window.confirmDeleteItem = async function() {
+  const id   = _pendingDeleteId;
+  const item = _pendingDeleteItem;
+  if (!id || !item) return;
+
+  // Close modal immediately (optimistic)
+  closeConfirmDelete();
+
+  const addedByUserId = item.addedByUserId;
+  const isOtherUser   = addedByUserId && addedByUserId !== myId;
+
+  try {
+    // 1. Remove from Firebase
+    await remove(ref(db, `groups/${groupId}/items/${id}`));
+    console.log('[delete] removed item:', item.name);
+
+    // 2. Create notification for item owner (if different user)
+    if (isOtherUser) {
+      const targets = {};
+      targets[addedByUserId] = true;
+      await createNotification({
+        type:           'item_deleted',
+        itemId:         id,
+        itemName:       item.name,
+        targetUsersObj: targets,
+      });
+    }
+
+    // 3. Log to activity feed
+    logActivity('item_removed', id, item.name);
+
+    toast(`🗑 ${esc(item.name)} נמחק`);
+
+  } catch(e) {
+    console.error('[delete] failed:', e.message);
+    toast('❌ מחיקה נכשלה: ' + e.message);
+  }
+};
+
+// Notifications are started from connectToGroup via startGroupNotifications()
+// (called inside attachGroupListeners which is called by connectToGroup)
+
+
+
+// ══════════════════════════════════════════════════
+// SHARED UTILITIES
+// ══════════════════════════════════════════════════
+
+// Cleanup notifications older than 30 days
+async function cleanupOldNotifications() {
+  if (!db || !groupId) return;
+  const cutoff = Date.now() - 30 * 24 * 3600 * 1000;
+  const toDelete = Object.entries(_allNotifications)
+    .filter(([, n]) => (n.createdAt || 0) < cutoff)
+    .map(([id]) => id);
+  if (!toDelete.length) return;
+  console.log('[notif] cleanup:', toDelete.length, 'old notifications');
+  await Promise.all(
+    toDelete.map(id =>
+      remove(ref(db, `notifications/${groupId}/${id}`)).catch(() => {})
+    )
+  );
+}
+
+// Reusable avatar HTML builder
+function buildAvatarHTML(avatarType, avatarValue, avatarEmoji, size = 36) {
+  const px = size + 'px';
+  const style = `width:${px};height:${px};border-radius:50%;background:var(--card2);`
+    + `display:flex;align-items:center;justify-content:center;`
+    + `font-size:${Math.round(size*0.5)}px;overflow:hidden;flex-shrink:0`;
+  if (avatarType === 'photo' && avatarValue && !avatarValue.startsWith('blob:')) {
+    return `<div style="${style}"><img src="${esc(avatarValue)}"
+      style="width:100%;height:100%;object-fit:cover;border-radius:50%" loading="lazy"></div>`;
+  }
+  const e = avatarType === 'cartoon' ? (avatarEmoji || '🧑') : (avatarValue || '👤');
+  return `<div style="${style}">${e}</div>`;
 }
 
 // SERVICE WORKER
@@ -3282,6 +4062,81 @@ onAuthStateChanged(auth, async (user) => {
       <button class="mbtn primary" onclick="saveProfileEdit()">💾 שמור שינויים</button>
       <button class="mbtn ghost" onclick="closeOL2('profile-edit-overlay')">סגור</button>
     </div>
+  </div>
+</div>
+
+
+<!-- ═══ ADD ANOTHER GROUP MODAL ═══ -->
+<div class="overlay" id="add-group-overlay" onclick="closeOL(event,'add-group-overlay')">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div id="add-group-tabs" style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="mbtn primary" style="flex:1" id="agtab-join"
+        onclick="switchAddGroupTab('join')">🔗 הצטרף</button>
+      <button class="mbtn ghost" style="flex:1" id="agTab-create"
+        onclick="switchAddGroupTab('create')">✨ צור חדשה</button>
+    </div>
+
+    <!-- Join tab -->
+    <div id="ag-join-panel">
+      <div class="field">
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">
+          קוד קבוצה (6 ספרות)
+        </label>
+        <input id="ag-join-code" class="add-input" maxlength="6"
+          placeholder="123456" inputmode="numeric" type="number">
+      </div>
+      <button class="mbtn primary" style="width:100%;margin-top:10px"
+        onclick="joinAnotherGroup()">🔗 הצטרף</button>
+    </div>
+
+    <!-- Create tab -->
+    <div id="ag-create-panel" style="display:none">
+      <div class="field">
+        <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">
+          שם הקבוצה החדשה
+        </label>
+        <input id="ag-create-name" class="add-input" maxlength="30"
+          placeholder="משפחה / חברים / עבודה...">
+      </div>
+      <button class="mbtn primary" style="width:100%;margin-top:10px"
+        onclick="createAnotherGroup()">✨ צור קבוצה</button>
+    </div>
+
+    <button class="mbtn ghost" style="width:100%;margin-top:8px"
+      onclick="closeOL2('add-group-overlay')">סגור</button>
+  </div>
+</div>
+
+
+<!-- ═══ DELETE CONFIRMATION MODAL ═══ -->
+<div class="confirm-modal-overlay" id="confirm-delete-overlay"
+  onclick="if(event.target===this)closeConfirmDelete()">
+  <div class="confirm-modal">
+    <div class="confirm-modal-handle"></div>
+    <div class="confirm-modal-icon">🗑</div>
+    <div class="confirm-modal-title">מחיקת פריט</div>
+    <div class="confirm-modal-item" id="confirm-item-name"></div>
+    <div class="confirm-modal-by" id="confirm-item-by"></div>
+    <div class="confirm-btns">
+      <button class="confirm-btn-cancel" onclick="closeConfirmDelete()">ביטול</button>
+      <button class="confirm-btn-delete" id="confirm-delete-btn" onclick="confirmDeleteItem()">
+        🗑 מחק
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ NOTIFICATIONS PANEL ═══ -->
+<div class="notif-overlay" id="notif-overlay" onclick="if(event.target===this)closeNotifications()">
+  <div class="notif-panel">
+    <div class="notif-panel-header">
+      <div class="notif-panel-title">🔔 התראות</div>
+      <button class="notif-mark-all" onclick="markAllNotificationsRead()">
+        סמן הכל כנקרא
+      </button>
+    </div>
+    <div class="notif-list" id="notif-list"></div>
   </div>
 </div>
 
