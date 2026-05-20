@@ -12,7 +12,7 @@ export const CHAINS = [
     enabled:  true,
     indexUrl: 'https://prices.shufersal.co.il/FileObject/UpdateCategory?catID=0&storeId=0&sort=None&order=None&size=10&page=1',
     baseUrl:  'https://prices.shufersal.co.il',
-    indexType: 'json',   // 'json' | 'html'
+    indexType: 'html',   // Changed from 'json' — API now returns HTML table (as of 2026-05-19)
   },
   {
     id:       'rami-levy',

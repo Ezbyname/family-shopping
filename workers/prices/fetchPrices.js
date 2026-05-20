@@ -64,7 +64,7 @@ function extractFileUrls(body, chain) {
     const items = Array.isArray(json) ? json : json.items || json.files || [];
     items.forEach(item => {
       const url = makeAbsolute(item.url || item.link || item.FileName || '', chain);
-      if (/PriceFull/i.test(url)) candidates.price.push(url);
+      if (/(?:PriceFull|Price\d+)/i.test(url)) candidates.price.push(url);
       if (/Stores/i.test(url))    candidates.store.push(url);
     });
   } catch (_) {
