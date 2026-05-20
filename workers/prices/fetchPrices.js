@@ -14,6 +14,7 @@ import { logger } from './logger.js';
 
 const DEFAULT_TIMEOUT_MS = 120_000; // 2 minutes per file
 const INDEX_TIMEOUT_MS   = 20_000;  // 20 seconds for index page
+const SAS_EXPIRY_PATTERN = /AuthenticationFailed|Signed expiry time/i; // SAS token expired
 
 const HEADERS = {
   'User-Agent':      'Mozilla/5.0 (compatible; IsraeliPriceBot/1.0; +https://github.com/Ezbyname/family-shopping)',
@@ -152,4 +153,65 @@ export async function downloadToStream(url, label, timeoutMs = DEFAULT_TIMEOUT_M
   outStream.on('error', cleanup);
 
   return outStream;
+}
+
+// ── ATOMIC FETCH + DOWNLOAD (with SAS token expiry retry) ──
+// Shufersal SAS URLs expire in ~2 minutes. Fetch index → download immediately.
+// On SAS auth failure, re-fetch index for a fresh token and retry.
+export async function fetchAndDownloadLatest(chain, label, timeoutMs = DEFAULT_TIMEOUT_MS, maxRetries = 3) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // 1. Fetch fresh index (with fresh SAS tokens)
+      logger.debug(`${label} [attempt ${attempt}/${maxRetries}] fetching index for fresh URLs`);
+      const urls = await resolveFileUrls(chain, INDEX_TIMEOUT_MS);
+
+      if (!urls.priceUrl) {
+        throw new Error('No price URL found in index');
+      }
+
+      // 2. Immediately download using fresh URL (no delay)
+      logger.debug(`${label} [attempt ${attempt}] downloading immediately`, {
+        url: redactSasToken(urls.priceUrl)
+      });
+
+      const stream = await downloadToStream(urls.priceUrl, label, timeoutMs, 1); // retries=1 for download itself
+      logger.info(`${label} [attempt ${attempt}] download succeeded`);
+      return { stream, priceUrl: urls.priceUrl };
+
+    } catch (err) {
+      lastError = err;
+      const isSasExpiry = SAS_EXPIRY_PATTERN.test(err.message);
+      const isAuthError = /AuthenticationFailed|401|403/.test(err.message);
+
+      if ((isSasExpiry || isAuthError) && attempt < maxRetries) {
+        logger.warn(`${label} [attempt ${attempt}] SAS token expired or auth failed, will re-fetch index`, {
+          error: err.message.split('\n')[0] // first line only
+        });
+        // Loop back to re-fetch index with fresh SAS token
+        continue;
+      }
+
+      logger.error(`${label} [attempt ${attempt}] fetch+download failed`, {
+        error: err.message.split('\n')[0],
+        isSasExpiry,
+        isAuthError
+      });
+
+      if (attempt < maxRetries && !isSasExpiry && !isAuthError) {
+        // Non-SAS errors: regular retry with backoff
+        await new Promise(r => setTimeout(r, 2000 * attempt));
+        continue;
+      }
+
+      break;
+    }
+  }
+
+  throw new Error(`Failed to fetch and download after ${maxRetries} attempts: ${lastError?.message}`);
+}
+
+function redactSasToken(url) {
+  return url.replace(/\?.*$/i, '?[SAS-TOKEN-REDACTED]');
 }
