@@ -56,6 +56,7 @@ export async function resolveFileUrls(chain, timeoutMs = INDEX_TIMEOUT_MS) {
 
 function extractFileUrls(body, chain) {
   const candidates = { price: [], store: [] };
+  const decodeHtml = (str) => str.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#x([0-9A-Fa-f]+);/g, (_, code) => String.fromCharCode(parseInt(code, 16)));
 
   // Try JSON index (Shufersal style)
   try {
@@ -71,18 +72,18 @@ function extractFileUrls(body, chain) {
   }
 
   if (!candidates.price.length) {
-    // HTML href extraction
-    const priceRe = /href=["']([^"']*PriceFull[^"']*(?:\.gz|\.xml\.gz|\.xml))["']/gi;
+    // HTML href extraction — look for PriceFull OR Price files (some chains use different naming)
+    const priceRe = /href=["']([^"']*(?:PriceFull|Price\d+)[^"']*(?:\.gz|\.xml\.gz|\.xml))["']/gi;
     const storeRe = /href=["']([^"']*Stores[^"']*(?:\.gz|\.xml\.gz|\.xml))["']/gi;
     let m;
-    while ((m = priceRe.exec(body)) !== null) candidates.price.push(makeAbsolute(m[1], chain));
-    while ((m = storeRe.exec(body)) !== null) candidates.store.push(makeAbsolute(m[1], chain));
+    while ((m = priceRe.exec(body)) !== null) candidates.price.push(makeAbsolute(decodeHtml(m[1]), chain));
+    while ((m = storeRe.exec(body)) !== null) candidates.store.push(makeAbsolute(decodeHtml(m[1]), chain));
 
-    // Plain-text URL scan
-    const urlRe = /https?:\/\/[^\s"'<>]+(?:PriceFull|Stores)[^\s"'<>]+(?:\.gz|\.xml)/gi;
+    // Plain-text URL scan (fallback)
+    const urlRe = /https?:\/\/[^\s"'<>]+(?:PriceFull|Price\d+|Stores)[^\s"'<>]+(?:\.gz|\.xml)/gi;
     while ((m = urlRe.exec(body)) !== null) {
-      const url = m[0];
-      if (/PriceFull/i.test(url)) candidates.price.push(url);
+      const url = decodeHtml(m[0]);
+      if (/(?:PriceFull|Price\d+)/i.test(url)) candidates.price.push(url);
       if (/Stores/i.test(url))    candidates.store.push(url);
     }
   }
