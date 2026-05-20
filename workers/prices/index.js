@@ -18,7 +18,7 @@
 import { loadConfig }                        from './config.js';
 import { checkIsraeliIP }                    from './check-ip.js';
 import { CHAINS }                            from './chains.js';
-import { resolveFileUrls, downloadToStream } from './fetchPrices.js';
+import { resolveFileUrls, downloadToStream, fetchAndDownloadLatest } from './fetchPrices.js';
 import { parseXMLStream }                    from './parseXml.js';
 import { safeKey }                           from './normalizeProduct.js';
 import { initFirebase, BatchWriter, getDB,
@@ -43,21 +43,18 @@ async function syncChain(chain, writer, config) {
   logger.info(`${label} Starting`, { chainId: chain.id, dryRun: config.dryRun });
 
   try {
-    // ── Step 1: Resolve file URLs ──
-    let priceUrl, storeUrl;
+    // ── Step 1: Atomic fetch + download (with SAS expiry retry) ──
+    let priceUrl, priceStream;
     try {
-      ({ priceUrl, storeUrl } = await resolveFileUrls(chain, config.worker.downloadTimeout));
+      ({ stream: priceStream, priceUrl } = await fetchAndDownloadLatest(
+        chain, label,
+        config.worker.downloadTimeout,
+        config.worker.downloadRetries
+      ));
     } catch (err) {
       result.failed = true;
-      result.failReason = `index fetch failed: ${err.message}`;
-      logger.fail(`${label} Index fetch failed`, { error: err.message });
-      return result;
-    }
-
-    if (!priceUrl) {
-      result.failed = true;
-      result.failReason = 'no PriceFull URL found in index';
-      logger.warn(`${label} No PriceFull URL found`);
+      result.failReason = `fetch+download failed: ${err.message}`;
+      logger.fail(`${label} Fetch+download failed`, { error: err.message });
       return result;
     }
 
@@ -77,39 +74,8 @@ async function syncChain(chain, writer, config) {
 
     const chainMeta = { chainId: chain.chainId, chainName: chain.name };
 
-    // ── Step 3: Sync Stores XML (non-fatal if fails) ──
-    if (storeUrl) {
-      logger.info(`${label} Syncing stores`, { url: storeUrl });
-      try {
-        const storeStream = await downloadToStream(
-          storeUrl, `${chain.name}-stores`,
-          config.worker.downloadTimeout, config.worker.downloadRetries
-        );
-        await parseXMLStream(storeStream, null, async (store) => {
-          await writer.queue(`stores/${safeKey(`${chain.id}_${store.storeId}`)}`, store);
-          result.storeCount++;
-        }, chainMeta);
-        await writer.flush();
-        logger.ok(`${label} Stores synced`, { count: result.storeCount });
-      } catch (e) {
-        logger.warn(`${label} Store sync failed (non-fatal)`, { error: e.message });
-      }
-    }
-
-    // ── Step 4: Sync Prices XML ──
-    logger.info(`${label} Syncing prices`, { url: priceUrl });
-    let priceStream;
-    try {
-      priceStream = await downloadToStream(
-        priceUrl, chain.name,
-        config.worker.downloadTimeout, config.worker.downloadRetries
-      );
-    } catch (err) {
-      result.failed = true;
-      result.failReason = `download failed: ${err.message}`;
-      logger.fail(`${label} Price download failed`, { error: err.message });
-      return result;
-    }
+    // ── Step 3: Parse Prices XML ──
+    logger.info(`${label} Parsing prices`);
 
     const { count, skipped, errors } = await parseXMLStream(
       priceStream,
@@ -142,7 +108,7 @@ async function syncChain(chain, writer, config) {
     result.skipped = skipped;
     result.errors  = errors;
 
-    // ── Step 5: Write sync status ──
+    // ── Step 4: Write sync status ──
     const now = new Date();
     await writer.writeSyncStatus(chain.id, {
       chainId:         chain.id,
@@ -150,9 +116,7 @@ async function syncChain(chain, writer, config) {
       lastSyncDate:    now.toISOString().split('T')[0],
       lastSuccessAt:   now.toISOString(),
       lastPriceUrl:    priceUrl,
-      lastStoreUrl:    storeUrl || null,
       itemsProcessed:  count,
-      storesSynced:    result.storeCount,
       skipped,
       errors,
     });
