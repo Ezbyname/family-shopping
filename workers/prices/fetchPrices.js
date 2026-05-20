@@ -63,7 +63,7 @@ function extractFileUrls(body, chain) {
     const items = Array.isArray(json) ? json : json.items || json.files || [];
     items.forEach(item => {
       const url = makeAbsolute(item.url || item.link || item.FileName || '', chain);
-      if (/PriceFull/i.test(url)) candidates.price.push(url);
+      if (/(?:PriceFull|Price\d+)/i.test(url)) candidates.price.push(url);
       if (/Stores/i.test(url))    candidates.store.push(url);
     });
   } catch (_) {
@@ -72,17 +72,17 @@ function extractFileUrls(body, chain) {
 
   if (!candidates.price.length) {
     // HTML href extraction
-    const priceRe = /href=["']([^"']*PriceFull[^"']*(?:\.gz|\.xml\.gz|\.xml))["']/gi;
+    const priceRe = /href=["'][^"']*(?:PriceFull|Price\d+)[^"']*(?:\.gz|\.xml\.gz|\.xml)["']/gi;
     const storeRe = /href=["']([^"']*Stores[^"']*(?:\.gz|\.xml\.gz|\.xml))["']/gi;
     let m;
     while ((m = priceRe.exec(body)) !== null) candidates.price.push(makeAbsolute(m[1], chain));
     while ((m = storeRe.exec(body)) !== null) candidates.store.push(makeAbsolute(m[1], chain));
 
     // Plain-text URL scan
-    const urlRe = /https?:\/\/[^\s"'<>]+(?:PriceFull|Stores)[^\s"'<>]+(?:\.gz|\.xml)/gi;
+    const urlRe = /https?:\/\/[^\s"'<>]+(?:PriceFull|Price\d+|Stores)[^\s"'<>]+(?:\.gz|\.xml)/gi;
     while ((m = urlRe.exec(body)) !== null) {
       const url = m[0];
-      if (/PriceFull/i.test(url)) candidates.price.push(url);
+      if (/(?:PriceFull|Price\d+)/i.test(url)) candidates.price.push(url);
       if (/Stores/i.test(url))    candidates.store.push(url);
     }
   }
