@@ -72,9 +72,9 @@ function extractFileUrls(body, chain) {
   }
 
   if (!candidates.price.length) {
-    // HTML href extraction — look for PriceFull OR Price files (some chains use different naming)
-    const priceRe = /href=["']([^"']*(?:PriceFull|Price\d+)[^"']*(?:\.gz|\.xml\.gz|\.xml))["']/gi;
-    const storeRe = /href=["']([^"']*Stores[^"']*(?:\.gz|\.xml\.gz|\.xml))["']/gi;
+    // HTML href extraction — capture full URLs including SAS token query params
+    const priceRe = /href=["']([^"']*(?:PriceFull|Price\d+)[^"']*(?:\.gz|\.xml)(?:[^"']*)?)["']/gi;
+    const storeRe = /href=["']([^"']*Stores[^"']*(?:\.gz|\.xml)(?:[^"']*)?)["']/gi;
     let m;
     while ((m = priceRe.exec(body)) !== null) candidates.price.push(makeAbsolute(decodeHtml(m[1]), chain));
     while ((m = storeRe.exec(body)) !== null) candidates.store.push(makeAbsolute(decodeHtml(m[1]), chain));
