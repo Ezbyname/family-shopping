@@ -1,8 +1,11 @@
 #!/usr/bin/env node
-// scripts/sanity-price-check.js
-// CI/CD sanity test: verify each enabled chain's price source is accessible and parseable
-// Exit 0 only if every enabled chain yields at least one valid official price
-// Exit 1 if any chain fails (unless ALLOW_PARTIAL_SANITY=true)
+// scripts/sanity-live.js
+// Live chain sanity test: verify each enabled chain's price source is accessible and parseable
+// MUST be run from Israeli VPS (Israeli IP required for supermarket access)
+// Tests real supermarket URLs and writes result to Firebase
+// Exit 0 only if EVERY enabled chain yields at least one valid official price
+// Exit 1 if any chain fails
+// Status written to Firebase: latestPriceSanityStatus
 
 import fetch from 'node-fetch';
 import { createReadStream, createWriteStream, statSync } from 'fs';
@@ -14,6 +17,9 @@ import { join } from 'path';
 import sax from 'sax';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import 'dotenv/config.js';
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getDatabase } from 'firebase-admin/database';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CHAINS = [
@@ -72,15 +78,54 @@ const HEADERS = {
 };
 
 const TIMEOUT_MS = 30_000;
-const ALLOW_PARTIAL = process.env.ALLOW_PARTIAL_SANITY === 'true';
+let firebaseDb = null;
+
+// Initialize Firebase (required for status reporting)
+async function initFirebase() {
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+  const url = process.env.FIREBASE_DATABASE_URL;
+
+  if (!projectId || !clientEmail || !privateKey || !url) {
+    console.warn('⚠️ Firebase credentials not available — status will NOT be saved');
+    return null;
+  }
+
+  try {
+    if (!getApps().length) {
+      const key = privateKey.replace(/\\n/g, '\n');
+      initializeApp({
+        credential: cert({ projectId, clientEmail, privateKey: key }),
+        databaseURL: url,
+      });
+    }
+    firebaseDb = getDatabase();
+    return firebaseDb;
+  } catch (err) {
+    console.warn(`⚠️ Firebase init failed: ${err.message}`);
+    return null;
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────
 // Main
 // ─────────────────────────────────────────────────────────────────
 async function main() {
   const t0 = Date.now();
-  console.log('\n🔍 SANITY CHECK: Price Source Access & Parsing\n');
-  console.log(`Allow partial: ${ALLOW_PARTIAL ? 'yes' : 'no'}\n`);
+  const runId = `sanity-${Date.now()}`;
+
+  console.log('\n🔍 LIVE CHAIN SANITY CHECK\n');
+  console.log('Testing REAL supermarket sources...');
+  console.log('⚠️ Requires Israeli IP for supermarket access\n');
+
+  // Initialize Firebase
+  await initFirebase();
+  if (firebaseDb) {
+    console.log('✅ Firebase initialized — results will be saved\n');
+  } else {
+    console.log('⚠️ Firebase unavailable — results will NOT be saved\n');
+  }
 
   const enabledChains = CHAINS.filter(c => c.enabled);
   if (!enabledChains.length) {
@@ -128,18 +173,47 @@ async function main() {
   console.log(`Duration: ${elapsed}s`);
   console.log('═'.repeat(50));
 
-  if (failed > 0) {
-    if (ALLOW_PARTIAL) {
-      console.warn(`\n⚠️  ${failed} chain(s) failed but ALLOW_PARTIAL_SANITY=true`);
-      console.warn('Continuing with warning...\n');
-      process.exit(0);
-    } else {
-      console.error(`\n❌ Sanity check FAILED: ${failed} chain(s) cannot produce valid prices`);
-      process.exit(1);
+  // Write Firebase status
+  const status = failed === 0 ? 'pass' : (failed < results.length ? 'partial' : 'fail');
+  if (firebaseDb) {
+    try {
+      const statusData = {
+        status,
+        runId,
+        checkedAt: new Date().toISOString(),
+        chainsTested: results.length,
+        chainsPassed: passed,
+        chainsFailed: failed,
+        results: Object.fromEntries(
+          results.map(r => [r.chainId, {
+            status: r.passed ? 'pass' : 'fail',
+            barcode: r.item?.barcode || null,
+            name: r.item?.name || null,
+            price: r.item?.price || null,
+            storeId: r.item?.storeId || null,
+            error: r.failReason || null,
+          }])
+        ),
+      };
+
+      await firebaseDb.ref('latestPriceSanityStatus').set(statusData);
+      console.log('✅ Firebase status updated\n');
+    } catch (err) {
+      console.warn(`⚠️ Failed to write Firebase status: ${err.message}\n`);
     }
   }
 
-  console.log('\n✅ All chains passed sanity check!\n');
+  // Exit based on results
+  if (failed > 0) {
+    console.error(`\n❌ LIVE SANITY CHECK FAILED`);
+    console.error(`${failed} chain(s) cannot produce valid prices`);
+    console.error(`Status: ${status.toUpperCase()}`);
+    console.error('This is a production issue. All enabled chains MUST pass.\n');
+    process.exit(1);
+  }
+
+  console.log('\n✅ ALL CHAINS PASSED LIVE SANITY CHECK');
+  console.log('All enabled supermarket sources are accessible and returning real prices.\n');
   process.exit(0);
 }
 

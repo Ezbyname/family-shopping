@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PricesFull>
+  <Item>
+    <ItemCode>11210000094</ItemCode>
+    <ItemName>רוטב טבסקו 60 מ&quot;ל</ItemName>
+    <ItemPrice>13.90</ItemPrice>
+    <UnitOfMeasure>100 גרם</UnitOfMeasure>
+    <Quantity>60</Quantity>
+    <ManufacturerName>Heinz</ManufacturerName>
+    <PriceUpdateDate>2026-05-21</PriceUpdateDate>
+    <PriceTag>
+      <StoreID>034</StoreID>
+      <StoreName>שופרסל נתניה</StoreName>
+    </PriceTag>
+  </Item>
+  <Item>
+    <ItemCode>7290010328103</ItemCode>
+    <ItemName>חלב תנובה 3% 1 ליטר</ItemName>
+    <ItemPrice>7.50</ItemPrice>
+    <UnitOfMeasure>1 ליטר</UnitOfMeasure>
+    <Quantity>1</Quantity>
+    <ManufacturerName>תנובה</ManufacturerName>
+    <PriceUpdateDate>2026-05-21</PriceUpdateDate>
+    <PriceTag>
+      <StoreID>034</StoreID>
+      <StoreName>שופרסל נתניה</StoreName>
+    </PriceTag>
+  </Item>
+</PricesFull>

@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "sync": "node sync-prices.js",
-    "sanity:prices": "node sanity-price-check.js"
+    "sanity:prices:fixture": "node sanity-fixture.js",
+    "sanity:prices:live": "node sanity-live.js"
   },
   "dependencies": {
     "firebase-admin": "^12.1.0",
