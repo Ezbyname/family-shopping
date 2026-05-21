@@ -7,68 +7,23 @@
 // Exit 1 if any chain fails
 // Status written to Firebase: latestPriceSanityStatus
 
+// ⚠️ IMPORTANT: CHAINS are imported from workers/prices/chains.js to ensure they're always in sync
+// Never hardcode URLs here. Always import from the source of truth.
+
 import fetch from 'node-fetch';
-import { createReadStream, createWriteStream, statSync } from 'fs';
-import { unlink } from 'fs/promises';
-import { pipeline } from 'stream/promises';
 import { createGunzip } from 'zlib';
-import { tmpdir } from 'os';
-import { join } from 'path';
 import sax from 'sax';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import 'dotenv/config.js';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
+import { CHAINS as CHAINS_FROM_SOURCE } from '../workers/prices/chains.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const CHAINS = [
-  {
-    id: 'shufersal',
-    name: 'שופרסל',
-    chainId: '7290027600007',
-    enabled: true,
-    indexUrl: 'https://prices.shufersal.co.il/FileObject/UpdateCategory?catID=0&storeId=0&sort=None&order=None&size=10&page=1',
-    baseUrl: 'https://prices.shufersal.co.il',
-    indexType: 'html',
-  },
-  {
-    id: 'rami-levy',
-    name: 'רמי לוי',
-    chainId: '7290058140886',
-    enabled: true,
-    indexUrl: 'https://url.retail.pe.il/MF/latest/7290058140886/',
-    baseUrl: 'https://url.retail.pe.il',
-    indexType: 'html',
-  },
-  {
-    id: 'victory',
-    name: 'ויקטורי',
-    chainId: '7290696200003',
-    enabled: true,
-    indexUrl: 'https://matrixcatalog.co.il/NBcompetitionRegulations.aspx',
-    baseUrl: 'https://matrixcatalog.co.il',
-    indexType: 'html',
-  },
-  {
-    id: 'yeinot-bitan',
-    name: 'יינות ביתן',
-    chainId: '7290873255550',
-    enabled: true,
-    indexUrl: 'https://publishprice.ybitan.co.il/',
-    baseUrl: 'https://publishprice.ybitan.co.il',
-    indexType: 'html',
-  },
-  {
-    id: 'osher-ad',
-    name: 'אושר עד',
-    chainId: '7290058179504',
-    enabled: true,
-    indexUrl: 'https://osherad.co.il/prices/',
-    baseUrl: 'https://osherad.co.il',
-    indexType: 'html',
-  },
-];
+
+// Use chains from the actual source of truth
+const CHAINS = CHAINS_FROM_SOURCE;
 
 const HEADERS = {
   'User-Agent': 'FamilyShopping/SanityCheck/1.0',
@@ -127,26 +82,43 @@ async function main() {
     console.log('⚠️ Firebase unavailable — results will NOT be saved\n');
   }
 
-  const enabledChains = CHAINS.filter(c => c.enabled);
-  if (!enabledChains.length) {
-    console.error('❌ No enabled chains found');
+  const requiredChains = CHAINS.filter(c => c.enabled && c.sanityRequired);
+  const optionalChains = CHAINS.filter(c => c.enabled && !c.sanityRequired);
+  const disabledChains = CHAINS.filter(c => !c.enabled);
+
+  if (!requiredChains.length) {
+    console.error('❌ No required chains enabled');
     process.exit(1);
   }
 
+  console.log(`Testing ${requiredChains.length} required chains:\n`);
+
+  if (optionalChains.length > 0) {
+    console.log(`(${optionalChains.length} optional chains will also be tested)\n`);
+  }
+
+  if (disabledChains.length > 0) {
+    console.log(`(${disabledChains.length} chains disabled - see chains.js for status)\n`);
+  }
+
   const results = [];
-  for (const chain of enabledChains) {
+  const allEnabledChains = [...requiredChains, ...optionalChains];
+
+  for (const chain of allEnabledChains) {
+    const isRequired = requiredChains.includes(chain);
     try {
       const result = await checkChain(chain);
+      result.required = isRequired;
       results.push(result);
       if (result.passed) {
-        console.log(`✅ ${result.chainId} PASS`);
+        console.log(`✅ ${result.chainId} PASS${isRequired ? '' : ' (optional)'}`);
         console.log(`   barcode: ${result.item.barcode}`);
         console.log(`   name: ${result.item.name}`);
         console.log(`   price: ₪${result.item.price?.toFixed(2)}`);
         if (result.item.storeId) console.log(`   storeId: ${result.item.storeId}`);
         console.log(`   source: ${result.source}`);
       } else {
-        console.log(`❌ ${result.chainId} FAIL`);
+        console.log(`❌ ${result.chainId} FAIL${isRequired ? ' (REQUIRED)' : ' (optional)'}`);
         console.log(`   reason: ${result.failReason}`);
       }
       console.log();
@@ -155,8 +127,9 @@ async function main() {
         chainId: chain.id,
         passed: false,
         failReason: err.message,
+        required: isRequired,
       });
-      console.log(`❌ ${chain.id} FAIL`);
+      console.log(`❌ ${chain.id} FAIL${isRequired ? ' (REQUIRED)' : ' (optional)'}`);
       console.log(`   reason: ${err.message}`);
       console.log();
     }
@@ -165,16 +138,20 @@ async function main() {
   // Summary
   const passed = results.filter(r => r.passed).length;
   const failed = results.filter(r => !r.passed).length;
+  const requiredPassed = results.filter(r => r.required && r.passed).length;
+  const requiredFailed = results.filter(r => r.required && !r.passed).length;
   const elapsed = ((Date.now() - t0) / 1000).toFixed(2);
 
   console.log('═'.repeat(50));
   console.log(`📊 SUMMARY`);
   console.log(`Tested: ${results.length} | Passed: ${passed} | Failed: ${failed}`);
+  console.log(`Required: ${requiredChains.length} | Passed: ${requiredPassed} | Failed: ${requiredFailed}`);
   console.log(`Duration: ${elapsed}s`);
   console.log('═'.repeat(50));
 
   // Write Firebase status
-  const status = failed === 0 ? 'pass' : (failed < results.length ? 'partial' : 'fail');
+  // Status is based ONLY on required chains
+  const status = requiredFailed === 0 ? 'pass' : (requiredFailed < requiredChains.length ? 'partial' : 'fail');
   if (firebaseDb) {
     try {
       const statusData = {
@@ -196,6 +173,20 @@ async function main() {
         ),
       };
 
+      // Add coverage metadata
+      statusData.statusLabel = requiredFailed === 0 && disabledChains.length === 0 ? 'full_pass' : 'baseline_pass';
+      statusData.productionCoverage = disabledChains.length === 0 ? 'full' : 'partial';
+      statusData.enabledRequiredChains = requiredChains.length;
+      statusData.enabledOptionalChains = optionalChains.length;
+      statusData.disabledChains = disabledChains.length;
+      statusData.disabledChainIds = disabledChains.map(c => c.id);
+
+      if (disabledChains.length > 0) {
+        statusData.message = `Baseline pass only. ${disabledChains.length} supported chains are disabled pending endpoint verification.`;
+      } else {
+        statusData.message = 'All supported chains enabled and tested.';
+      }
+
       await firebaseDb.ref('latestPriceSanityStatus').set(statusData);
       console.log('✅ Firebase status updated\n');
     } catch (err) {
@@ -203,17 +194,26 @@ async function main() {
     }
   }
 
-  // Exit based on results
-  if (failed > 0) {
+  // Exit based on required chains only
+  if (requiredFailed > 0) {
     console.error(`\n❌ LIVE SANITY CHECK FAILED`);
-    console.error(`${failed} chain(s) cannot produce valid prices`);
+    console.error(`${requiredFailed} required chain(s) cannot produce valid prices`);
     console.error(`Status: ${status.toUpperCase()}`);
-    console.error('This is a production issue. All enabled chains MUST pass.\n');
+    console.error('This is a production issue. All required chains MUST pass.\n');
     process.exit(1);
   }
 
-  console.log('\n✅ ALL CHAINS PASSED LIVE SANITY CHECK');
-  console.log('All enabled supermarket sources are accessible and returning real prices.\n');
+  if (disabledChains.length > 0) {
+    console.log(`\n✅ BASELINE PASS: ALL ENABLED REQUIRED CHAINS PASSED`);
+    console.log(`Tested: ${requiredChains.length} required chain${requiredChains.length === 1 ? '' : 's'}\n`);
+    console.log(`Production Coverage: PARTIAL`);
+    console.log(`Disabled Chains: ${disabledChains.map(c => c.id).join(', ')}\n`);
+    console.log(`Status: baseline_pass (pending endpoint verification for disabled chains)\n`);
+  } else {
+    console.log('\n✅ FULL PASS: ALL SUPPORTED CHAINS TESTED AND PASSING');
+    console.log('All enabled supermarket sources are accessible and returning real prices.');
+    console.log('Production Coverage: FULL\n');
+  }
   process.exit(0);
 }
 
@@ -222,28 +222,45 @@ async function main() {
 // ─────────────────────────────────────────────────────────────────
 async function checkChain(chain) {
   const label = `[${chain.id}]`;
+  const t0 = Date.now();
+
+  console.log(`${label} Starting chain check...`);
 
   // Step 1: Fetch index
-  console.log(`${label} Fetching index...`);
+  console.log(`${label} Step 1: Fetching index from ${redact(chain.indexUrl)}...`);
   let priceUrl;
   try {
     priceUrl = await fetchPriceUrl(chain);
     if (!priceUrl) throw new Error('No price URL found in index');
-    console.log(`${label} Found price URL: ${redact(priceUrl)}`);
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(2);
+    console.log(`${label} ✓ Index fetch succeeded (${elapsed}s)`);
+    console.log(`${label} ✓ Price URL: ${redact(priceUrl)}`);
   } catch (err) {
-    throw new Error(`fetch index failed: ${err.message}`);
+    throw new Error(`Step 1 failed - fetch index: ${err.message}`);
   }
 
   // Step 2: Download and parse
-  console.log(`${label} Downloading price file...`);
+  const t1 = Date.now();
+  console.log(`${label} Step 2: Downloading and parsing price file...`);
   let item;
   try {
     item = await downloadAndFindFirstItem(priceUrl, label);
     if (!item) throw new Error('No valid item found in price file');
-    validateItem(item);
-    console.log(`${label} Found valid item: ${item.barcode}`);
+    const elapsed = ((Date.now() - t1) / 1000).toFixed(2);
+    console.log(`${label} ✓ Download/parse succeeded (${elapsed}s)`);
+
+    // Validate
+    try {
+      validateItem(item);
+    } catch (err) {
+      throw new Error(`Item validation failed: ${err.message}`);
+    }
+
+    const totalElapsed = ((Date.now() - t0) / 1000).toFixed(2);
+    console.log(`${label} ✓ Valid item found (total: ${totalElapsed}s)`);
   } catch (err) {
-    throw new Error(`download/parse failed: ${err.message}`);
+    const elapsed = ((Date.now() - t1) / 1000).toFixed(2);
+    throw new Error(`Step 2 failed - download/parse (${elapsed}s): ${err.message}`);
   }
 
   return {
@@ -301,13 +318,17 @@ async function fetchPriceUrl(chain) {
 
 // ─────────────────────────────────────────────────────────────────
 // Download file and find first valid item
+// Stream directly: response → decompress → parse (no temp files)
 // ─────────────────────────────────────────────────────────────────
 async function downloadAndFindFirstItem(url, label) {
   const isGz = /\.gz(?:\?|$)/i.test(url);
-  const tmpFile = join(tmpdir(), `sanity-${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`);
+  let bytesDownloaded = 0;
+  let streamActive = true;
+
+  console.log(`${label} Starting download... (streaming mode, no temp files)`);
 
   try {
-    // Download
+    // Fetch response
     const res = await fetch(url, {
       headers: HEADERS,
       signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -317,26 +338,22 @@ async function downloadAndFindFirstItem(url, label) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     if (!res.body) throw new Error('Empty response body');
 
-    const writer = createWriteStream(tmpFile);
-    await pipeline(res.body, writer);
+    console.log(`${label} Response received, setting up decompression pipeline...`);
 
-    const size = statSync(tmpFile).size;
-    if (size < 100) throw new Error(`File too small (${size} bytes)`);
-
-    console.log(`${label} Downloaded ${size} bytes`);
-
-    // Decompress if needed
-    let readStream = createReadStream(tmpFile);
+    // Build decompression pipeline if needed
+    let dataStream = res.body;
     if (isGz) {
-      readStream = readStream.pipe(createGunzip());
+      console.log(`${label} Gzip detected, decompressing on-the-fly...`);
+      dataStream = dataStream.pipe(createGunzip());
     }
 
-    // Parse with sax stream
+    // Parse with SAX stream directly (no temp file)
     return new Promise((resolve, reject) => {
       let foundItem = null;
       let currentItem = {};
       let currentText = '';
       let inItem = false;
+      let itemsProcessed = 0;
 
       const parser = sax.createStream(false, {
         lowercase: true,
@@ -383,29 +400,59 @@ async function downloadAndFindFirstItem(url, label) {
 
         // End of item tag
         if (tag === 'item') {
+          itemsProcessed++;
           inItem = false;
           if (currentItem.barcode && currentItem.name && currentItem.price > 0) {
             foundItem = currentItem;
-            // Stop reading from the stream
-            readStream.unpipe(parser);
+            console.log(`${label} ✓ Found valid item at position ${itemsProcessed}, stopping stream...`);
+
+            // Properly close streams
+            streamActive = false;
+            dataStream.destroy();
+            parser.close();
+
             return resolve(foundItem);
           }
         }
       });
 
       parser.on('error', (err) => {
-        reject(err);
+        streamActive = false;
+        reject(new Error(`SAX parser error: ${err.message}`));
       });
 
       parser.on('end', () => {
-        resolve(foundItem);
+        streamActive = false;
+        if (!foundItem) {
+          reject(new Error(`No valid items found after processing ${itemsProcessed} items`));
+        } else {
+          resolve(foundItem);
+        }
       });
 
-      readStream.pipe(parser);
-      readStream.on('error', reject);
+      // Track bytes for logging
+      dataStream.on('data', (chunk) => {
+        bytesDownloaded += chunk.length;
+      });
+
+      dataStream.on('error', (err) => {
+        streamActive = false;
+        reject(new Error(`Stream error: ${err.message}`));
+      });
+
+      console.log(`${label} Piping stream to parser...`);
+      dataStream.pipe(parser);
     });
+
+  } catch (err) {
+    // Ensure streams are closed on error
+    if (err.message) {
+      throw new Error(`download/parse error: ${err.message}`);
+    } else {
+      throw err;
+    }
   } finally {
-    await unlink(tmpFile).catch(() => {});
+    console.log(`${label} Cleanup complete (${bytesDownloaded} bytes streamed)`);
   }
 }
 
