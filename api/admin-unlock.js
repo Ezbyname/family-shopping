@@ -8,14 +8,34 @@
 // Returns: { ok: true } | { ok: false, error: 'Access denied' }
 
 import { timingSafeEqual, createHash } from 'crypto';
-import { getDB } from './_firebase.js';
+import { getDB, checkOrigin } from './_firebase.js';
 
 const ADMIN_PIN = process.env.ADMIN_PIN;
 
 // ── In-memory rate limiter ───────────────────────────────────────────
 // Key: sha256(rawIp).slice(0,16) → { count, resetAt }
-// NOTE: Serverless functions may run as multiple instances — this limiter
-// applies per-instance, not globally. Still effective against naive brute-force.
+//
+// ⚠️  ARCHITECTURE NOTE — distributed rate limiting (TODO for production)
+// ─────────────────────────────────────────────────────────────────────────
+// This _failMap lives in the serverless function's memory. On Vercel every cold
+// start creates a fresh map, and concurrent instances each have their own copy.
+// A distributed attacker hitting multiple Vercel instances can exceed 5 attempts
+// globally while staying under 5 per instance.
+//
+// This is acceptable as a *lightweight first-line anti-bruteforce* measure only.
+// The Firebase role check + constant-time PIN comparison are the real gate.
+//
+// Production upgrade path (in preference order):
+//   1. Upstash Redis  — @upstash/redis  atomic INCR+EXPIRE  ~1 ms latency
+//   2. Firebase RTDB  — db.ref(`rateLimits/adminUnlock/${ipHash}`)  serverless-safe
+//   3. Vercel KV      — built-in Redis, available on Pro+ plan
+//
+// Pattern for option 1:
+//   const rdb = new Redis({ url: process.env.UPSTASH_REDIS_URL, token: process.env.UPSTASH_REDIS_TOKEN });
+//   const count = await rdb.incr(`rl:admin:${ipHash}`);
+//   if (count === 1) await rdb.expire(`rl:admin:${ipHash}`, 900); // 15 min TTL
+//   if (count > RATE_MAX_FAILS) return 429;
+// ─────────────────────────────────────────────────────────────────────────
 const _failMap = new Map();
 const RATE_MAX_FAILS = 5;
 const RATE_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
@@ -81,6 +101,12 @@ export default async function handler(req, res) {
   if (!ADMIN_PIN || ADMIN_PIN.length < 4) {
     console.error('[admin-unlock] ADMIN_PIN env var not set or too short');
     return res.status(503).json({ ok: false, error: 'Access denied' });
+  }
+
+  // ── CSRF: reject requests from disallowed browser origins ───────────
+  if (!checkOrigin(req)) {
+    console.warn(`[admin-unlock] CSRF_REJECTED origin=${req.headers['origin']}`);
+    return res.status(403).json({ ok: false, error: 'Access denied' });
   }
 
   // ── Rate limit check (before any Firebase work) ─────────────────────

@@ -6,7 +6,7 @@
 // Header:  Authorization: Bearer <firebase-id-token>
 // Returns: { ok: true, status: {...} } | { ok: false, error: 'Access denied' }
 
-import { getDB } from './_firebase.js';
+import { getDB, checkOrigin } from './_firebase.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -17,6 +17,12 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ ok: false, error: 'Method not allowed' });
+
+  // ── CSRF: reject requests from disallowed browser origins ───────────
+  if (!checkOrigin(req)) {
+    console.warn(`[admin-status] CSRF_REJECTED origin=${req.headers['origin']}`);
+    return res.status(403).json({ ok: false, error: 'Access denied' });
+  }
 
   // ── Extract ID token ────────────────────────────────────────────────
   const authHeader = req.headers['authorization'] || '';
@@ -57,7 +63,15 @@ export default async function handler(req, res) {
     }
 
     console.log(`[admin-status] served uid=${uid} status=${status.status} label=${status.statusLabel}`);
-    return res.status(200).json({ ok: true, status });
+    return res.status(200).json({
+      ok: true,
+      status,
+      // Build metadata — populated by Vercel system env vars at deploy time
+      meta: {
+        deployedSha: (process.env.VERCEL_GIT_COMMIT_SHA || 'unknown').slice(0, 7),
+        deployedEnv: process.env.VERCEL_ENV || 'local',
+      },
+    });
 
   } catch (err) {
     console.error('[admin-status] unexpected error:', err.message);
