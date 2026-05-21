@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Price Worker — Admin Panel</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --surface:   #1a1d27;
+      --border:    #2a2d3a;
+      --text:      #e8eaf0;
+      --muted:     #7b7f93;
+      --pass:      #22c55e;
+      --pass-bg:   #052e16;
+      --warn:      #f59e0b;
+      --warn-bg:   #1c1007;
+      --fail:      #ef4444;
+      --fail-bg:   #2d0707;
+      --accent:    #6366f1;
+      --accent-bg: #1e1b4b;
+      --radius:    10px;
+      --mono:      'Courier New', monospace;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    h1 { font-size: 20px; font-weight: 700; }
+    h1 span { color: var(--muted); font-weight: 400; font-size: 14px; margin-right: 8px; }
+
+    /* ── Token form ── */
+    .token-form {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      align-items: center;
+    }
+    .token-form input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 10px 14px;
+      font-size: 13px;
+      font-family: var(--mono);
+      direction: ltr;
+    }
+    .token-form input:focus { outline: none; border-color: var(--accent); }
+    .btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity .15s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    /* ── Status banner ── */
+    .banner {
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .banner .icon { font-size: 28px; flex-shrink: 0; }
+    .banner .title { font-size: 17px; font-weight: 700; }
+    .banner .sub   { font-size: 12px; margin-top: 2px; color: inherit; opacity: .75; }
+
+    .banner.pass   { background: var(--pass-bg);   border: 1px solid var(--pass);   color: var(--pass);  }
+    .banner.warn   { background: var(--warn-bg);   border: 1px solid var(--warn);   color: var(--warn);  }
+    .banner.fail   { background: var(--fail-bg);   border: 1px solid var(--fail);   color: var(--fail);  }
+    .banner.idle   { background: var(--surface);   border: 1px solid var(--border); color: var(--muted); }
+
+    /* ── Warning strip ── */
+    .coverage-warn {
+      background: var(--warn-bg);
+      border: 1px solid var(--warn);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      color: var(--warn);
+      font-size: 13px;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .coverage-warn strong { display: block; margin-bottom: 4px; }
+    .coverage-warn.hidden { display: none; }
+
+    /* ── Metadata grid ── */
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .meta-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+    }
+    .meta-label  { font-size: 11px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .05em; }
+    .meta-value  { font-size: 18px; font-weight: 700; }
+    .meta-value.pass  { color: var(--pass); }
+    .meta-value.warn  { color: var(--warn); }
+    .meta-value.fail  { color: var(--fail); }
+    .meta-value.sm    { font-size: 13px; font-family: var(--mono); }
+
+    /* ── Chains table ── */
+    .section { margin-bottom: 20px; }
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin-bottom: 10px;
+    }
+
+    .chain-row {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .chain-row.disabled { opacity: .55; }
+    .chain-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .chain-dot.pass    { background: var(--pass); }
+    .chain-dot.fail    { background: var(--fail); }
+    .chain-dot.disabled{ background: var(--border); }
+
+    .chain-id    { font-family: var(--mono); font-size: 13px; font-weight: 700; min-width: 130px; }
+    .chain-badge {
+      font-size: 11px;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-weight: 600;
+    }
+    .chain-badge.required  { background: var(--accent-bg); color: var(--accent); }
+    .chain-badge.optional  { background: var(--surface);   color: var(--muted);  border: 1px solid var(--border); }
+    .chain-badge.disabled  { background: var(--fail-bg);   color: var(--fail);   }
+    .chain-badge.enabled   { background: var(--pass-bg);   color: var(--pass);   }
+
+    .chain-meta  { color: var(--muted); font-size: 12px; flex: 1; }
+    .chain-price { font-size: 13px; font-weight: 700; color: var(--pass); margin-right: auto; }
+
+    /* ── Sample product card ── */
+    .product-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+    .product-barcode { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .product-name    { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    .product-row     { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 8px; }
+    .product-field   { font-size: 13px; }
+    .product-field .label { color: var(--muted); }
+    .product-field .val   { font-weight: 700; }
+    .product-field .val.price { color: var(--pass); font-size: 20px; }
+
+    /* ── Error / idle states ── */
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 48px 24px;
+      font-size: 14px;
+    }
+    .error-msg {
+      background: var(--fail-bg);
+      border: 1px solid var(--fail);
+      border-radius: var(--radius);
+      color: var(--fail);
+      padding: 12px 16px;
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: middle;
+      margin-left: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .timestamp { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+    hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🛒 Price Worker <span>/ Admin Panel</span></h1>
+  <span id="last-refresh" class="timestamp"></span>
+</header>
+
+<!-- Token entry -->
+<div class="token-form">
+  <input
+    type="password"
+    id="token-input"
+    placeholder="x-admin-token"
+    autocomplete="off"
+    dir="ltr"
+  >
+  <button class="btn" id="load-btn" onclick="loadStatus()">טען סטטוס</button>
+  <button class="btn btn-ghost" onclick="triggerSanity()">▶ הרץ כעת</button>
+</div>
+
+<div id="error-area"></div>
+<div id="coverage-warn" class="coverage-warn hidden">
+  <span>⚠️</span>
+  <div>
+    <strong>כיסוי חלקי בלבד — לא כל הרשתות מחוברות</strong>
+    רק שופרסל מופעלת כרגע. הרשתות הנוספות (רמי לוי, ויקטורי, יינות ביתן, אושר עד, מחסני להב) מושבתות בהמתנה לאימות ה-endpoint שלהן.
+  </div>
+</div>
+
+<div id="status-banner" class="banner idle">
+  <span class="icon">⏳</span>
+  <div>
+    <div class="title">ממתין לטעינת נתונים</div>
+    <div class="sub">הזן טוקן ולחץ "טען סטטוס"</div>
+  </div>
+</div>
+
+<div id="meta-grid" class="meta-grid" style="display:none"></div>
+<div id="product-section" style="display:none"></div>
+<div id="chains-section" style="display:none"></div>
+
+<script>
+  const API_BASE = '';  // same origin — served by admin-server.js
+
+  // ── Restore saved token ──────────────────────────────────────────
+  window.addEventListener('DOMContentLoaded', () => {
+    const saved = sessionStorage.getItem('admin_token');
+    if (saved) {
+      document.getElementById('token-input').value = saved;
+      loadStatus();
+    }
+  });
+
+  function getToken() {
+    const t = document.getElementById('token-input').value.trim();
+    if (t) sessionStorage.setItem('admin_token', t);
+    return t;
+  }
+
+  function showError(msg) {
+    document.getElementById('error-area').innerHTML =
+      `<div class="error-msg">❌ ${escHtml(msg)}</div>`;
+  }
+  function clearError() {
+    document.getElementById('error-area').innerHTML = '';
+  }
+
+  // ── Load status ──────────────────────────────────────────────────
+  async function loadStatus() {
+    const token = getToken();
+    if (!token) { showError('נא להזין טוקן'); return; }
+
+    clearError();
+    const btn = document.getElementById('load-btn');
+    btn.disabled = true;
+    btn.innerHTML = 'טוען <span class="spinner"></span>';
+
+    try {
+      const res = await fetch(`${API_BASE}/admin/live-sanity-status`, {
+        headers: { 'x-admin-token': token },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      renderStatus(data);
+      document.getElementById('last-refresh').textContent =
+        'עודכן: ' + new Date().toLocaleTimeString('he-IL');
+    } catch (err) {
+      showError(err.message);
+      resetBanner();
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = 'טען סטטוס';
+    }
+  }
+
+  // ── Trigger run ─────────────────────────────────────────────────
+  async function triggerSanity() {
+    const token = getToken();
+    if (!token) { showError('נא להזין טוקן'); return; }
+
+    clearError();
+    const triggerBtn = document.querySelectorAll('.btn')[1];
+    triggerBtn.disabled = true;
+    triggerBtn.textContent = '⏳ מריץ...';
+
+    try {
+      const res = await fetch(`${API_BASE}/admin/run-live-sanity`, {
+        method: 'POST',
+        headers: { 'x-admin-token': token },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      await loadStatus();
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      triggerBtn.disabled = false;
+      triggerBtn.textContent = '▶ הרץ כעת';
+    }
+  }
+
+  // ── Render ───────────────────────────────────────────────────────
+  function renderStatus(data) {
+    const s = data.raw || {};
+    const statusLabel   = s.statusLabel        || 'unknown';
+    const coverage      = s.productionCoverage || 'unknown';
+    const checkedAt     = s.checkedAt          || null;
+    const disabledIds   = s.disabledChainIds   || [];
+    const enabledReq    = s.enabledRequiredChains ?? '?';
+    const disabledCount = s.disabledChains     ?? disabledIds.length;
+    const chainResults  = s.results            || {};
+    const message       = s.message            || '';
+
+    // Banner
+    renderBanner(statusLabel, coverage, data.status, checkedAt, message);
+
+    // Coverage warning
+    const warnEl = document.getElementById('coverage-warn');
+    warnEl.classList.toggle('hidden', coverage !== 'partial');
+
+    // Meta grid
+    const checkedDate = checkedAt
+      ? new Date(checkedAt).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })
+      : '—';
+
+    const elapsed = s.elapsed ? `${s.elapsed}s` : '—';
+
+    document.getElementById('meta-grid').style.display = '';
+    document.getElementById('meta-grid').innerHTML = `
+      ${metaCard('סטטוס', labelText(statusLabel), labelClass(statusLabel))}
+      ${metaCard('כיסוי ייצור', coverage === 'full' ? '✅ מלא' : '⚠️ חלקי', coverage === 'full' ? 'pass' : 'warn')}
+      ${metaCard('רשתות פעילות', enabledReq, enabledReq > 0 ? 'pass' : 'fail')}
+      ${metaCard('רשתות מושבתות', disabledCount, disabledCount > 0 ? 'warn' : 'pass')}
+      ${metaCard('בדיקה אחרונה', checkedDate, '', 'sm')}
+      ${metaCard('זמן ריצה', elapsed, '', 'sm')}
+    `;
+
+    // Sample product (from first passing chain)
+    const passingResult = Object.values(chainResults).find(r => r.status === 'pass');
+    const productSection = document.getElementById('product-section');
+    if (passingResult && passingResult.barcode) {
+      productSection.style.display = '';
+      productSection.innerHTML = `
+        <div class="section-title">מוצר לדוגמה שהוחזר בבדיקה</div>
+        <div class="product-card">
+          <div class="product-barcode">ברקוד: ${escHtml(passingResult.barcode)}</div>
+          <div class="product-name">${escHtml(passingResult.name || '—')}</div>
+          <div class="product-row">
+            <div class="product-field">
+              <span class="label">מחיר</span>
+              <div class="val price">₪${passingResult.price != null ? Number(passingResult.price).toFixed(2) : '—'}</div>
+            </div>
+            ${passingResult.storeId ? `
+            <div class="product-field">
+              <span class="label">סניף</span>
+              <div class="val">${escHtml(passingResult.storeId)}</div>
+            </div>` : ''}
+            <div class="product-field">
+              <span class="label">מקור</span>
+              <div class="val">official</div>
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      productSection.style.display = 'none';
+    }
+
+    // Chains section — enabled first, then disabled
+    const chains = data.chains || [];
+    const enabledChains  = chains.filter(c => !disabledIds.includes(c.chainId));
+    const disabledChains = disabledIds.map(id => ({ chainId: id, status: 'disabled' }));
+
+    const chainsSection = document.getElementById('chains-section');
+    chainsSection.style.display = '';
+    chainsSection.innerHTML = `
+      ${enabledChains.length ? `
+        <div class="section">
+          <div class="section-title">רשתות פעילות (${enabledChains.length})</div>
+          ${enabledChains.map(c => chainRow(c, chainResults[c.chainId], false)).join('')}
+        </div>` : ''}
+      ${disabledChains.length ? `
+        <div class="section">
+          <div class="section-title">רשתות מושבתות (${disabledChains.length})</div>
+          ${disabledChains.map(c => chainRow(c, null, true)).join('')}
+        </div>` : ''}
+    `;
+  }
+
+  // ── Banner ───────────────────────────────────────────────────────
+  function renderBanner(statusLabel, coverage, rawStatus, checkedAt, message) {
+    const el = document.getElementById('status-banner');
+    let cls, icon, title, sub;
+
+    if (statusLabel === 'full_pass') {
+      cls = 'pass'; icon = '✅';
+      title = 'FULL PASS — כל הרשתות עוברות';
+      sub = 'כיסוי ייצור מלא';
+    } else if (statusLabel === 'baseline_pass') {
+      cls = 'warn'; icon = '⚠️';
+      title = 'BASELINE PASS — כיסוי חלקי';
+      sub = message || 'רק הרשתות המופעלות נבדקו';
+    } else if (rawStatus === 'fail') {
+      cls = 'fail'; icon = '❌';
+      title = 'FAIL — בדיקת הסניטי נכשלה';
+      sub = 'רשת חובה אחת או יותר לא מחזירות מחירים';
+    } else {
+      cls = 'warn'; icon = '❓';
+      title = 'סטטוס לא ידוע';
+      sub = '';
+    }
+
+    if (checkedAt) {
+      const ago = timeAgo(checkedAt);
+      sub += (sub ? ' · ' : '') + `נבדק ${ago}`;
+    }
+
+    el.className = `banner ${cls}`;
+    el.innerHTML = `<span class="icon">${icon}</span><div><div class="title">${title}</div><div class="sub">${escHtml(sub)}</div></div>`;
+  }
+
+  function resetBanner() {
+    const el = document.getElementById('status-banner');
+    el.className = 'banner idle';
+    el.innerHTML = `<span class="icon">⏳</span><div><div class="title">לא ניתן לטעון נתונים</div><div class="sub">בדוק טוקן וחיבור לשרת</div></div>`;
+    document.getElementById('meta-grid').style.display = 'none';
+    document.getElementById('product-section').style.display = 'none';
+    document.getElementById('chains-section').style.display = 'none';
+  }
+
+  // ── Chain row ────────────────────────────────────────────────────
+  function chainRow(chain, result, isDisabled) {
+    const id     = chain.chainId;
+    const status = result?.status || (isDisabled ? 'disabled' : '—');
+    const price  = result?.price != null ? `₪${Number(result.price).toFixed(2)}` : '';
+    const name   = result?.name  ? escHtml(result.name.substring(0, 30)) : '';
+    const error  = result?.error ? escHtml(result.error.substring(0, 60)) : '';
+
+    const dotCls  = isDisabled ? 'disabled' : (status === 'pass' ? 'pass' : 'fail');
+    const badgeLabel = isDisabled ? 'מושבת' : (status === 'pass' ? 'עובר' : 'נכשל');
+    const badgeCls   = isDisabled ? 'disabled' : (status === 'pass' ? 'enabled' : 'disabled');
+
+    const meta = isDisabled
+      ? `ממתין לאימות endpoint`
+      : (error || name || '');
+
+    return `
+      <div class="chain-row ${isDisabled ? 'disabled' : ''}">
+        <span class="chain-dot ${dotCls}"></span>
+        <span class="chain-id">${escHtml(id)}</span>
+        <span class="chain-badge ${badgeCls}">${badgeLabel}</span>
+        <span class="chain-meta">${meta}</span>
+        ${price ? `<span class="chain-price">${price}</span>` : ''}
+      </div>`;
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────
+  function metaCard(label, value, cls = '', extra = '') {
+    return `
+      <div class="meta-card">
+        <div class="meta-label">${label}</div>
+        <div class="meta-value ${cls} ${extra}">${value}</div>
+      </div>`;
+  }
+
+  function labelText(sl) {
+    return {
+      baseline_pass: 'Baseline Pass',
+      full_pass:     'Full Pass',
+    }[sl] || sl || '—';
+  }
+
+  function labelClass(sl) {
+    return { baseline_pass: 'warn', full_pass: 'pass', fail: 'fail' }[sl] || '';
+  }
+
+  function timeAgo(iso) {
+    const diff = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diff < 60)   return `לפני ${diff}ש`;
+    if (diff < 3600) return `לפני ${Math.round(diff/60)}ד`;
+    return `לפני ${Math.round(diff/3600)}ש`;
+  }
+
+  function escHtml(s) {
+    return String(s ?? '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+</script>
+</body>
+</html>
