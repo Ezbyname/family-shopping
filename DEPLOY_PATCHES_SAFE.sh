@@ -155,6 +155,28 @@ else
 fi
 echo ""
 
+echo "🛡️  SAFETY CHECK 5C: Verifying semantic chain filtering variables..."
+REQUIRED_VARS=("enabledChains" "disabledChains" "requiredChains" "productionCoverage" "baseline_pass")
+MISSING_VARS=()
+
+for VAR in "${REQUIRED_VARS[@]}"; do
+  if ! grep -q "$VAR" ~/family-shopping/scripts/sanity-live.js; then
+    MISSING_VARS+=("$VAR")
+  fi
+done
+
+if [ ${#MISSING_VARS[@]} -gt 0 ]; then
+  echo "❌ CRITICAL: sanity-live.js missing required semantic variables"
+  echo "   Missing: ${MISSING_VARS[*]}"
+  echo "   Required: enabledChains, disabledChains, requiredChains, productionCoverage, baseline_pass"
+  exit 1
+fi
+
+echo "✅ sanity-live.js has all required semantic variables:"
+grep -n "const enabledChains\|const disabledChains\|const requiredChains" ~/family-shopping/scripts/sanity-live.js | head -3
+grep -n "productionCoverage\|baseline_pass" ~/family-shopping/scripts/sanity-live.js | head -2
+echo ""
+
 echo "🛡️  SAFETY CHECK 5A: Verifying exactly one enabled required chain..."
 node << 'CHECK_5A'
 import('../workers/prices/chains.js').then(m => {
