@@ -82,9 +82,13 @@ async function main() {
     console.log('⚠️ Firebase unavailable — results will NOT be saved\n');
   }
 
-  const requiredChains = CHAINS.filter(c => c.enabled && c.sanityRequired);
-  const optionalChains = CHAINS.filter(c => c.enabled && !c.sanityRequired);
-  const disabledChains = CHAINS.filter(c => !c.enabled);
+  // Explicitly filter for enabled chains (safety requirement)
+  const enabledChains = CHAINS.filter(c => c.enabled === true);
+  const disabledChains = CHAINS.filter(c => c.enabled !== true);
+
+  // Subdivide enabled chains by requirement
+  const requiredChains = enabledChains.filter(c => c.sanityRequired === true);
+  const optionalChains = enabledChains.filter(c => c.sanityRequired !== true);
 
   if (!requiredChains.length) {
     console.error('❌ No required chains enabled');
