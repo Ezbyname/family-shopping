@@ -15,6 +15,7 @@
 //   4 = Firebase write failure
 //   5 = source fetch failure (all chains blocked/unreachable)
 
+import 'dotenv/config.js';
 import { loadConfig }                        from './config.js';
 import { checkIsraeliIP }                    from './check-ip.js';
 import { CHAINS }                            from './chains.js';

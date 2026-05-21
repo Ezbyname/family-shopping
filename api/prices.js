@@ -8,7 +8,7 @@
 //   D. manualPrices/{groupId}/{barcode}/{entryId}    — family scoped, only if no official/proxy
 //   E. priceReports — warning signal only, never shown as real price
 
-import { getDB, haversine, setCors, isValidBarcode, isValidPrice } from './_firebase.js';
+import { getDB, getLastError, haversine, setCors, isValidBarcode, isValidPrice } from './_firebase.js';
 
 // Hebrew → English dictionary for Open Food Facts search
 const HE_EN = {
@@ -57,6 +57,15 @@ export default async function handler(req, res) {
 
     try {
       const db = await getDB();
+      if (!db) {
+        const lastError = getLastError();
+        return res.status(200).json({
+          barcode: clean, prices: [], source: 'none',
+          isStale: true, lastUpdated: null,
+          warning: 'Firebase not initialized',
+          error: lastError || 'database_unavailable',
+        });
+      }
       const result = await buildLayeredPrices(db, clean, userId, groupId, hasLoc, userLat, userLng, radius);
       return res.status(200).json({ version: '6.0.0', barcode: clean, ...result });
     } catch (e) {
