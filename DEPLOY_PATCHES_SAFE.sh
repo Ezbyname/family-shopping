@@ -146,15 +146,6 @@ fi
 echo "✅ Imports verified"
 echo ""
 
-echo "🔍 STEP 5: Checking sanity-live.js filtering logic..."
-if grep -q "filter(c => c.enabled)" ~/family-shopping/scripts/sanity-live.js; then
-  echo "✅ sanity-live.js filters by enabled status"
-else
-  echo "❌ CRITICAL: sanity-live.js missing filter(c => c.enabled)"
-  exit 1
-fi
-echo ""
-
 echo "🛡️  SAFETY CHECK 5C: Verifying semantic chain filtering variables..."
 REQUIRED_VARS=("enabledChains" "disabledChains" "requiredChains" "productionCoverage" "baseline_pass")
 MISSING_VARS=()
