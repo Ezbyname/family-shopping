@@ -359,6 +359,27 @@ async function downloadAndFindFirstItem(url, label) {
       let inItem = false;
       let itemsProcessed = 0;
 
+      // Guard against double resolve/reject after stream is torn down
+      let resolved = false;
+
+      function safeResolve(item) {
+        if (resolved) return;
+        resolved = true;
+        streamActive = false;
+        try { dataStream.destroy(); } catch {}
+        try { parser.removeAllListeners(); } catch {}
+        resolve(item);
+      }
+
+      function safeReject(err) {
+        if (resolved) return;
+        resolved = true;
+        streamActive = false;
+        try { dataStream.destroy(); } catch {}
+        try { parser.removeAllListeners(); } catch {}
+        reject(err);
+      }
+
       const parser = sax.createStream(false, {
         lowercase: true,
         trim: true,
@@ -382,6 +403,7 @@ async function downloadAndFindFirstItem(url, label) {
       });
 
       parser.on('closetag', (tagName) => {
+        if (resolved) return;
         const tag = tagName.toLowerCase();
         const text = currentText.trim();
         currentText = '';
@@ -409,28 +431,23 @@ async function downloadAndFindFirstItem(url, label) {
           if (currentItem.barcode && currentItem.name && currentItem.price > 0) {
             foundItem = currentItem;
             console.log(`${label} ✓ Found valid item at position ${itemsProcessed}, stopping stream...`);
-
-            // Properly close streams
-            streamActive = false;
-            dataStream.destroy();
-            parser.close();
-
-            return resolve(foundItem);
+            safeResolve(foundItem);
           }
         }
       });
 
       parser.on('error', (err) => {
-        streamActive = false;
-        reject(new Error(`SAX parser error: ${err.message}`));
+        // Ignore errors after stream is already resolved (e.g. from destroy())
+        if (resolved) return;
+        safeReject(new Error(`SAX parser error: ${err.message}`));
       });
 
       parser.on('end', () => {
-        streamActive = false;
+        if (resolved) return;
         if (!foundItem) {
-          reject(new Error(`No valid items found after processing ${itemsProcessed} items`));
+          safeReject(new Error(`No valid items found after processing ${itemsProcessed} items`));
         } else {
-          resolve(foundItem);
+          safeResolve(foundItem);
         }
       });
 
@@ -440,8 +457,9 @@ async function downloadAndFindFirstItem(url, label) {
       });
 
       dataStream.on('error', (err) => {
-        streamActive = false;
-        reject(new Error(`Stream error: ${err.message}`));
+        // Ignore errors after stream is already resolved (e.g. from destroy())
+        if (resolved) return;
+        safeReject(new Error(`Stream error: ${err.message}`));
       });
 
       console.log(`${label} Piping stream to parser...`);
