@@ -3932,6 +3932,57 @@ let _adminPressTimer = null;
 let _adminRoleCache = null; // null=unknown, true/false
 let _adminRevokeListenerActive = false;
 
+// ── Admin panel session telemetry ─────────────────────────────────────
+// adminPanelSessions/{uid}/{sessionId} = { openedAt, closedAt, userAgent, revoked, timedOut }
+// Goal: detect abandoned sessions and suspicious usage patterns.
+let _adminSessionRef   = null; // Firebase ref for the active session record
+let _adminSessionTimer = null; // setTimeout handle for TTL-based timedOut marker
+
+async function _openAdminSession() {
+  if (!myId) return;
+  // If a previous session ref leaked, close it as abandoned before opening a new one
+  if (_adminSessionRef) await _closeAdminSession('abandoned');
+  const sessionId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  _adminSessionRef = ref(db, `adminPanelSessions/${myId}/${sessionId}`);
+  try {
+    await set(_adminSessionRef, {
+      openedAt:  new Date().toISOString(),
+      closedAt:  null,
+      userAgent: navigator.userAgent.slice(0, 200),
+      revoked:   false,
+      timedOut:  false,
+    });
+  } catch {
+    _adminSessionRef = null; // telemetry failure is non-critical
+    return;
+  }
+  // Auto-mark timedOut when the 15-min session TTL expires while the panel is still open
+  const elapsed = Date.now() - parseInt(sessionStorage.getItem('adminUnlocked') || '0', 10);
+  const msLeft  = Math.max(ADMIN_SESSION_MS - elapsed, 0);
+  if (_adminSessionTimer) clearTimeout(_adminSessionTimer);
+  _adminSessionTimer = setTimeout(async () => {
+    _adminSessionTimer = null;
+    await _updateAdminSession({ closedAt: new Date().toISOString(), timedOut: true });
+    _adminSessionRef = null;
+    // Session expired — next API call will 401; UI shows error naturally
+  }, msLeft);
+}
+
+async function _updateAdminSession(fields) {
+  if (!_adminSessionRef) return;
+  try { await update(_adminSessionRef, fields); } catch { /* non-critical */ }
+}
+
+async function _closeAdminSession(reason = 'manual') {
+  if (_adminSessionTimer) { clearTimeout(_adminSessionTimer); _adminSessionTimer = null; }
+  await _updateAdminSession({
+    closedAt: new Date().toISOString(),
+    revoked:  reason === 'revoked',
+    timedOut: reason === 'timeout',
+  });
+  _adminSessionRef = null;
+}
+
 // ── Live admin-role revocation listener ──────────────────────────────
 // Watches users/{uid}/roles/admin in Firebase. If an admin revokes their own
 // (or another admin revokes their) role while the panel is open, the session
@@ -3962,7 +4013,7 @@ function initAdminRevokeListener() {
       // Close the admin panel if it is currently visible
       const overlay = document.getElementById('admin-overlay');
       if (overlay && overlay.classList.contains('show')) {
-        closeAdminOverlay();
+        closeAdminOverlay('revoked');
         toast('🔒 הרשאת אדמין בוטלה');
       }
     }
@@ -4102,6 +4153,7 @@ async function openAdminPanel() {
   document.getElementById('admin-panel-content').innerHTML =
     '<div style="text-align:center;color:var(--muted);padding:32px 0">' +
     '<div style="font-size:32px;margin-bottom:8px">⏳</div>טוען נתונים...</div>';
+  _openAdminSession(); // non-blocking telemetry
   await loadAdminStatus();
 }
 
@@ -4116,14 +4168,14 @@ async function loadAdminStatus() {
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || 'failed');
-    renderAdminPanel(data.status);
+    renderAdminPanel(data.status, data.meta || {});
   } catch (err) {
     document.getElementById('admin-panel-content').innerHTML =
       `<div style="color:#ef4444;text-align:center;padding:24px">❌ ${esc(err.message)}</div>`;
   }
 }
 
-function renderAdminPanel(s) {
+function renderAdminPanel(s, meta = {}) {
   const statusLabel  = s.statusLabel        || 'unknown';
   const coverage     = s.productionCoverage || 'unknown';
   const checkedAt    = s.checkedAt          || null;
@@ -4223,6 +4275,24 @@ function renderAdminPanel(s) {
     ${enabledRows ? `<div class="admin-section-label">רשתות פעילות</div>${enabledRows}` : ''}
     ${disabledRows ? `<div class="admin-section-label" style="margin-top:12px">רשתות מושבתות</div>${disabledRows}` : ''}`;
 
+  // ── Version / build footer ──────────────────────────────────────────
+  const sha       = esc(meta.deployedSha || 'unknown');
+  const env       = esc(meta.deployedEnv || (location.hostname === 'localhost' ? 'local' : 'unknown'));
+  const envColor  = env === 'production' ? '#34d399' : env === 'preview' ? '#f0b429' : '#7d8590';
+  const svVer     = esc(s.sanityVersion  || '—');
+  const footerHtml = `
+    <div style="margin-top:18px;padding:12px 14px;background:#0d1117;border-radius:10px;
+                font-size:10px;color:var(--muted);line-height:1.7">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-weight:700;letter-spacing:.5px;text-transform:uppercase">Build Info</span>
+        <span style="background:${envColor}22;color:${envColor};padding:1px 7px;border-radius:4px;
+                     font-weight:700;letter-spacing:.5px;text-transform:uppercase">${env}</span>
+      </div>
+      <div>Git SHA: <code style="color:var(--text)">${sha}</code></div>
+      <div>Sanity: <code style="color:var(--text)">v${svVer}</code></div>
+      <div>runId: <code style="color:var(--text);font-size:9px">${esc(s.runId || '—')}</code></div>
+    </div>`;
+
   document.getElementById('admin-panel-content').innerHTML = `
     <div class="admin-status-banner ${bannerCls}">
       <span class="asb-icon">${bannerIcon}</span>
@@ -4235,12 +4305,13 @@ function renderAdminPanel(s) {
     ${metaHtml}
     ${productHtml}
     ${chainsHtml}
-    <div class="admin-ts">runId: ${esc(s.runId || '—')}</div>
+    ${footerHtml}
   `;
 }
 
 // ── Close overlay ─────────────────────────────────────────────────────
-window.closeAdminOverlay = function() {
+window.closeAdminOverlay = async function(reason = 'manual') {
+  await _closeAdminSession(reason); // telemetry — non-blocking for UI timing
   document.getElementById('admin-overlay').classList.remove('show');
   document.getElementById('admin-pin-input').value = '';
 };

@@ -25,8 +25,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Use chains from the actual source of truth
 const CHAINS = CHAINS_FROM_SOURCE;
 
+const SANITY_VERSION = '2.0.0'; // increment when sanity-live.js logic changes
+
 const HEADERS = {
-  'User-Agent': 'FamilyShopping/SanityCheck/1.0',
+  'User-Agent': `FamilyShopping/SanityCheck/${SANITY_VERSION}`,
   'Accept': 'application/xml, text/xml, application/gzip, text/html, */*',
   'Accept-Language': 'he-IL,he;q=0.9,en;q=0.8',
   'Accept-Encoding': 'gzip, deflate',
@@ -190,6 +192,8 @@ async function main() {
       } else {
         statusData.message = 'All supported chains enabled and tested.';
       }
+
+      statusData.sanityVersion = SANITY_VERSION;
 
       await firebaseDb.ref('latestPriceSanityStatus').set(statusData);
       console.log('✅ Firebase status updated\n');

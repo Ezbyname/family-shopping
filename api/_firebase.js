@@ -50,6 +50,28 @@ export const setCors = (res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 };
 
+// ── CSRF: Origin validation ──────────────────────────────────────────────────
+// Returns true when the request is safe to proceed.
+//
+// Non-browser callers (curl, server-to-server) never send Origin → always allowed.
+// Browser callers always include Origin for cross-origin fetches → we check it.
+//
+// Configure: set ALLOWED_ORIGINS env var to comma-separated list of permitted
+// origins, e.g. "https://example.com,https://staging.example.com".
+// If ALLOWED_ORIGINS is empty/unset: all origins are permitted (dev/preview fallback).
+//
+// Note: Authorization: Bearer already mitigates most CSRF risk because a
+// cross-site attacker cannot read the victim's Firebase token (same-origin policy).
+// This check adds defence-in-depth for unexpected future auth changes.
+export function checkOrigin(req) {
+  const origin = req.headers['origin'];
+  if (!origin) return true; // non-browser caller — no Origin header → allow
+  const allowed = (process.env.ALLOWED_ORIGINS || '')
+    .split(',').map(s => s.trim()).filter(Boolean);
+  if (allowed.length === 0) return true; // not configured → allow all (dev fallback)
+  return allowed.includes(origin);
+}
+
 export const isValidBarcode = (str) => {
   const clean = String(str).replace(/\D/g, '');
   return clean.length >= 8 && clean.length <= 14;
