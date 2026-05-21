@@ -4208,10 +4208,7 @@ function adminTimeAgo(iso) {
   return `לפני ${Math.round(diff/3600)}ש`;
 }
 
-// Patch connectToGroup to init admin gesture after login
-const _origConnectToGroup = connectToGroup;
-// eslint-disable-next-line no-global-assign
-window._initAdminOnConnect = function() { setTimeout(initAdminGesture, 500); };
+// initAdminGesture is called from connectToGroup() directly (line above auth block).
 
 </script>
 
