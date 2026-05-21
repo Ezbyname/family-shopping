@@ -732,6 +732,95 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 .notif-empty .ne-icon{font-size:40px;margin-bottom:10px}
 .notif-empty p{font-size:13px}
 
+/* ══ ADMIN UNLOCK & PANEL ══════════════════════════════════════════ */
+#admin-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9000;
+  display:none;align-items:flex-end;justify-content:center}
+#admin-overlay.show{display:flex}
+
+#admin-unlock-modal,#admin-panel-modal{
+  background:var(--card);border-radius:20px 20px 0 0;
+  width:100%;max-width:480px;padding:24px 20px 36px;
+  animation:slideUp .25s ease}
+
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+
+.admin-handle{width:36px;height:4px;background:var(--border);border-radius:2px;
+  margin:0 auto 20px;flex-shrink:0}
+.admin-title{font-size:17px;font-weight:800;margin-bottom:4px;text-align:center}
+.admin-sub{font-size:12px;color:var(--muted);margin-bottom:20px;text-align:center}
+
+#admin-pin-input{
+  width:100%;padding:14px 16px;font-size:22px;letter-spacing:8px;text-align:center;
+  background:var(--surface);border:1.5px solid var(--border);border-radius:12px;
+  color:var(--text);margin-bottom:6px;font-family:monospace}
+#admin-pin-input:focus{outline:none;border-color:var(--accent)}
+
+.admin-error{color:#ef4444;font-size:12px;text-align:center;
+  min-height:18px;margin-bottom:12px}
+
+.admin-btns{display:flex;gap:10px;margin-top:4px}
+.admin-btn{flex:1;padding:13px;border-radius:12px;font-size:15px;
+  font-weight:700;border:none;cursor:pointer;transition:opacity .15s}
+.admin-btn:active{opacity:.75}
+.admin-btn.primary{background:var(--accent);color:#fff}
+.admin-btn.ghost{background:var(--surface);color:var(--muted);
+  border:1px solid var(--border)}
+.admin-btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* Status panel */
+.admin-panel-scroll{max-height:70vh;overflow-y:auto;margin:0 -4px}
+.admin-status-banner{border-radius:10px;padding:14px 16px;margin-bottom:14px;
+  display:flex;gap:12px;align-items:flex-start;font-size:13px}
+.admin-status-banner.pass{background:#052e16;border:1px solid #22c55e;color:#22c55e}
+.admin-status-banner.warn{background:#1c1007;border:1px solid #f59e0b;color:#f59e0b}
+.admin-status-banner.fail{background:#2d0707;border:1px solid #ef4444;color:#ef4444}
+.admin-status-banner .asb-icon{font-size:22px;flex-shrink:0}
+.admin-status-banner .asb-title{font-weight:800;margin-bottom:2px}
+.admin-status-banner .asb-sub{opacity:.8;font-size:11px}
+
+.admin-coverage-warn{background:#1c1007;border:1px solid #f59e0b;color:#f59e0b;
+  border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px}
+.admin-coverage-warn strong{display:block;margin-bottom:2px;font-size:13px}
+
+.admin-meta-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.admin-meta-pill{background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:8px 12px;flex:1;min-width:100px;text-align:center}
+.admin-meta-pill .aml{font-size:10px;color:var(--muted);margin-bottom:3px;
+  text-transform:uppercase;letter-spacing:.04em}
+.admin-meta-pill .amv{font-size:16px;font-weight:800}
+.admin-meta-pill .amv.pass{color:#22c55e}
+.admin-meta-pill .amv.warn{color:#f59e0b}
+.admin-meta-pill .amv.fail{color:#ef4444}
+
+.admin-section-label{font-size:11px;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.05em;font-weight:700;margin-bottom:8px}
+.admin-chain-row{display:flex;align-items:center;gap:10px;padding:10px 12px;
+  background:var(--surface);border-radius:8px;margin-bottom:6px;font-size:13px}
+.admin-chain-row.disabled{opacity:.5}
+.acdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.acdot.pass{background:#22c55e}.acdot.fail{background:#ef4444}
+.acdot.dis{background:var(--border)}
+.admin-chain-id{font-weight:700;min-width:110px;font-size:12px;
+  font-family:monospace}
+.admin-chain-price{color:#22c55e;font-weight:700;margin-right:auto}
+.admin-chain-err{color:#f59e0b;font-size:11px;flex:1}
+
+.admin-product-card{background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;padding:14px;margin-bottom:14px}
+.admin-product-barcode{font-size:11px;color:var(--muted);
+  font-family:monospace;margin-bottom:4px}
+.admin-product-name{font-size:15px;font-weight:800;margin-bottom:8px}
+.admin-product-price{font-size:22px;font-weight:900;color:#22c55e}
+.admin-product-store{font-size:11px;color:var(--muted);margin-top:2px}
+
+.admin-ts{font-size:11px;color:var(--muted);text-align:center;
+  margin-top:14px;font-family:monospace}
+
+/* Long-press ring on avatar when admin */
+#hdr-my-avatar.admin-press-active{
+  box-shadow:0 0 0 3px var(--accent),0 0 0 5px rgba(99,102,241,.3);
+  transition:box-shadow .1s}
+
 </style>
 </head>
 <body>
@@ -987,6 +1076,8 @@ function connectToGroup(){
 
   // Load header avatar
   setTimeout(updateHeaderAvatar, 300);
+  // Attach hidden admin long-press gesture (silently no-ops for non-admins)
+  setTimeout(initAdminGesture, 600);
 
   toast('👋 שלום '+myName+'!');
 }
@@ -3826,6 +3917,302 @@ onAuthStateChanged(auth, async (user) => {
     }
   }
 });
+
+// ════════════════════════════════════════════════════════════════════
+// ADMIN UNLOCK — hidden long-press gesture on avatar
+// Security model:
+//   1. Client reads users/{uid}/roles/admin from Firebase (fast pre-check)
+//   2. PIN + Firebase ID token sent to /api/admin-unlock (server validates both)
+//   3. Session stored in sessionStorage with 15-min TTL
+//   4. Status data fetched from /api/admin-status (server-gated)
+// ════════════════════════════════════════════════════════════════════
+
+const ADMIN_SESSION_MS = 15 * 60 * 1000; // 15 minutes
+let _adminPressTimer = null;
+let _adminRoleCache = null; // null=unknown, true/false
+
+// ── Attach long-press to avatar after connectToGroup ────────────────
+function initAdminGesture() {
+  const avatar = document.getElementById('hdr-my-avatar');
+  if (!avatar || avatar._adminGestureAttached) return;
+  avatar._adminGestureAttached = true;
+
+  const HOLD_MS = 3000;
+
+  function startPress() {
+    if (_adminPressTimer) return;
+    _adminPressTimer = setTimeout(async () => {
+      _adminPressTimer = null;
+      avatar.classList.remove('admin-press-active');
+      await onAdminLongPress();
+    }, HOLD_MS);
+    avatar.classList.add('admin-press-active');
+  }
+
+  function cancelPress() {
+    if (_adminPressTimer) {
+      clearTimeout(_adminPressTimer);
+      _adminPressTimer = null;
+    }
+    avatar.classList.remove('admin-press-active');
+  }
+
+  avatar.addEventListener('pointerdown', startPress);
+  avatar.addEventListener('pointerup',   cancelPress);
+  avatar.addEventListener('pointerleave', cancelPress);
+  avatar.addEventListener('contextmenu', e => e.preventDefault());
+}
+
+async function onAdminLongPress() {
+  // Silently check Firebase admin role first
+  const isAdmin = await checkAdminRole();
+  if (!isAdmin) return; // no feedback — not admin
+
+  // Haptic feedback if available
+  if (navigator.vibrate) navigator.vibrate(40);
+
+  // Check if already unlocked with valid session
+  if (isAdminSessionValid()) {
+    openAdminPanel();
+  } else {
+    openAdminUnlock();
+  }
+}
+
+async function checkAdminRole() {
+  // Return cached value to avoid repeated DB reads
+  if (_adminRoleCache !== null) return _adminRoleCache;
+  if (!myId) return false;
+  try {
+    const snap = await get(ref(db, `users/${myId}/roles/admin`));
+    _adminRoleCache = snap.val() === true;
+    return _adminRoleCache;
+  } catch {
+    return false;
+  }
+}
+
+function isAdminSessionValid() {
+  const ts = parseInt(sessionStorage.getItem('adminUnlocked') || '0', 10);
+  return ts > 0 && (Date.now() - ts) < ADMIN_SESSION_MS;
+}
+
+// ── Unlock modal ─────────────────────────────────────────────────────
+function openAdminUnlock() {
+  document.getElementById('admin-unlock-modal').style.display = 'block';
+  document.getElementById('admin-panel-modal').style.display  = 'none';
+  document.getElementById('admin-overlay').classList.add('show');
+  document.getElementById('admin-pin-input').value = '';
+  document.getElementById('admin-pin-error').textContent = '';
+  document.getElementById('admin-unlock-btn').disabled = false;
+  setTimeout(() => document.getElementById('admin-pin-input').focus(), 100);
+}
+
+window.submitAdminPin = async function() {
+  const pin = document.getElementById('admin-pin-input').value.trim();
+  if (!pin) return;
+
+  const btn = document.getElementById('admin-unlock-btn');
+  btn.disabled = true;
+  btn.textContent = '...';
+  document.getElementById('admin-pin-error').textContent = '';
+
+  try {
+    const user = auth.currentUser;
+    if (!user) throw new Error('not-auth');
+    const idToken = await user.getIdToken();
+
+    const res = await fetch('/api/admin-unlock', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ pin }),
+    });
+
+    const data = await res.json();
+
+    if (data.ok) {
+      sessionStorage.setItem('adminUnlocked', String(Date.now()));
+      if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
+      openAdminPanel();
+    } else {
+      document.getElementById('admin-pin-error').textContent = '❌ קוד שגוי או אין הרשאה';
+      document.getElementById('admin-pin-input').value = '';
+      document.getElementById('admin-pin-input').focus();
+    }
+  } catch {
+    document.getElementById('admin-pin-error').textContent = '❌ שגיאת חיבור';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'כניסה';
+  }
+};
+
+// ── Admin status panel ────────────────────────────────────────────────
+async function openAdminPanel() {
+  document.getElementById('admin-unlock-modal').style.display = 'none';
+  document.getElementById('admin-panel-modal').style.display  = 'block';
+  document.getElementById('admin-overlay').classList.add('show');
+  document.getElementById('admin-panel-content').innerHTML =
+    '<div style="text-align:center;color:var(--muted);padding:32px 0">' +
+    '<div style="font-size:32px;margin-bottom:8px">⏳</div>טוען נתונים...</div>';
+  await loadAdminStatus();
+}
+
+async function loadAdminStatus() {
+  try {
+    const user = auth.currentUser;
+    if (!user) throw new Error('not-auth');
+    const idToken = await user.getIdToken();
+
+    const res = await fetch('/api/admin-status', {
+      headers: { 'Authorization': `Bearer ${idToken}` },
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'failed');
+    renderAdminPanel(data.status);
+  } catch (err) {
+    document.getElementById('admin-panel-content').innerHTML =
+      `<div style="color:#ef4444;text-align:center;padding:24px">❌ ${esc(err.message)}</div>`;
+  }
+}
+
+function renderAdminPanel(s) {
+  const statusLabel  = s.statusLabel        || 'unknown';
+  const coverage     = s.productionCoverage || 'unknown';
+  const checkedAt    = s.checkedAt          || null;
+  const disabledIds  = s.disabledChainIds   || [];
+  const enabledReq   = s.enabledRequiredChains ?? '?';
+  const disabledCnt  = s.disabledChains     ?? disabledIds.length;
+  const results      = s.results            || {};
+
+  // Banner
+  let bannerCls, bannerIcon, bannerTitle, bannerSub;
+  if (statusLabel === 'full_pass') {
+    bannerCls = 'pass'; bannerIcon = '✅';
+    bannerTitle = 'FULL PASS — כל הרשתות פעילות';
+    bannerSub   = 'כיסוי ייצור מלא';
+  } else if (statusLabel === 'baseline_pass') {
+    bannerCls = 'warn'; bannerIcon = '⚠️';
+    bannerTitle = 'BASELINE PASS — כיסוי חלקי';
+    bannerSub   = s.message || 'רק רשתות מופעלות נבדקו';
+  } else {
+    bannerCls = 'fail'; bannerIcon = '❌';
+    bannerTitle = 'FAIL — בדיקת הסניטי נכשלה';
+    bannerSub   = 'רשת חובה אחת או יותר לא מחזירה מחירים';
+  }
+  if (checkedAt) bannerSub += ` · ${adminTimeAgo(checkedAt)}`;
+
+  // Coverage warning
+  const warnHtml = coverage === 'partial'
+    ? `<div class="admin-coverage-warn">
+        <strong>⚠️ כיסוי חלקי — כרגע רק שופרסל פעילה</strong>
+        רשתות נוספות (רמי לוי, ויקטורי, יינות ביתן, אושר עד, מחסני להב) מושבתות בהמתנה לאימות endpoints.
+       </div>`
+    : '';
+
+  // Meta pills
+  const checkedStr = checkedAt
+    ? new Date(checkedAt).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })
+    : '—';
+  const metaHtml = `
+    <div class="admin-meta-row">
+      <div class="admin-meta-pill">
+        <div class="aml">סטטוס</div>
+        <div class="amv ${bannerCls}">${statusLabel === 'full_pass' ? 'Full' : statusLabel === 'baseline_pass' ? 'Base' : 'Fail'}</div>
+      </div>
+      <div class="admin-meta-pill">
+        <div class="aml">כיסוי</div>
+        <div class="amv ${coverage === 'full' ? 'pass' : 'warn'}">${coverage === 'full' ? 'מלא' : 'חלקי'}</div>
+      </div>
+      <div class="admin-meta-pill">
+        <div class="aml">פעילות</div>
+        <div class="amv ${enabledReq > 0 ? 'pass' : 'fail'}">${enabledReq}</div>
+      </div>
+      <div class="admin-meta-pill">
+        <div class="aml">מושבתות</div>
+        <div class="amv ${disabledCnt > 0 ? 'warn' : 'pass'}">${disabledCnt}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:14px">
+      בדיקה אחרונה: ${esc(checkedStr)}
+    </div>`;
+
+  // Sample product
+  const passing = Object.values(results).find(r => r.status === 'pass');
+  const productHtml = passing && passing.barcode ? `
+    <div class="admin-section-label">מוצר לדוגמה</div>
+    <div class="admin-product-card">
+      <div class="admin-product-barcode">${esc(passing.barcode)}</div>
+      <div class="admin-product-name">${esc(passing.name || '—')}</div>
+      <div class="admin-product-price">₪${passing.price != null ? Number(passing.price).toFixed(2) : '—'}</div>
+      ${passing.storeId ? `<div class="admin-product-store">סניף ${esc(passing.storeId)}</div>` : ''}
+    </div>` : '';
+
+  // Chains
+  const allChainIds = [...Object.keys(results), ...disabledIds.filter(id => !results[id])];
+  const enabledRows = allChainIds
+    .filter(id => !disabledIds.includes(id))
+    .map(id => {
+      const r = results[id] || {};
+      const pass = r.status === 'pass';
+      const price = r.price != null ? `₪${Number(r.price).toFixed(2)}` : '';
+      const err = r.error ? esc(r.error.substring(0, 50)) : '';
+      return `<div class="admin-chain-row">
+        <span class="acdot ${pass ? 'pass' : 'fail'}"></span>
+        <span class="admin-chain-id">${esc(id)}</span>
+        ${price ? `<span class="admin-chain-price">${price}</span>` : ''}
+        ${err  ? `<span class="admin-chain-err">${err}</span>` : ''}
+      </div>`;
+    }).join('');
+
+  const disabledRows = disabledIds.map(id => `
+    <div class="admin-chain-row disabled">
+      <span class="acdot dis"></span>
+      <span class="admin-chain-id">${esc(id)}</span>
+      <span class="admin-chain-err">ממתין לאימות endpoint</span>
+    </div>`).join('');
+
+  const chainsHtml = `
+    ${enabledRows ? `<div class="admin-section-label">רשתות פעילות</div>${enabledRows}` : ''}
+    ${disabledRows ? `<div class="admin-section-label" style="margin-top:12px">רשתות מושבתות</div>${disabledRows}` : ''}`;
+
+  document.getElementById('admin-panel-content').innerHTML = `
+    <div class="admin-status-banner ${bannerCls}">
+      <span class="asb-icon">${bannerIcon}</span>
+      <div>
+        <div class="asb-title">${esc(bannerTitle)}</div>
+        <div class="asb-sub">${esc(bannerSub)}</div>
+      </div>
+    </div>
+    ${warnHtml}
+    ${metaHtml}
+    ${productHtml}
+    ${chainsHtml}
+    <div class="admin-ts">runId: ${esc(s.runId || '—')}</div>
+  `;
+}
+
+// ── Close overlay ─────────────────────────────────────────────────────
+window.closeAdminOverlay = function() {
+  document.getElementById('admin-overlay').classList.remove('show');
+  document.getElementById('admin-pin-input').value = '';
+};
+
+function adminTimeAgo(iso) {
+  const diff = Math.round((Date.now() - new Date(iso)) / 1000);
+  if (diff < 60)   return `לפני ${diff}ש`;
+  if (diff < 3600) return `לפני ${Math.round(diff/60)}ד`;
+  return `לפני ${Math.round(diff/3600)}ש`;
+}
+
+// Patch connectToGroup to init admin gesture after login
+const _origConnectToGroup = connectToGroup;
+// eslint-disable-next-line no-global-assign
+window._initAdminOnConnect = function() { setTimeout(initAdminGesture, 500); };
+
 </script>
 
 <!-- ═══ PROFILE SETUP SCREEN ═══ -->
@@ -4125,6 +4512,44 @@ onAuthStateChanged(auth, async (user) => {
       </button>
     </div>
   </div>
+</div>
+
+<!-- ═══ ADMIN OVERLAY ═══════════════════════════════════════════════ -->
+<div id="admin-overlay" onclick="if(event.target===this)closeAdminOverlay()">
+
+  <!-- MODAL: Admin unlock (PIN entry) -->
+  <div id="admin-unlock-modal" style="display:none">
+    <div class="admin-handle"></div>
+    <div class="admin-title">🔐 כניסת אדמין</div>
+    <div class="admin-sub">הזן קוד גישה להמשך</div>
+    <input id="admin-pin-input" type="password" inputmode="numeric"
+      placeholder="••••" maxlength="12" autocomplete="off"
+      onkeydown="if(event.key==='Enter')submitAdminPin()">
+    <div class="admin-error" id="admin-pin-error"></div>
+    <div class="admin-btns">
+      <button class="admin-btn ghost" onclick="closeAdminOverlay()">ביטול</button>
+      <button class="admin-btn primary" id="admin-unlock-btn"
+        onclick="submitAdminPin()">כניסה</button>
+    </div>
+  </div>
+
+  <!-- MODAL: Admin status panel -->
+  <div id="admin-panel-modal" style="display:none">
+    <div class="admin-handle"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div class="admin-title" style="margin:0">📊 מצב מערכת</div>
+      <button class="admin-btn ghost"
+        style="flex:none;padding:6px 14px;font-size:13px"
+        onclick="closeAdminOverlay()">סגור</button>
+    </div>
+    <div class="admin-panel-scroll" id="admin-panel-content">
+      <div style="text-align:center;color:var(--muted);padding:32px 0">
+        <div style="font-size:32px;margin-bottom:8px">⏳</div>
+        טוען נתונים...
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <!-- ═══ NOTIFICATIONS PANEL ═══ -->
