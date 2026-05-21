@@ -1,24 +1,22 @@
-name: Price Sanity Check
+name: Price Parser Sanity Check
 
 on:
   pull_request:
     paths:
-      - 'workers/prices/**'
       - 'scripts/**'
       - '.github/workflows/price-sanity.yml'
   push:
     branches: [main]
     paths:
-      - 'workers/prices/**'
       - 'scripts/**'
       - '.github/workflows/price-sanity.yml'
   workflow_dispatch:
 
 jobs:
-  sanity-check:
-    name: Verify Price Sources
+  parser-sanity:
+    name: Parser Fixture Test (No IP Dependency)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
 
     steps:
       - name: Checkout
@@ -35,26 +33,27 @@ jobs:
         working-directory: ./scripts
         run: npm install
 
-      - name: Run price sanity check
+      - name: Run parser fixture sanity check
         working-directory: ./scripts
-        run: npm run sanity:prices
-        env:
-          # Allow partial pass if explicitly set in secrets (optional)
-          ALLOW_PARTIAL_SANITY: ${{ secrets.ALLOW_PARTIAL_SANITY || 'false' }}
+        run: npm run sanity:prices:fixture
 
-      - name: Report results
-        if: always()
+      - name: Parser check passed
+        if: success()
         run: |
-          echo "✅ Sanity check completed"
-          echo "All enabled chains verified for price source access and parseable data."
+          echo "✅ Parser fixture tests passed"
+          echo "Parser correctness verified. Code is safe to merge."
+          echo ""
+          echo "Note: Live chain verification runs on Israeli VM on schedule"
+          echo "See scripts/SANITY_CHECK.md for details"
 
-      - name: Failure notification
+      - name: Parser check failed
         if: failure()
         run: |
-          echo "❌ Sanity check failed!"
-          echo "One or more price sources are unreachable or unparseable."
-          echo "This may indicate:"
-          echo "  - Chain's pricing feed is down or changed format"
-          echo "  - Parser needs updating for new XML schema"
-          echo "  - Network/IP-based blocking (if not running from Israeli IP)"
+          echo "❌ Parser sanity check failed!"
+          echo "This indicates a regression in the price parsing code."
+          echo "Parser must correctly handle:"
+          echo "  - XML tag mapping across chain formats"
+          echo "  - gzip decompression"
+          echo "  - HTML entity decoding"
+          echo "  - Field validation (barcode, name, price)"
           exit 1

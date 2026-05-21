@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Prices>
+  <Item>
+    <ItemCode>72917367</ItemCode>
+    <ItemName>חטיף טעמי 40ג עלית</ItemName>
+    <ItemPrice>5.90</ItemPrice>
+    <Unit>יח&apos;</Unit>
+    <Quantity>40</Quantity>
+    <Brand>עלית</Brand>
+    <UpdateDate>2026-05-21</UpdateDate>
+    <Store>
+      <StoreID>1001</StoreID>
+      <StoreName>רמי לוי הוד השרון</StoreName>
+      <Address>הוד השרון</Address>
+    </Store>
+  </Item>
+  <Item>
+    <ItemCode>7290058000133</ItemCode>
+    <ItemName>לחם קוביות 500 גר</ItemName>
+    <ItemPrice>4.99</ItemPrice>
+    <Unit>חבילה</Unit>
+    <Quantity>500</Quantity>
+    <Brand>רמי לוי</Brand>
+    <UpdateDate>2026-05-21</UpdateDate>
+    <Store>
+      <StoreID>1001</StoreID>
+      <StoreName>רמי לוי הוד השרון</StoreName>
+      <Address>הוד השרון</Address>
+    </Store>
+  </Item>
+</Prices>

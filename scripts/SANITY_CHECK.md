@@ -1,42 +1,86 @@
 # Price Sanity Check
 
-## Purpose
+## Architecture: Two Modes
 
-The sanity check ensures that **every enabled supermarket chain's price source is accessible and parseable** before code is deployed. This catches silent failures in the price sync pipeline.
+The sanity check is **split into two independent verifications**:
+
+### A. **Parser Fixture Tests** (GitHub Actions)
+- **Runs**: Every PR, every push to main
+- **IP requirement**: None (no external network calls)
+- **Tests**: Parser correctness using local XML fixtures
+- **Verifies**:
+  - Parser handles different XML schemas (Shufersal, Rami Levy formats)
+  - Tag name mapping works across chains
+  - gzip decompression works
+  - HTML entity decoding works (`&amp;` → `&`)
+  - Field validation logic (barcode, name, price)
+- **Fails CI if**: Parser has regressions
+
+### B. **Live Chain Tests** (Israeli VM)
+- **Runs**: Cron schedule on price-worker VM
+- **IP requirement**: Yes (Israeli IP required for supermarket access)
+- **Tests**: Real supermarket sources return valid prices
+- **Verifies**: Every **enabled chain** produces at least one real official price
+- **Writes**: Result to Firebase `latestPriceSanityStatus`
+- **Requirement**: **ALL enabled chains must pass**
+  - If any chain fails → status: "partial" or "fail"
+  - Never "pass" if even one enabled chain fails
 
 ## When It Runs
 
-- **Automatically**: On every pull request (if `workers/prices/` or `scripts/` changed)
-- **Automatically**: On every push to `main`
-- **Manually**: Via GitHub Actions workflow dispatch button
+### GitHub Actions (Parser Fixtures)
+```
+Trigger: PR or push to main (if scripts/ changed)
+Command: npm run sanity:prices:fixture
+No IP dependency ✅
+```
 
-## What It Does
-
-For each enabled chain in `workers/prices/chains.js`:
-
-1. **Fetch the index page** (HTML or JSON listing price files)
-2. **Extract the price file URL** (handles SAS tokens, gzip extensions)
-3. **Download the price file** (typically 10-50MB, compressed)
-4. **Parse minimally** to find one valid product item
-5. **Validate item structure**:
-   - barcode (8+ digits)
-   - product name (non-empty)
-   - price > 0 ILS
-   - source: "official"
-
-## Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| 0 | ✅ All chains passed — at least one real price found per chain |
-| 1 | ❌ One or more chains failed — cannot produce valid prices |
+### Israeli VM (Live Chains)
+```
+Trigger: Cron schedule (before/after sync)
+Command: npm run sanity:prices:live
+Requires Israeli IP ⚠️
+Writes to Firebase
+```
 
 ## Running Locally
 
+### Parser Fixture Tests (No IP Required)
 ```bash
 cd scripts/
 npm install
-npm run sanity:prices
+npm run sanity:prices:fixture
+```
+
+**Output example:**
+```
+✅ shufersal PASS
+   Parsed 2 items
+   • 11210000094: רוטב טבסקו 60 מ"ל ₪13.9
+   • 7290010328103: חלב תנובה 3% 1 ליטר ₪7.5
+
+✅ rami-levy PASS
+   Parsed 2 items
+   ...
+
+✅ Gzip decompression PASS
+
+📊 PARSER FIXTURE SUMMARY
+Passed: 3 | Failed: 0
+```
+
+### Live Chain Tests (Israeli IP Required)
+```bash
+cd scripts/
+npm run sanity:prices:live
+```
+
+Requires Firebase credentials in `.env`:
+```
+FIREBASE_PROJECT_ID=...
+FIREBASE_CLIENT_EMAIL=...
+FIREBASE_PRIVATE_KEY=...
+FIREBASE_DATABASE_URL=...
 ```
 
 **Output example:**
@@ -45,28 +89,61 @@ npm run sanity:prices
    barcode: 11210000094
    name: רוטב טבסקו 60 מ"ל
    price: ₪13.90
+   storeId: 034
    source: official
 
 ❌ rami-levy FAIL
    reason: DNS timeout / HTTP 403 / no valid item
 
-📊 SUMMARY
-Tested: 5 | Passed: 1 | Failed: 4 | Duration: 52.24s
+📊 LIVE CHAIN SUMMARY
+Tested: 5 | Passed: 1 | Failed: 4
+✅ Firebase status updated
 ```
 
-## Environment Variables
+## Firebase Status
 
-### `ALLOW_PARTIAL_SANITY` (optional)
+When run on the Israeli VM, live checks write to:
 
-If set to `true`, the check will warn about failed chains but **not fail the pipeline**:
-
-```bash
-ALLOW_PARTIAL_SANITY=true npm run sanity:prices
+```
+latestPriceSanityStatus = {
+  status: "pass" | "partial" | "fail",
+  runId: "sanity-1234567890",
+  checkedAt: "2026-05-21T12:00:00Z",
+  chainsTested: 5,
+  chainsPassed: 5,
+  chainsFailed: 0,
+  results: {
+    shufersal: {
+      status: "pass",
+      barcode: "11210000094",
+      name: "רוטב טבסקו 60 מ\"ל",
+      price: 13.90,
+      storeId: "034",
+      error: null
+    },
+    rami-levy: {
+      status: "fail",
+      barcode: null,
+      name: null,
+      price: null,
+      storeId: null,
+      error: "DNS timeout"
+    }
+  }
+}
 ```
 
-Useful for:
-- Temporary chain downtime during maintenance
-- Testing with non-Israeli IP (expected failures)
+**Status meanings:**
+- `pass`: ALL enabled chains returned valid prices
+- `partial`: Some chains passed, some failed
+- `fail`: Most/all chains failed
+
+## Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | ✅ All enabled chains passed sanity check |
+| 1 | ❌ Any chain failed — at least one cannot produce valid prices |
 
 ## CI/CD Integration
 
