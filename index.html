@@ -3930,12 +3930,53 @@ onAuthStateChanged(auth, async (user) => {
 const ADMIN_SESSION_MS = 15 * 60 * 1000; // 15 minutes
 let _adminPressTimer = null;
 let _adminRoleCache = null; // null=unknown, true/false
+let _adminRevokeListenerActive = false;
+
+// ── Live admin-role revocation listener ──────────────────────────────
+// Watches users/{uid}/roles/admin in Firebase. If an admin revokes their own
+// (or another admin revokes their) role while the panel is open, the session
+// is invalidated immediately and the panel closes without a page reload.
+// Emergency revoke: set users/{uid}/roles/admin = false in Firebase console.
+function initAdminRevokeListener() {
+  if (_adminRevokeListenerActive || !myId) return;
+  _adminRevokeListenerActive = true;
+
+  let firstFire = true;
+  onValue(ref(db, `users/${myId}/roles/admin`), snap => {
+    const isAdmin = snap.val() === true;
+
+    if (firstFire) {
+      // Seed the cache from live DB value on first fire (replaces one-time get())
+      _adminRoleCache = isAdmin;
+      firstFire = false;
+      return; // Don't react to the initial read — only to changes
+    }
+
+    // Role changed after initial load — update cache unconditionally
+    _adminRoleCache = isAdmin;
+
+    if (!isAdmin) {
+      // Admin access was revoked externally. Wipe local session immediately.
+      sessionStorage.removeItem('adminUnlocked');
+
+      // Close the admin panel if it is currently visible
+      const overlay = document.getElementById('admin-overlay');
+      if (overlay && overlay.classList.contains('show')) {
+        closeAdminOverlay();
+        toast('🔒 הרשאת אדמין בוטלה');
+      }
+    }
+  });
+}
 
 // ── Attach long-press to avatar after connectToGroup ────────────────
 function initAdminGesture() {
   const avatar = document.getElementById('hdr-my-avatar');
   if (!avatar || avatar._adminGestureAttached) return;
   avatar._adminGestureAttached = true;
+
+  // Start the revocation listener alongside the gesture (one-time, idempotent)
+  initAdminRevokeListener();
 
   const HOLD_MS = 3000;
 
@@ -3993,6 +4034,9 @@ async function checkAdminRole() {
 }
 
 function isAdminSessionValid() {
+  // ⚠️ sessionStorage is NOT a security boundary.
+  // It prevents accidental access but is trivially bypassed by anyone with
+  // DevTools. Real security is enforced server-side on every /api/admin-* call.
   const ts = parseInt(sessionStorage.getItem('adminUnlocked') || '0', 10);
   return ts > 0 && (Date.now() - ts) < ADMIN_SESSION_MS;
 }
