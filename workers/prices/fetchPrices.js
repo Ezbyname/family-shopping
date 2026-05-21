@@ -74,8 +74,8 @@ function extractFileUrls(body, chain) {
 
   if (!candidates.price.length) {
     // HTML href extraction — capture full URLs including SAS token query params
-    const priceRe = /href=["']([^"']*(?:PriceFull|Price\d+)[^"']*(?:\.gz|\.xml)(?:[^"']*)?)["']/gi;
-    const storeRe = /href=["']([^"']*Stores[^"']*(?:\.gz|\.xml)(?:[^"']*)?)["']/gi;
+    const priceRe = /href=["']([^"']*Price\d+[^"']*\.gz[^"']*)["']/gi;
+    const storeRe = /href=["']([^"']*Stores[^"']*\.gz[^"']*)["']/gi;
     let m;
     while ((m = priceRe.exec(body)) !== null) candidates.price.push(makeAbsolute(decodeHtml(m[1]), chain));
     while ((m = storeRe.exec(body)) !== null) candidates.store.push(makeAbsolute(decodeHtml(m[1]), chain));
@@ -118,7 +118,7 @@ function makeAbsolute(url, chain) {
 // Downloads to disk first to avoid holding 50MB in memory.
 // Returns a readable stream (decompressed if .gz).
 export async function downloadToStream(url, label, timeoutMs = DEFAULT_TIMEOUT_MS, retries = 3) {
-  const isGz  = /\.gz$/i.test(url);
+  const isGz  = /\.gz(?:\?|$)/i.test(url); // Match .gz before query string or at end
   const tmpFile = join(tmpdir(), `price-worker-${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`);
 
   await withRetry(async () => {
