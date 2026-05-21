@@ -7,10 +7,52 @@
 // Header:  Authorization: Bearer <firebase-id-token>
 // Returns: { ok: true } | { ok: false, error: 'Access denied' }
 
-import { timingSafeEqual } from 'crypto';
+import { timingSafeEqual, createHash } from 'crypto';
 import { getDB } from './_firebase.js';
 
 const ADMIN_PIN = process.env.ADMIN_PIN;
+
+// ── In-memory rate limiter ───────────────────────────────────────────
+// Key: sha256(rawIp).slice(0,16) → { count, resetAt }
+// NOTE: Serverless functions may run as multiple instances — this limiter
+// applies per-instance, not globally. Still effective against naive brute-force.
+const _failMap = new Map();
+const RATE_MAX_FAILS = 5;
+const RATE_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+function getRawIp(req) {
+  return (
+    (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+    req.headers['x-real-ip'] ||
+    req.socket?.remoteAddress ||
+    req.connection?.remoteAddress ||
+    'unknown'
+  );
+}
+
+function hashIp(rawIp) {
+  return createHash('sha256').update(rawIp).digest('hex').slice(0, 16);
+}
+
+function isRateLimited(ipHash) {
+  const entry = _failMap.get(ipHash);
+  if (!entry) return false;
+  if (Date.now() > entry.resetAt) {
+    _failMap.delete(ipHash);
+    return false;
+  }
+  return entry.count >= RATE_MAX_FAILS;
+}
+
+function recordFailure(ipHash) {
+  const now = Date.now();
+  const entry = _failMap.get(ipHash);
+  if (!entry || now > entry.resetAt) {
+    _failMap.set(ipHash, { count: 1, resetAt: now + RATE_WINDOW_MS });
+  } else {
+    entry.count += 1;
+  }
+}
 
 // Compare strings in constant time using Node.js native crypto.
 // Pads shorter input to equal length to prevent length-based timing leaks,
@@ -41,6 +83,15 @@ export default async function handler(req, res) {
     return res.status(503).json({ ok: false, error: 'Access denied' });
   }
 
+  // ── Rate limit check (before any Firebase work) ─────────────────────
+  const rawIp  = getRawIp(req);
+  const ipHash = hashIp(rawIp);
+
+  if (isRateLimited(ipHash)) {
+    console.warn(`[admin-unlock] RATE_LIMITED ip=${ipHash}`);
+    return res.status(429).json({ ok: false, error: 'Access denied' });
+  }
+
   // ── Extract ID token from Authorization header ──────────────────────
   const authHeader = req.headers['authorization'] || '';
   const idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
@@ -54,6 +105,9 @@ export default async function handler(req, res) {
   } catch {
     return res.status(400).json({ ok: false, error: 'Access denied' });
   }
+
+  // Track uid across try/catch so we can log failures at the outer level
+  let uid = null;
 
   try {
     // ── Initialize Firebase first — required before getAuth() ───────────
@@ -72,7 +126,7 @@ export default async function handler(req, res) {
       return res.status(401).json({ ok: false, error: 'Access denied' });
     }
 
-    const uid = decoded.uid;
+    uid = decoded.uid;
 
     // ── Re-check admin role directly in DB (prevents custom claims spoofing) ──
     const roleSnap = await db.ref(`users/${uid}/roles/admin`).once('value');
@@ -86,16 +140,40 @@ export default async function handler(req, res) {
     const granted = isAdmin && pinMatch;
 
     if (!granted) {
+      recordFailure(ipHash);
       // Server-side audit log only — never sent to client.
       // Log combined result, not individual check, to avoid revealing which failed.
       console.warn(`[admin-unlock] DENIED uid=${uid} granted=false`);
+    } else {
+      console.log(`[admin-unlock] GRANTED uid=${uid}`);
+    }
+
+    // ── Audit trail — NO PIN, NO token, NO raw IP ───────────────────────
+    // ipHash is a truncated SHA-256 of the raw IP — untraceable without the original.
+    const userAgent = (req.headers['user-agent'] || '').slice(0, 200);
+    try {
+      const logKey = `${Date.now()}_${uid}`;
+      await db.ref(`adminAuditLogs/${logKey}`).set({
+        uid,
+        success: granted,
+        ipHash,
+        userAgent,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (auditErr) {
+      // Audit log failure must never block the actual response
+      console.error('[admin-unlock] audit log write failed:', auditErr.message);
+    }
+
+    if (!granted) {
       return res.status(401).json({ ok: false, error: 'Access denied' });
     }
 
-    console.log(`[admin-unlock] GRANTED uid=${uid}`);
     return res.status(200).json({ ok: true });
 
   } catch (err) {
+    // Record failure if we at least identified the caller
+    if (uid) recordFailure(ipHash);
     console.error('[admin-unlock] unexpected error:', err.message);
     return res.status(500).json({ ok: false, error: 'Access denied' });
   }
