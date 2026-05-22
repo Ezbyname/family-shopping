@@ -1496,6 +1496,7 @@ const db  = getDatabase(app);
 
 let myName='', myId='', groupId='', groupName='';
 let items={}, members={}, prices={}, favorites={};
+let _membershipOk = false; // set true once ensureGroupMembership succeeds
 let curTab='all', priceRadius=10;
 const STORES=['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב','אושר עד'];
 let activeStores=new Set(STORES);
@@ -1576,8 +1577,9 @@ function connectToGroup(){
 }
 
 
-window.toggleFav=function(id){const i=items[id];update(ref(db,`groups/${groupId}/items/${id}`),{fav:!i.fav});toast(i.fav?'הוסר מהמועדפים':'⭐ נוסף למועדפים')};
-window.changeQty=function(id,d){const i=items[id];update(ref(db,`groups/${groupId}/items/${id}`),{qty:Math.max(1,(i.qty||1)+d)})};
+function _warnPermission(){ toast('⚠️ אין הרשאה — רענן את האפליקציה'); }
+window.toggleFav=function(id){const i=items[id];update(ref(db,`groups/${groupId}/items/${id}`),{fav:!i.fav}).then(()=>toast(i.fav?'הוסר מהמועדפים':'⭐ נוסף למועדפים')).catch(e=>{if((e.message||'').includes('PERMISSION_DENIED'))_warnPermission();else toast('❌ '+e.message);});};
+window.changeQty=function(id,d){const i=items[id];update(ref(db,`groups/${groupId}/items/${id}`),{qty:Math.max(1,(i.qty||1)+d)}).catch(e=>{if((e.message||'').includes('PERMISSION_DENIED'))_warnPermission();});};
 window.clearBought=function(){Object.entries(items).forEach(([id,i])=>{if(i.bought)remove(ref(db,`groups/${groupId}/items/${id}`))});toast('🗑 נקנים נמחקו')};
 
 window.setTab=function(tab){
@@ -4248,7 +4250,16 @@ async function ensureGroupMembership(gId, gName) {
       role:      'member',
       joinedAt:  Date.now(),
     });
-  } catch(e) { console.warn('[multi-group] ensureMembership failed:', e.message); }
+    _membershipOk = true;
+  } catch(e) {
+    _membershipOk = false;
+    console.warn('[multi-group] ensureMembership failed:', e.message);
+    if (e.code === 'PERMISSION_DENIED' || (e.message||'').includes('PERMISSION_DENIED')) {
+      // Auth UID mismatch — likely re-install or anonymous auth reset
+      console.error('[auth] membership write denied — UID may have changed. Ask admin to update Firebase Rules.');
+      toast('⚠️ בעיית הרשאות — רענן את האפליקציה או פנה למנהל הקבוצה');
+    }
+  }
 }
 
 // ── RENDER GROUP DROPDOWN ──
