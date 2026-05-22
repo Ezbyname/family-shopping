@@ -59,6 +59,17 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);
   border-radius:12px;padding:12px;font-family:'Heebo',sans-serif;
   font-size:15px;font-weight:800;cursor:pointer;transition:opacity .15s,transform .1s;}
 .btn-p:active{opacity:.85;transform:scale(.98)}
+/* ── SETUP TABS ── */
+.setup-tabs{display:flex;width:100%;background:var(--card);border-radius:14px;
+  padding:3px;margin-bottom:14px;gap:2px;flex-shrink:0}
+.setup-tab{flex:1;padding:10px 6px;border:none;border-radius:11px;
+  background:transparent;color:var(--muted);font-family:'Heebo',sans-serif;
+  font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap}
+.setup-tab.active{background:var(--surface);color:var(--text);
+  box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.setup-pane{display:none;width:100%}
+.setup-pane.active{display:block}
+
 .divider{text-align:center;color:var(--muted);font-size:11px;margin:3px 0;
   position:relative;width:100%}
 .divider::before,.divider::after{content:'';position:absolute;top:50%;width:43%;
@@ -112,6 +123,47 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);
   display:flex;align-items:center;justify-content:center;flex-shrink:0;
   transition:transform .1s,opacity .1s;}
 .add-btn:active{transform:scale(.85);opacity:.85}
+/* ── BRAND PICKER TRIGGER ── */
+.brand-pick-btn{background:var(--card);border:1.5px solid var(--border);
+  border-radius:11px;width:40px;height:40px;font-size:16px;cursor:pointer;
+  flex-shrink:0;display:none;align-items:center;justify-content:center;
+  transition:all .15s;color:var(--muted)}
+.brand-pick-btn.show{display:flex}
+.brand-pick-btn:active{background:var(--accent);color:#111;border-color:var(--accent)}
+/* ── BRAND PICKER SHEET ── */
+.bp-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
+  z-index:900;align-items:flex-end;justify-content:center}
+.bp-overlay.show{display:flex}
+.bp-sheet{background:var(--surface);border-radius:24px 24px 0 0;width:100%;
+  max-width:480px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
+.bp-drag{width:36px;height:4px;background:var(--border);border-radius:2px;
+  margin:10px auto 0;flex-shrink:0}
+.bp-header{display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px 10px;flex-shrink:0}
+.bp-title{font-size:16px;font-weight:800}
+.bp-close{background:var(--card);border:none;color:var(--muted);font-size:14px;
+  cursor:pointer;width:28px;height:28px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center}
+.bp-query-bar{padding:0 12px 10px;flex-shrink:0}
+.bp-query-text{font-size:12px;color:var(--muted);padding:6px 12px;
+  background:var(--card);border-radius:8px;display:inline-block}
+.bp-results{flex:1;overflow-y:auto;padding:4px 8px 16px}
+.bp-loading{text-align:center;padding:32px;color:var(--muted);font-size:13px}
+.bp-item{display:flex;align-items:center;gap:10px;padding:10px 8px;
+  border-radius:12px;margin-bottom:2px;transition:background .15s}
+.bp-item:active{background:var(--card)}
+.bp-item-img{width:54px;height:54px;object-fit:contain;border-radius:10px;
+  background:var(--card);flex-shrink:0;padding:3px}
+.bp-img-ph{width:54px;height:54px;border-radius:10px;background:var(--card);
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:24px}
+.bp-item-info{flex:1;min-width:0}
+.bp-item-name{font-size:14px;font-weight:600;line-height:1.35;word-break:break-word}
+.bp-item-name strong{color:var(--accent);font-weight:800}
+.bp-item-sub{font-size:11px;color:var(--muted);margin-top:3px}
+.bp-add-btn{background:var(--accent);color:#111;border:none;border-radius:20px;
+  padding:8px 14px;font-size:13px;font-weight:800;cursor:pointer;flex-shrink:0;
+  font-family:'Heebo',sans-serif;white-space:nowrap;transition:opacity .15s}
+.bp-add-btn:active{opacity:.75}
 
 /* LIST */
 .list-wrap{flex:1;overflow-y:auto;padding:8px 10px;overscroll-behavior:contain}
@@ -794,8 +846,8 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   display:flex;align-items:center;justify-content:center;font-size:18px;
   transition:background .15s}
 .notif-btn:active{background:var(--card2)}
-.notif-badge{position:absolute;top:-2px;right:-2px;background:var(--red);
-  color:#fff;border-radius:50%;min-width:16px;height:16px;
+.notif-badge{position:absolute;top:-2px;right:-2px;background:var(--accent);
+  color:#111;border-radius:50%;min-width:16px;height:16px;
   font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;
   padding:0 3px;border:2px solid var(--surface);display:none}
 .notif-badge.show{display:flex}
@@ -1151,24 +1203,32 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
   <div class="setup-logo">🛒</div>
   <div class="setup-title">קניות <span>משפחה</span></div>
   <div class="setup-sub">רשימה משותפת • זמן אמת • כל המשפחה</div>
-  <div class="setup-card">
-    <div class="sc-title">✨ צור קבוצה חדשה</div>
-    <div class="field"><label>השם שלך</label>
-      <input id="cn-name" placeholder="למשל: אבא" maxlength="20"></div>
-    <div class="field"><label>שם הקבוצה</label>
-      <input id="cn-group" placeholder="למשל: משפחת כהן" maxlength="30"></div>
-    <button class="btn-p" onclick="createGroup()">🚀 צור קבוצה</button>
+  <!-- Tab switcher — both options always visible above keyboard -->
+  <div class="setup-tabs">
+    <button class="setup-tab active" id="stab-create" onclick="switchSetupTab('create')">✨ צור קבוצה</button>
+    <button class="setup-tab" id="stab-join" onclick="switchSetupTab('join')">🔗 הצטרף</button>
   </div>
-  <div class="divider">או</div>
-  <div class="setup-card">
-    <div class="sc-title">🔗 הצטרף לקבוצה קיימת</div>
-    <div class="field"><label>השם שלך</label>
-      <input id="jn-name" placeholder="למשל: אמא" maxlength="20"></div>
-    <div class="field"><label>קוד הצטרפות (6 ספרות)</label>
-      <input id="jn-code" placeholder="123456" maxlength="6"
-        style="letter-spacing:4px;font-size:20px;font-weight:800;text-align:center"
-        oninput="this.value=this.value.replace(/\D/g,'')"></div>
-    <button class="btn-s" onclick="joinGroup()">🔗 הצטרף</button>
+  <div class="setup-pane active" id="spane-create">
+    <div class="setup-card">
+      <div class="sc-title">✨ צור קבוצה חדשה</div>
+      <div class="field"><label>השם שלך</label>
+        <input id="cn-name" placeholder="למשל: אבא" maxlength="20"></div>
+      <div class="field"><label>שם הקבוצה</label>
+        <input id="cn-group" placeholder="למשל: משפחת כהן" maxlength="30"></div>
+      <button class="btn-p" onclick="createGroup()">🚀 צור קבוצה</button>
+    </div>
+  </div>
+  <div class="setup-pane" id="spane-join">
+    <div class="setup-card">
+      <div class="sc-title">🔗 הצטרף לקבוצה קיימת</div>
+      <div class="field"><label>השם שלך</label>
+        <input id="jn-name" placeholder="למשל: אמא" maxlength="20"></div>
+      <div class="field"><label>קוד הצטרפות (6 ספרות)</label>
+        <input id="jn-code" placeholder="123456" maxlength="6"
+          style="letter-spacing:4px;font-size:20px;font-weight:800;text-align:center"
+          oninput="this.value=this.value.replace(/\D/g,'')"></div>
+      <button class="btn-s" onclick="joinGroup()">🔗 הצטרף</button>
+    </div>
   </div>
 </div>
 
@@ -1228,7 +1288,9 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
   </div>
   <div class="add-bar" id="add-bar">
     <input class="add-input" id="new-item-input" placeholder="הוסף לרשימה..."
-      maxlength="50" onkeydown="if(event.key==='Enter')addItem()">
+      maxlength="50" onkeydown="if(event.key==='Enter')addItem()"
+      oninput="_onAddInputChange()">
+    <button class="brand-pick-btn" id="brand-pick-btn" onclick="openBrandPicker()" title="בחר מותג ספציפי">🔍</button>
     <button class="add-btn" onclick="addItem()">+</button>
   </div>
   <div id="list-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
@@ -1350,6 +1412,21 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
   </div>
 </div>
 
+<!-- BRAND PICKER SHEET -->
+<div class="bp-overlay" id="bp-overlay" onclick="if(event.target===this)closeBrandPicker()">
+  <div class="bp-sheet" id="bp-sheet">
+    <div class="bp-drag"></div>
+    <div class="bp-header">
+      <div class="bp-title">בחר מוצר ספציפי</div>
+      <button class="bp-close" onclick="closeBrandPicker()">✕</button>
+    </div>
+    <div class="bp-query-bar"><span class="bp-query-text" id="bp-query-text"></span></div>
+    <div class="bp-results" id="bp-results">
+      <div class="bp-loading">🔍 מחפש...</div>
+    </div>
+  </div>
+</div>
+
 <!-- PRODUCT MODAL -->
 <div class="pm-overlay" id="pm-overlay" onclick="if(event.target===this)closeProductModal()">
   <div class="pm-sheet" id="pm-sheet">
@@ -1427,6 +1504,14 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
 
 function saveLocal(){localStorage.setItem('fsl_v2',JSON.stringify({myName,myId,groupId,groupName}))}
+
+// ── SETUP SCREEN TAB SWITCHER ──
+window.switchSetupTab = function(tab) {
+  ['create','join'].forEach(t => {
+    document.getElementById(`stab-${t}`)?.classList.toggle('active', t === tab);
+    document.getElementById(`spane-${t}`)?.classList.toggle('active', t === tab);
+  });
+};
 
 window.createGroup=async function(){
   const name=document.getElementById('cn-name').value.trim();
@@ -2627,15 +2712,128 @@ function renderBasketResults(data, totalItems) {
 let listId = 'default';
 let myProfile = null;
 
+// ── BRAND PICKER ──
+function _boldKeyword(text, keyword) {
+  if (!keyword || !text) return esc(text);
+  try {
+    const kw = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return text.split(new RegExp(`(${kw})`, 'gi'))
+      .map(p => p.toLowerCase() === keyword.toLowerCase() ? `<strong>${esc(p)}</strong>` : esc(p))
+      .join('');
+  } catch(_) { return esc(text); }
+}
+
+window._onAddInputChange = function() {
+  const btn = document.getElementById('brand-pick-btn');
+  const val = document.getElementById('new-item-input')?.value.trim() || '';
+  btn?.classList.toggle('show', val.length > 1);
+};
+
+window.openBrandPicker = async function() {
+  const query = document.getElementById('new-item-input')?.value.trim();
+  if (!query) return;
+  const overlay   = document.getElementById('bp-overlay');
+  const resultsEl = document.getElementById('bp-results');
+  const queryEl   = document.getElementById('bp-query-text');
+  overlay.classList.add('show');
+  document.body.classList.add('sheet-open');
+  if (queryEl)   queryEl.textContent = `מחפש "${query}"...`;
+  if (resultsEl) resultsEl.innerHTML = '<div class="bp-loading">🔍 מחפש מוצרים...</div>';
+  try {
+    const enc = encodeURIComponent(query);
+    const BASE = 'https://world.openfoodfacts.org/cgi/search.pl';
+    const FIELDS = 'product_name,product_name_he,brands,quantity,image_small_url,code,countries_tags';
+    const urls = [
+      `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=15&fields=${FIELDS}&tagtype_0=countries&tag_contains_0=contains&tag_0=israel`,
+      `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=20&fields=${FIELDS}`,
+    ];
+    const seen = new Set(), products = [];
+    for (const url of urls) {
+      if (products.length >= 15) break;
+      try {
+        const r = await fetch(url, { headers:{'User-Agent':'FamilyShoppingIL/6.0'}, signal:AbortSignal.timeout(8000) });
+        if (!r.ok) continue;
+        const data = await r.json();
+        for (const p of data?.products || []) {
+          const code = p.code || '';
+          if (code && seen.has(code)) continue;
+          if (code) seen.add(code);
+          const name = p.product_name_he || p.product_name || '';
+          if (!name) continue;
+          const isIsraeli = (p.countries_tags || []).some(c => c.includes('israel'));
+          products.push({ name, brand: p.brands || '', size: p.quantity || '',
+            image: p.image_small_url || '', barcode: code, isIsraeli });
+        }
+      } catch(_) {}
+    }
+    // Israeli first, then preserve relevance order
+    products.sort((a,b) => (b.isIsraeli?1:0)-(a.isIsraeli?1:0));
+    if (queryEl) queryEl.textContent = products.length
+      ? `${products.length} תוצאות עבור "${query}"`
+      : `לא נמצאו תוצאות עבור "${query}"`;
+    if (!products.length) {
+      if (resultsEl) resultsEl.innerHTML = '<div class="bp-loading">😕 לא נמצאו מוצרים<br><small>נסה מילה אחרת</small></div>';
+      return;
+    }
+    if (resultsEl) resultsEl.innerHTML = products.slice(0, 14).map(p => {
+      const nameHtml = _boldKeyword(p.name, query);
+      const sub = [p.brand, p.size].filter(Boolean).join(' · ');
+      const imgTag = p.image
+        ? `<img class="bp-item-img" src="${esc(p.image)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+        : '';
+      const phStyle = p.image ? 'style="display:none"' : '';
+      const dataName = JSON.stringify(p.name);
+      const dataBarcode = JSON.stringify(p.barcode || '');
+      return `<div class="bp-item">
+        ${imgTag}<div class="bp-img-ph" ${phStyle}>🛒</div>
+        <div class="bp-item-info">
+          <div class="bp-item-name">${nameHtml}</div>
+          ${sub ? `<div class="bp-item-sub">${esc(sub)}</div>` : ''}
+        </div>
+        <button class="bp-add-btn" onclick="selectBrandProduct(${dataName},${dataBarcode})">הוסף</button>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    if (resultsEl) resultsEl.innerHTML = `<div class="bp-loading">⚠️ ${esc(e.message)}</div>`;
+  }
+};
+
+window.selectBrandProduct = function(name, barcode) {
+  window._pendingBarcode = barcode || null;
+  const input = document.getElementById('new-item-input');
+  if (input) input.value = name;
+  closeBrandPicker();
+  window.addItem();
+};
+
+window.closeBrandPicker = function() {
+  document.getElementById('bp-overlay')?.classList.remove('show');
+  document.body.classList.remove('sheet-open');
+};
+
 // Override addItem to include attribution and activity
 window.addItem = function() {
   const input = document.getElementById('new-item-input');
   const name = input.value.trim();
   if (!name) return;
+
+  // Duplicate detection — increase quantity instead of adding a new row
+  const existing = findExistingListItem(name, null);
+  if (existing) {
+    const newQty = (existing.qty || 1) + 1;
+    update(ref(db, `groups/${groupId}/items/${existing.id}`), { qty: newQty });
+    toast(`➕ ${esc(name)} × ${newQty}`);
+    input.value = '';
+    return;
+  }
+
   const m = myProfile || {};
+  const barcode = window._pendingBarcode || null;
+  window._pendingBarcode = null;
   const newRef = push(ref(db, `groups/${groupId}/items`));
   set(newRef, {
     name, qty: 1, bought: false, fav: false,
+    barcode,
     addedByUserId:      myId,
     addedByDisplayName: myName,
     addedByAvatarType:  m.avatarType  || 'emoji',
@@ -2646,6 +2844,7 @@ window.addItem = function() {
   });
   logActivity('item_added', newRef.key, name);
   input.value = '';
+  window._onAddInputChange(); // hide the 🔍 button after adding
   toast('✅ ' + name + ' נוסף');
 };
 
