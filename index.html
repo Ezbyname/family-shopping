@@ -164,6 +164,13 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);
   padding:8px 14px;font-size:13px;font-weight:800;cursor:pointer;flex-shrink:0;
   font-family:'Heebo',sans-serif;white-space:nowrap;transition:opacity .15s}
 .bp-add-btn:active{opacity:.75}
+.bp-item-hint{font-size:11px;color:var(--muted);padding:0 16px 6px;direction:rtl;flex-shrink:0}
+.bp-search-wrap{padding:0 12px 8px;flex-shrink:0}
+.bp-search{width:100%;background:var(--card);border:1.5px solid var(--border);
+  border-radius:12px;padding:9px 12px;font-size:14px;color:var(--text);
+  font-family:'Heebo',sans-serif;box-sizing:border-box;direction:rtl;outline:none;
+  transition:border-color .2s}
+.bp-search:focus{border-color:var(--accent)}
 
 /* ── ITEM PRODUCT TILE (ip-tile) ── */
 .ip-tile-wrap{position:relative;flex-shrink:0}
@@ -187,44 +194,6 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);
   display:flex;align-items:center;justify-content:center;color:var(--muted);
   transition:all .15s;padding:0;font-family:'Heebo',sans-serif}
 .ip-clear-btn:hover{background:var(--card);color:var(--text)}
-
-/* ── ITEM PRODUCT PICKER SHEET (ip-overlay) ── */
-.ip-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
-  z-index:900;align-items:flex-end;justify-content:center}
-.ip-overlay.show{display:flex}
-.ip-sheet{background:var(--surface);border-radius:24px 24px 0 0;width:100%;
-  max-width:480px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;
-  padding-bottom:var(--safe-b)}
-.ip-drag{width:36px;height:4px;background:var(--border);border-radius:2px;
-  margin:10px auto 0;flex-shrink:0}
-.ip-header{display:flex;align-items:center;padding:10px 14px 6px;gap:8px;flex-shrink:0}
-.ip-title{flex:1;font-size:15px;font-weight:700;text-align:right}
-.ip-item-name-hint{font-size:11px;color:var(--muted);text-align:right;direction:rtl}
-.ip-close-btn{background:transparent;border:none;font-size:17px;cursor:pointer;
-  color:var(--muted);padding:4px 8px;line-height:1}
-.ip-search-wrap{padding:0 12px 8px;flex-shrink:0}
-.ip-search{width:100%;background:var(--card);border:1.5px solid var(--border);
-  border-radius:12px;padding:9px 12px;font-size:14px;color:var(--text);
-  font-family:'Heebo',sans-serif;box-sizing:border-box;direction:rtl;outline:none;
-  transition:border-color .2s}
-.ip-search:focus{border-color:var(--accent)}
-.ip-results{flex:1;overflow-y:auto;padding:4px 8px calc(8px + var(--safe-b))}
-.ip-loading{text-align:center;padding:32px;color:var(--muted);font-size:13px}
-.ip-item{display:flex;align-items:center;gap:10px;padding:10px 8px;
-  border-radius:12px;margin-bottom:2px;transition:background .15s}
-.ip-item:active{background:var(--card)}
-.ip-item-img{width:44px;height:44px;object-fit:contain;border-radius:9px;
-  background:var(--card);flex-shrink:0;padding:2px}
-.ip-img-ph{width:44px;height:44px;border-radius:9px;background:var(--card);
-  flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px}
-.ip-item-info{flex:1;min-width:0}
-.ip-item-name{font-size:13px;font-weight:600;white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis}
-.ip-item-sub{font-size:11px;color:var(--muted);margin-top:2px}
-.ip-pick-btn{background:var(--accent);color:#111;border:none;border-radius:10px;
-  padding:7px 13px;font-family:'Heebo',sans-serif;font-size:12px;font-weight:700;
-  cursor:pointer;flex-shrink:0;transition:all .15s;white-space:nowrap}
-.ip-pick-btn:active{opacity:.8;transform:scale(.96)}
 
 /* LIST */
 .list-wrap{flex:1;overflow-y:auto;padding:8px 10px;overscroll-behavior:contain}
@@ -1481,30 +1450,14 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
       <div class="bp-title">בחר מוצר ספציפי</div>
       <button class="bp-close" onclick="closeBrandPicker()">✕</button>
     </div>
-    <div class="bp-query-bar"><span class="bp-query-text" id="bp-query-text"></span></div>
+    <div class="bp-item-hint" id="bp-item-hint" style="display:none"></div>
+    <div class="bp-search-wrap" id="bp-search-wrap" style="display:none">
+      <input class="bp-search" id="bp-search" placeholder="חפש מותג, גודל, אחוז שומן..." dir="rtl"
+             oninput="_bpOnSearchInput()" autocomplete="off">
+    </div>
+    <div class="bp-query-bar" id="bp-query-bar"><span class="bp-query-text" id="bp-query-text"></span></div>
     <div class="bp-results" id="bp-results">
       <div class="bp-loading">🔍 מחפש...</div>
-    </div>
-  </div>
-</div>
-
-<!-- ITEM PRODUCT PICKER SHEET -->
-<div class="ip-overlay" id="ip-overlay" onclick="if(event.target===this)closeItemPicker()">
-  <div class="ip-sheet" id="ip-sheet">
-    <div class="ip-drag"></div>
-    <div class="ip-header">
-      <button class="ip-close-btn" onclick="closeItemPicker()">✕</button>
-      <div>
-        <div class="ip-title">בחר מוצר ספציפי</div>
-        <div class="ip-item-name-hint" id="ip-item-hint"></div>
-      </div>
-    </div>
-    <div class="ip-search-wrap">
-      <input class="ip-search" id="ip-search" placeholder="חפש מותג, גודל, אחוז שומן..." dir="rtl"
-             oninput="_ipOnSearchInput()" autocomplete="off">
-    </div>
-    <div class="ip-results" id="ip-results">
-      <div class="ip-loading">🔍 מחפש...</div>
     </div>
   </div>
 </div>
@@ -2670,7 +2623,7 @@ function itemHTML(item) {
       ? `<img class="ip-tile-img" src="${esc(at.image)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span class="ip-tile-icon" style="display:none">${_ipEmoji(item.name)}</span>`
       : `<span class="ip-tile-icon">${_ipEmoji(item.name)}</span>`;
     ipTile = `<div class="ip-tile-wrap">
-      <button class="ip-tile has-product" onclick="openItemPicker('${item.id}',${JSON.stringify(item.name)})" title="${label}">
+      <button class="ip-tile has-product" onclick="openBrandPicker('attach','${item.id}',${JSON.stringify(item.name)})" title="${label}">
         ${iconHtml}
         <span class="ip-tile-label">${label}</span>
         ${sub ? `<span class="ip-tile-sub">${sub}</span>` : ''}
@@ -2678,7 +2631,7 @@ function itemHTML(item) {
       <button class="ip-clear-btn" onclick="clearItemProduct('${item.id}',event)" title="הסר מוצר">✕</button>
     </div>`;
   } else if (!isFavTab) {
-    ipTile = `<button class="ip-tile" onclick="openItemPicker('${item.id}',${JSON.stringify(item.name)})" title="בחר מוצר ספציפי">
+    ipTile = `<button class="ip-tile" onclick="openBrandPicker('attach','${item.id}',${JSON.stringify(item.name)})" title="בחר מוצר ספציפי">
       <span class="ip-tile-icon">${_ipEmoji(item.name)}</span>
       <span class="ip-tile-label" style="color:var(--muted)">בחר מוצר</span>
     </button>`;
@@ -2866,7 +2819,11 @@ let listId = 'default';
 let myProfile = null;
 
 // ── BRAND PICKER ──
-let _bpAbortCtrl = null; // cancel in-flight OFF requests when picker re-opens/closes
+let _bpAbortCtrl  = null;   // cancel in-flight OFF requests when picker re-opens/closes
+let _bpMode       = 'new';  // 'new' | 'attach'
+let _bpItemId     = null;   // item ID when mode==='attach'
+let _bpProducts   = [];     // current result list (indexed by button onclick)
+let _bpSearchTimer = null;
 
 function _boldKeyword(text, keyword) {
   if (!keyword || !text) return esc(text);
@@ -2884,34 +2841,25 @@ window._onAddInputChange = function() {
   btn?.classList.toggle('show', val.length > 1);
 };
 
-window.openBrandPicker = async function() {
-  const query = document.getElementById('new-item-input')?.value.trim();
-  if (!query) return;
-
-  // Cancel any in-flight request from a previous open
-  if (_bpAbortCtrl) { _bpAbortCtrl.abort(); }
-  _bpAbortCtrl = new AbortController();
-  const signal = _bpAbortCtrl.signal;
-
-  const overlay   = document.getElementById('bp-overlay');
+// Internal search runner — used by both 'new' and 'attach' modes
+async function _bpRunSearch(query, signal) {
   const resultsEl = document.getElementById('bp-results');
   const queryEl   = document.getElementById('bp-query-text');
-  overlay.classList.add('show');
-  document.body.classList.add('sheet-open');
   if (queryEl)   queryEl.textContent = `מחפש "${query}"...`;
   if (resultsEl) resultsEl.innerHTML = '<div class="bp-loading">🔍 מחפש מוצרים...</div>';
   try {
-    const enc = encodeURIComponent(query);
-    const BASE = 'https://world.openfoodfacts.org/cgi/search.pl';
+    const enc    = encodeURIComponent(query);
+    const BASE   = 'https://world.openfoodfacts.org/cgi/search.pl';
     const FIELDS = 'product_name,product_name_he,brands,quantity,image_small_url,code,countries_tags';
-    const urls = [
+    const urls   = [
       `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=15&fields=${FIELDS}&tagtype_0=countries&tag_contains_0=contains&tag_0=israel`,
       `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=20&fields=${FIELDS}`,
     ];
-    const seen = new Set(), products = [];
+    const seen = new Set();
+    _bpProducts = [];
     for (const url of urls) {
-      if (products.length >= 15) break;
-      if (signal.aborted) return; // picker was closed/reopened — discard
+      if (_bpProducts.length >= 15) break;
+      if (signal.aborted) return;
       try {
         const r = await fetch(url, { headers:{'User-Agent':'FamilyShoppingIL/6.0'}, signal });
         if (!r.ok) continue;
@@ -2923,70 +2871,123 @@ window.openBrandPicker = async function() {
           const name = p.product_name_he || p.product_name || '';
           if (!name) continue;
           const isIsraeli = (p.countries_tags || []).some(c => c.includes('israel'));
-          products.push({ name, brand: p.brands || '', size: p.quantity || '',
+          _bpProducts.push({ name, brand: p.brands || '', size: p.quantity || '',
             image: p.image_small_url || '', barcode: code, isIsraeli });
         }
-      } catch(e) { if (e.name === 'AbortError') return; } // aborted — exit silently
+      } catch(e) { if (e.name === 'AbortError') return; }
     }
     if (signal.aborted) return;
-    // Israeli first, then preserve relevance order
-    products.sort((a,b) => (b.isIsraeli?1:0)-(a.isIsraeli?1:0));
-    if (queryEl) queryEl.textContent = products.length
-      ? `${products.length} תוצאות עבור "${query}"`
+    _bpProducts.sort((a,b) => (b.isIsraeli?1:0)-(a.isIsraeli?1:0));
+    if (queryEl) queryEl.textContent = _bpProducts.length
+      ? `${_bpProducts.length} תוצאות עבור "${query}"`
       : `לא נמצאו תוצאות עבור "${query}"`;
-    if (!products.length) {
+    if (!_bpProducts.length) {
       if (resultsEl) resultsEl.innerHTML = '<div class="bp-loading">😕 לא נמצאו מוצרים<br><small>נסה מילה אחרת</small></div>';
       return;
     }
-    if (resultsEl) resultsEl.innerHTML = products.slice(0, 14).map(p => {
+    const isAttach = _bpMode === 'attach';
+    if (resultsEl) resultsEl.innerHTML = _bpProducts.slice(0, 14).map((p, i) => {
       const nameHtml = _boldKeyword(p.name, query);
       const sub = [p.brand, p.size].filter(Boolean).join(' · ');
       const imgTag = p.image
         ? `<img class="bp-item-img" src="${esc(p.image)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
         : '';
       const phStyle = p.image ? 'style="display:none"' : '';
-      const dataName = JSON.stringify(p.name);
-      const dataBarcode = JSON.stringify(p.barcode || '');
+      const btnClick = isAttach
+        ? `selectBrandProduct(${i})`
+        : `selectBrandProduct(${JSON.stringify(p.name)},${JSON.stringify(p.barcode||'')})`;
+      const btnLabel = isAttach ? 'בחר' : 'הוסף';
       return `<div class="bp-item">
         ${imgTag}<div class="bp-img-ph" ${phStyle}>🛒</div>
         <div class="bp-item-info">
           <div class="bp-item-name">${nameHtml}</div>
           ${sub ? `<div class="bp-item-sub">${esc(sub)}</div>` : ''}
         </div>
-        <button class="bp-add-btn" onclick="selectBrandProduct(${dataName},${dataBarcode})">הוסף</button>
+        <button class="bp-add-btn" onclick="${btnClick}">${btnLabel}</button>
       </div>`;
     }).join('');
   } catch(e) {
     if (e.name === 'AbortError') return;
+    const resultsEl = document.getElementById('bp-results');
     if (resultsEl) resultsEl.innerHTML = `<div class="bp-loading">⚠️ ${esc(e.message)}</div>`;
   }
+}
+
+// openBrandPicker(mode='new')           — from add-bar brand button
+// openBrandPicker('attach', id, name)   — from ip-tile on existing items
+window.openBrandPicker = async function(mode, itemId, itemName) {
+  _bpMode   = (mode === 'attach') ? 'attach' : 'new';
+  _bpItemId = itemId || null;
+
+  if (_bpAbortCtrl) _bpAbortCtrl.abort();
+  _bpAbortCtrl = new AbortController();
+  const signal = _bpAbortCtrl.signal;
+
+  const query = _bpMode === 'attach'
+    ? (itemName || '')
+    : (document.getElementById('new-item-input')?.value.trim() || '');
+  if (!query) return;
+
+  // Show/hide mode-specific controls
+  const hintEl      = document.getElementById('bp-item-hint');
+  const searchWrap  = document.getElementById('bp-search-wrap');
+  const searchEl    = document.getElementById('bp-search');
+  const queryBar    = document.getElementById('bp-query-bar');
+  if (_bpMode === 'attach') {
+    if (hintEl)     { hintEl.textContent = `עבור: ${itemName}`; hintEl.style.display = 'block'; }
+    if (searchWrap) searchWrap.style.display = 'block';
+    if (searchEl)   { searchEl.value = query; }
+    if (queryBar)   queryBar.style.display = 'none';
+  } else {
+    if (hintEl)     hintEl.style.display = 'none';
+    if (searchWrap) searchWrap.style.display = 'none';
+    if (queryBar)   queryBar.style.display = 'block';
+  }
+
+  document.getElementById('bp-overlay')?.classList.add('show');
+  document.body.classList.add('sheet-open');
+  await _bpRunSearch(query, signal);
 };
 
-window.selectBrandProduct = function(name, barcode) {
+window._bpOnSearchInput = function() {
+  clearTimeout(_bpSearchTimer);
+  const val = document.getElementById('bp-search')?.value.trim();
+  if (!val) return;
+  if (_bpAbortCtrl) _bpAbortCtrl.abort();
+  _bpAbortCtrl = new AbortController();
+  _bpSearchTimer = setTimeout(() => _bpRunSearch(val, _bpAbortCtrl.signal), 380);
+};
+
+window.selectBrandProduct = function(nameOrIdx, barcode) {
+  if (_bpMode === 'attach') {
+    // nameOrIdx is an index into _bpProducts
+    const p = _bpProducts[nameOrIdx];
+    if (p && _bpItemId) {
+      const payload = { name: p.name, brand: p.brand||null, size: p.size||null,
+                        barcode: p.barcode||null, image: p.image||null };
+      update(ref(db, `groups/${groupId}/items/${_bpItemId}`), { attached: payload })
+        .catch(e => console.warn('[bp-attach] failed:', e.message));
+    }
+    closeBrandPicker();
+    return;
+  }
+  // 'new' mode — nameOrIdx is the product name string
   window._pendingBarcode = barcode || null;
   const input = document.getElementById('new-item-input');
-  if (input) input.value = name;
+  if (input) input.value = nameOrIdx;
   closeBrandPicker();
   window.addItem();
 };
 
 window.closeBrandPicker = function() {
+  clearTimeout(_bpSearchTimer);
   if (_bpAbortCtrl) { _bpAbortCtrl.abort(); _bpAbortCtrl = null; }
   document.getElementById('bp-overlay')?.classList.remove('show');
   document.body.classList.remove('sheet-open');
+  _bpMode = 'new'; _bpItemId = null; _bpProducts = [];
 };
 
-// ══════════════════════════════════════════════════
-// ITEM PRODUCT PICKER — attach a specific branded
-// product to a generic shopping-list item
-// ══════════════════════════════════════════════════
-
-let _ipItemId   = null;   // item ID currently being picked for
-let _ipAbortCtrl = null;  // AbortController for in-flight OFF requests
-let _ipSearchTimer = null;
-let _ipProducts = [];     // current result list (index referenced by buttons)
-
-// Emoji heuristic for tile icon when no product image
+// ── ip-tile helpers (emoji + clear; picker reuses bp-overlay) ──
 function _ipEmoji(name) {
   const n = (name || '').toLowerCase();
   if (n.includes('חלב'))                          return '🥛';
@@ -3014,126 +3015,6 @@ function _ipEmoji(name) {
   if (n.includes('ניקוי') || n.includes('כביסה')) return '🧹';
   return '🛒';
 }
-
-window.openItemPicker = async function(itemId, itemName) {
-  _ipItemId = itemId;
-
-  const overlay  = document.getElementById('ip-overlay');
-  const searchEl = document.getElementById('ip-search');
-  const hintEl   = document.getElementById('ip-item-hint');
-
-  overlay.classList.add('show');
-  document.body.classList.add('sheet-open');
-
-  if (hintEl)   hintEl.textContent = `עבור: ${itemName}`;
-  if (searchEl) { searchEl.value = itemName || ''; searchEl.focus(); }
-
-  _ipDoSearch(itemName || '');
-};
-
-window.closeItemPicker = function() {
-  if (_ipAbortCtrl) { _ipAbortCtrl.abort(); _ipAbortCtrl = null; }
-  clearTimeout(_ipSearchTimer);
-  document.getElementById('ip-overlay')?.classList.remove('show');
-  document.body.classList.remove('sheet-open');
-  _ipItemId = null;
-};
-
-window._ipOnSearchInput = function() {
-  clearTimeout(_ipSearchTimer);
-  const val = document.getElementById('ip-search')?.value.trim();
-  if (!val) return;
-  _ipSearchTimer = setTimeout(() => _ipDoSearch(val), 380);
-};
-
-async function _ipDoSearch(query) {
-  if (!query) return;
-  if (_ipAbortCtrl) _ipAbortCtrl.abort();
-  _ipAbortCtrl = new AbortController();
-  const signal = _ipAbortCtrl.signal;
-
-  const resultsEl = document.getElementById('ip-results');
-  if (resultsEl) resultsEl.innerHTML = '<div class="ip-loading">🔍 מחפש מוצרים...</div>';
-
-  try {
-    const enc    = encodeURIComponent(query);
-    const FIELDS = 'product_name,product_name_he,brands,quantity,image_small_url,code,countries_tags';
-    const BASE   = 'https://world.openfoodfacts.org/cgi/search.pl';
-    const urls   = [
-      `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=15&fields=${FIELDS}&tagtype_0=countries&tag_contains_0=contains&tag_0=israel`,
-      `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=20&fields=${FIELDS}`,
-    ];
-
-    const seen = new Set();
-    _ipProducts = [];
-
-    for (const url of urls) {
-      if (_ipProducts.length >= 15) break;
-      if (signal.aborted) return;
-      try {
-        const r = await fetch(url, { headers: {'User-Agent':'FamilyShoppingIL/6.0'}, signal });
-        if (!r.ok) continue;
-        const data = await r.json();
-        for (const p of data?.products || []) {
-          const code = p.code || '';
-          if (code && seen.has(code)) continue;
-          if (code) seen.add(code);
-          const name = p.product_name_he || p.product_name || '';
-          if (!name) continue;
-          const isIsraeli = (p.countries_tags || []).some(c => c.includes('israel'));
-          _ipProducts.push({
-            name, brand: p.brands || '', size: p.quantity || '',
-            image: p.image_small_url || '', barcode: code, isIsraeli,
-          });
-        }
-      } catch(e) { if (e.name === 'AbortError') return; }
-    }
-    if (signal.aborted) return;
-
-    // Israeli products first, preserve relevance order within each group
-    _ipProducts.sort((a, b) => (b.isIsraeli ? 1 : 0) - (a.isIsraeli ? 1 : 0));
-
-    if (!_ipProducts.length) {
-      if (resultsEl) resultsEl.innerHTML = '<div class="ip-loading">😕 לא נמצאו מוצרים<br><small>נסה שם אחר או מותג</small></div>';
-      return;
-    }
-
-    if (resultsEl) resultsEl.innerHTML = _ipProducts.slice(0, 14).map((p, i) => {
-      const sub    = [p.brand, p.size].filter(Boolean).join(' · ');
-      const imgTag = p.image
-        ? `<img class="ip-item-img" src="${esc(p.image)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-        : '';
-      const phStyle = p.image ? 'style="display:none"' : '';
-      return `<div class="ip-item">
-        ${imgTag}<div class="ip-img-ph" ${phStyle}>🛒</div>
-        <div class="ip-item-info">
-          <div class="ip-item-name">${esc(p.name)}</div>
-          ${sub ? `<div class="ip-item-sub">${esc(sub)}</div>` : ''}
-        </div>
-        <button class="ip-pick-btn" onclick="selectItemProduct(${i})">בחר</button>
-      </div>`;
-    }).join('');
-
-  } catch(e) {
-    if (e.name === 'AbortError') return;
-    if (resultsEl) resultsEl.innerHTML = `<div class="ip-loading">⚠️ ${esc(e.message)}</div>`;
-  }
-}
-
-window.selectItemProduct = function(idx) {
-  const product = _ipProducts[idx];
-  if (!product || !_ipItemId) return;
-  const payload = {
-    name:    product.name,
-    brand:   product.brand || null,
-    size:    product.size  || null,
-    barcode: product.barcode || null,
-    image:   product.image || null,
-  };
-  update(ref(db, `groups/${groupId}/items/${_ipItemId}`), { attached: payload })
-    .catch(e => console.warn('[ip] attach failed:', e.message));
-  closeItemPicker();
-};
 
 window.clearItemProduct = function(itemId, e) {
   if (e) e.stopPropagation();
