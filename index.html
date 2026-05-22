@@ -1688,25 +1688,24 @@ let _filterState = { chains: new Set(), officialOnly: false, matchQuality: 'all'
 let _chainGroups = [];
 
 function _normalizeResults(results) {
+  // API v6 returns: { name, barcode, prices: [{chainName, storeName, displayPrice, price, unit, ...}] }
   const normalized = results.map(r => {
-    if (Array.isArray(r.storePrices)) {
-      return {
-        name: r.name || '', brand: r.brand || '', size: r.size || '',
-        image: r.image || '', barcode: r.barcode || '',
-        stores: r.storePrices.map(sp => ({
-          store: sp.store, price: parseFloat(sp.price) || 0, unit: sp.unit || ''
-        })).filter(sp => sp.price > 0)
-      };
-    }
-    if (r.store && r.price) {
-      return {
-        name: r.name || '', brand: r.brand || '', size: r.size || '',
-        image: r.image || '', barcode: r.barcode || '',
-        stores: [{ store: r.store, price: parseFloat(r.price) || 0, unit: r.unit || '' }]
-      };
-    }
-    return { name: r.name || '', brand: r.brand || '', size: r.size || '',
-      image: r.image || '', barcode: r.barcode || '', stores: [] };
+    // Primary: r.prices[] from buildLayeredPrices (official / proxy / manual)
+    const rawPrices = Array.isArray(r.prices) ? r.prices : [];
+    const stores = rawPrices
+      .map(p => ({
+        store: p.chainName || p.storeName || p.chain || '',
+        price: parseFloat(p.displayPrice ?? p.price) || 0,
+        unit:  p.unit || '',
+        source: p.source || '',
+        isStale: r.isStale || false,
+      }))
+      .filter(sp => sp.price > 0 && sp.store);
+    return {
+      name: r.name || '', brand: r.brand || '', size: r.size || '',
+      image: r.image || '', barcode: r.barcode || '',
+      stores
+    };
   }).filter(r => r.name.length > 0);
 
   // De-duplicate by name
