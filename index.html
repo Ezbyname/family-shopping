@@ -165,6 +165,67 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);
   font-family:'Heebo',sans-serif;white-space:nowrap;transition:opacity .15s}
 .bp-add-btn:active{opacity:.75}
 
+/* ── ITEM PRODUCT TILE (ip-tile) ── */
+.ip-tile-wrap{position:relative;flex-shrink:0}
+.ip-tile{width:62px;min-height:62px;border-radius:13px;
+  border:1.5px dashed var(--border);background:var(--card2);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;cursor:pointer;padding:5px 4px;transition:all .15s;
+  font-family:'Heebo',sans-serif;color:var(--muted)}
+.ip-tile:active{transform:scale(.93);border-color:var(--accent)}
+.ip-tile.has-product{border-style:solid;border-color:var(--border);background:var(--card);color:var(--text)}
+.ip-tile.has-product:active{border-color:var(--accent)}
+.ip-tile-icon{font-size:22px;line-height:1;display:block}
+.ip-tile-img{width:32px;height:32px;object-fit:contain;border-radius:6px}
+.ip-tile-label{font-size:9px;font-weight:700;text-align:center;line-height:1.25;
+  white-space:nowrap;overflow:hidden;max-width:58px;text-overflow:ellipsis;display:block}
+.ip-tile-sub{font-size:8px;color:var(--muted);text-align:center;white-space:nowrap;
+  overflow:hidden;max-width:58px;text-overflow:ellipsis;display:block}
+.ip-clear-btn{position:absolute;top:-5px;left:-5px;
+  background:var(--card2);border:1.5px solid var(--border);border-radius:50%;
+  width:18px;height:18px;font-size:9px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;color:var(--muted);
+  transition:all .15s;padding:0;font-family:'Heebo',sans-serif}
+.ip-clear-btn:hover{background:var(--card);color:var(--text)}
+
+/* ── ITEM PRODUCT PICKER SHEET (ip-overlay) ── */
+.ip-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
+  z-index:900;align-items:flex-end;justify-content:center}
+.ip-overlay.show{display:flex}
+.ip-sheet{background:var(--surface);border-radius:24px 24px 0 0;width:100%;
+  max-width:480px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;
+  padding-bottom:var(--safe-b)}
+.ip-drag{width:36px;height:4px;background:var(--border);border-radius:2px;
+  margin:10px auto 0;flex-shrink:0}
+.ip-header{display:flex;align-items:center;padding:10px 14px 6px;gap:8px;flex-shrink:0}
+.ip-title{flex:1;font-size:15px;font-weight:700;text-align:right}
+.ip-item-name-hint{font-size:11px;color:var(--muted);text-align:right;direction:rtl}
+.ip-close-btn{background:transparent;border:none;font-size:17px;cursor:pointer;
+  color:var(--muted);padding:4px 8px;line-height:1}
+.ip-search-wrap{padding:0 12px 8px;flex-shrink:0}
+.ip-search{width:100%;background:var(--card);border:1.5px solid var(--border);
+  border-radius:12px;padding:9px 12px;font-size:14px;color:var(--text);
+  font-family:'Heebo',sans-serif;box-sizing:border-box;direction:rtl;outline:none;
+  transition:border-color .2s}
+.ip-search:focus{border-color:var(--accent)}
+.ip-results{flex:1;overflow-y:auto;padding:4px 8px calc(8px + var(--safe-b))}
+.ip-loading{text-align:center;padding:32px;color:var(--muted);font-size:13px}
+.ip-item{display:flex;align-items:center;gap:10px;padding:10px 8px;
+  border-radius:12px;margin-bottom:2px;transition:background .15s}
+.ip-item:active{background:var(--card)}
+.ip-item-img{width:44px;height:44px;object-fit:contain;border-radius:9px;
+  background:var(--card);flex-shrink:0;padding:2px}
+.ip-img-ph{width:44px;height:44px;border-radius:9px;background:var(--card);
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px}
+.ip-item-info{flex:1;min-width:0}
+.ip-item-name{font-size:13px;font-weight:600;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.ip-item-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.ip-pick-btn{background:var(--accent);color:#111;border:none;border-radius:10px;
+  padding:7px 13px;font-family:'Heebo',sans-serif;font-size:12px;font-weight:700;
+  cursor:pointer;flex-shrink:0;transition:all .15s;white-space:nowrap}
+.ip-pick-btn:active{opacity:.8;transform:scale(.96)}
+
 /* LIST */
 .list-wrap{flex:1;overflow-y:auto;padding:8px 10px;overscroll-behavior:contain}
 .list-wrap::-webkit-scrollbar{width:0}
@@ -1427,6 +1488,27 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
   </div>
 </div>
 
+<!-- ITEM PRODUCT PICKER SHEET -->
+<div class="ip-overlay" id="ip-overlay" onclick="if(event.target===this)closeItemPicker()">
+  <div class="ip-sheet" id="ip-sheet">
+    <div class="ip-drag"></div>
+    <div class="ip-header">
+      <button class="ip-close-btn" onclick="closeItemPicker()">✕</button>
+      <div>
+        <div class="ip-title">בחר מוצר ספציפי</div>
+        <div class="ip-item-name-hint" id="ip-item-hint"></div>
+      </div>
+    </div>
+    <div class="ip-search-wrap">
+      <input class="ip-search" id="ip-search" placeholder="חפש מותג, גודל, אחוז שומן..." dir="rtl"
+             oninput="_ipOnSearchInput()" autocomplete="off">
+    </div>
+    <div class="ip-results" id="ip-results">
+      <div class="ip-loading">🔍 מחפש...</div>
+    </div>
+  </div>
+</div>
+
 <!-- PRODUCT MODAL -->
 <div class="pm-overlay" id="pm-overlay" onclick="if(event.target===this)closeProductModal()">
   <div class="pm-sheet" id="pm-sheet">
@@ -2567,7 +2649,6 @@ const _origItemHTML = window.itemHTML || null;
 function itemHTML(item) {
   const byMe = item.addedByUserId === myId || item.addedByDisplayName === myName;
   const isFavTab = curTab === 'fav';
-  // Check if this item name is saved in favorites
   const isFavSaved = isItemInFavorites(item.name, item.barcode);
 
   // Live member data is PRIMARY source — snapshot is FALLBACK only
@@ -2577,11 +2658,36 @@ function itemHTML(item) {
   const avatarValue = addedMember?.avatarValue || item.addedByAvatarValue || '👤';
   const avatarEmoji = addedMember?.avatarEmoji || item.addedByAvatarEmoji || null;
 
-  const checkBtn  = isFavTab ? '' : `<button class="check-btn" onclick="toggleBought('${item.id}')">${item.bought?'✓':''}</button>`;
   const boughtBtn = isFavTab ? '' : `<span class="${item.bought?'bought-tag':'pending-tag'}" onclick="toggleBought('${item.id}')">${item.bought?'✅ קניתי':'קניתי'}</span>`;
 
+  // ── Product attachment tile (replaces check-btn) ──
+  const at = item.attached;
+  let ipTile;
+  if (!isFavTab && at && at.name) {
+    const label = esc(at.name.split(' ').slice(0, 3).join(' '));
+    const sub   = esc([at.brand, at.size].filter(Boolean).join(' · '));
+    const iconHtml = at.image
+      ? `<img class="ip-tile-img" src="${esc(at.image)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span class="ip-tile-icon" style="display:none">${_ipEmoji(item.name)}</span>`
+      : `<span class="ip-tile-icon">${_ipEmoji(item.name)}</span>`;
+    ipTile = `<div class="ip-tile-wrap">
+      <button class="ip-tile has-product" onclick="openItemPicker('${item.id}',${JSON.stringify(item.name)})" title="${label}">
+        ${iconHtml}
+        <span class="ip-tile-label">${label}</span>
+        ${sub ? `<span class="ip-tile-sub">${sub}</span>` : ''}
+      </button>
+      <button class="ip-clear-btn" onclick="clearItemProduct('${item.id}',event)" title="הסר מוצר">✕</button>
+    </div>`;
+  } else if (!isFavTab) {
+    ipTile = `<button class="ip-tile" onclick="openItemPicker('${item.id}',${JSON.stringify(item.name)})" title="בחר מוצר ספציפי">
+      <span class="ip-tile-icon">${_ipEmoji(item.name)}</span>
+      <span class="ip-tile-label" style="color:var(--muted)">בחר מוצר</span>
+    </button>`;
+  } else {
+    ipTile = '';
+  }
+
   return `<div class="item-card${(!isFavTab&&item.bought)?' bought':''}${item.fav?' fav':''}">
-    ${checkBtn}
+    ${ipTile}
     <div class="item-body">
       <div class="item-name">${esc(item.name)}</div>
       <div class="item-attribution">
@@ -2868,6 +2974,171 @@ window.closeBrandPicker = function() {
   if (_bpAbortCtrl) { _bpAbortCtrl.abort(); _bpAbortCtrl = null; }
   document.getElementById('bp-overlay')?.classList.remove('show');
   document.body.classList.remove('sheet-open');
+};
+
+// ══════════════════════════════════════════════════
+// ITEM PRODUCT PICKER — attach a specific branded
+// product to a generic shopping-list item
+// ══════════════════════════════════════════════════
+
+let _ipItemId   = null;   // item ID currently being picked for
+let _ipAbortCtrl = null;  // AbortController for in-flight OFF requests
+let _ipSearchTimer = null;
+let _ipProducts = [];     // current result list (index referenced by buttons)
+
+// Emoji heuristic for tile icon when no product image
+function _ipEmoji(name) {
+  const n = (name || '').toLowerCase();
+  if (n.includes('חלב'))                          return '🥛';
+  if (n.includes('לחמ') || n.includes('לחם'))     return '🍞';
+  if (n.includes('ביצ'))                          return '🥚';
+  if (n.includes('עוף') || n.includes('פרגית'))   return '🍗';
+  if (n.includes('בשר') || n.includes('סטייק'))   return '🥩';
+  if (n.includes('דג'))                           return '🐟';
+  if (n.includes('גבינ'))                         return '🧀';
+  if (n.includes('יוגורט'))                       return '🥄';
+  if (n.includes('תפוח') || n.includes('פרי'))    return '🍎';
+  if (n.includes('ירק') || n.includes('עגבנ'))    return '🥦';
+  if (n.includes('אורז'))                         return '🍚';
+  if (n.includes('פסטה') || n.includes('ספגטי'))  return '🍝';
+  if (n.includes('קפה'))                          return '☕';
+  if (n.includes('תה'))                           return '🍵';
+  if (n.includes('שמן'))                          return '🫙';
+  if (n.includes('סוכר') || n.includes('מלח'))    return '🧂';
+  if (n.includes('שוקולד') || n.includes('חטיף')) return '🍫';
+  if (n.includes('עוגי') || n.includes('ביסקוי')) return '🍪';
+  if (n.includes('מיץ') || n.includes('שתייה'))   return '🧃';
+  if (n.includes('חומוס') || n.includes('טחינ'))  return '🫘';
+  if (n.includes('ממרח') || n.includes('חמאה'))   return '🧈';
+  if (n.includes('שמפו') || n.includes('סבון'))   return '🧴';
+  if (n.includes('ניקוי') || n.includes('כביסה')) return '🧹';
+  return '🛒';
+}
+
+window.openItemPicker = async function(itemId, itemName) {
+  _ipItemId = itemId;
+
+  const overlay  = document.getElementById('ip-overlay');
+  const searchEl = document.getElementById('ip-search');
+  const hintEl   = document.getElementById('ip-item-hint');
+
+  overlay.classList.add('show');
+  document.body.classList.add('sheet-open');
+
+  if (hintEl)   hintEl.textContent = `עבור: ${itemName}`;
+  if (searchEl) { searchEl.value = itemName || ''; searchEl.focus(); }
+
+  _ipDoSearch(itemName || '');
+};
+
+window.closeItemPicker = function() {
+  if (_ipAbortCtrl) { _ipAbortCtrl.abort(); _ipAbortCtrl = null; }
+  clearTimeout(_ipSearchTimer);
+  document.getElementById('ip-overlay')?.classList.remove('show');
+  document.body.classList.remove('sheet-open');
+  _ipItemId = null;
+};
+
+window._ipOnSearchInput = function() {
+  clearTimeout(_ipSearchTimer);
+  const val = document.getElementById('ip-search')?.value.trim();
+  if (!val) return;
+  _ipSearchTimer = setTimeout(() => _ipDoSearch(val), 380);
+};
+
+async function _ipDoSearch(query) {
+  if (!query) return;
+  if (_ipAbortCtrl) _ipAbortCtrl.abort();
+  _ipAbortCtrl = new AbortController();
+  const signal = _ipAbortCtrl.signal;
+
+  const resultsEl = document.getElementById('ip-results');
+  if (resultsEl) resultsEl.innerHTML = '<div class="ip-loading">🔍 מחפש מוצרים...</div>';
+
+  try {
+    const enc    = encodeURIComponent(query);
+    const FIELDS = 'product_name,product_name_he,brands,quantity,image_small_url,code,countries_tags';
+    const BASE   = 'https://world.openfoodfacts.org/cgi/search.pl';
+    const urls   = [
+      `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=15&fields=${FIELDS}&tagtype_0=countries&tag_contains_0=contains&tag_0=israel`,
+      `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=20&fields=${FIELDS}`,
+    ];
+
+    const seen = new Set();
+    _ipProducts = [];
+
+    for (const url of urls) {
+      if (_ipProducts.length >= 15) break;
+      if (signal.aborted) return;
+      try {
+        const r = await fetch(url, { headers: {'User-Agent':'FamilyShoppingIL/6.0'}, signal });
+        if (!r.ok) continue;
+        const data = await r.json();
+        for (const p of data?.products || []) {
+          const code = p.code || '';
+          if (code && seen.has(code)) continue;
+          if (code) seen.add(code);
+          const name = p.product_name_he || p.product_name || '';
+          if (!name) continue;
+          const isIsraeli = (p.countries_tags || []).some(c => c.includes('israel'));
+          _ipProducts.push({
+            name, brand: p.brands || '', size: p.quantity || '',
+            image: p.image_small_url || '', barcode: code, isIsraeli,
+          });
+        }
+      } catch(e) { if (e.name === 'AbortError') return; }
+    }
+    if (signal.aborted) return;
+
+    // Israeli products first, preserve relevance order within each group
+    _ipProducts.sort((a, b) => (b.isIsraeli ? 1 : 0) - (a.isIsraeli ? 1 : 0));
+
+    if (!_ipProducts.length) {
+      if (resultsEl) resultsEl.innerHTML = '<div class="ip-loading">😕 לא נמצאו מוצרים<br><small>נסה שם אחר או מותג</small></div>';
+      return;
+    }
+
+    if (resultsEl) resultsEl.innerHTML = _ipProducts.slice(0, 14).map((p, i) => {
+      const sub    = [p.brand, p.size].filter(Boolean).join(' · ');
+      const imgTag = p.image
+        ? `<img class="ip-item-img" src="${esc(p.image)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+        : '';
+      const phStyle = p.image ? 'style="display:none"' : '';
+      return `<div class="ip-item">
+        ${imgTag}<div class="ip-img-ph" ${phStyle}>🛒</div>
+        <div class="ip-item-info">
+          <div class="ip-item-name">${esc(p.name)}</div>
+          ${sub ? `<div class="ip-item-sub">${esc(sub)}</div>` : ''}
+        </div>
+        <button class="ip-pick-btn" onclick="selectItemProduct(${i})">בחר</button>
+      </div>`;
+    }).join('');
+
+  } catch(e) {
+    if (e.name === 'AbortError') return;
+    if (resultsEl) resultsEl.innerHTML = `<div class="ip-loading">⚠️ ${esc(e.message)}</div>`;
+  }
+}
+
+window.selectItemProduct = function(idx) {
+  const product = _ipProducts[idx];
+  if (!product || !_ipItemId) return;
+  const payload = {
+    name:    product.name,
+    brand:   product.brand || null,
+    size:    product.size  || null,
+    barcode: product.barcode || null,
+    image:   product.image || null,
+  };
+  update(ref(db, `groups/${groupId}/items/${_ipItemId}`), { attached: payload })
+    .catch(e => console.warn('[ip] attach failed:', e.message));
+  closeItemPicker();
+};
+
+window.clearItemProduct = function(itemId, e) {
+  if (e) e.stopPropagation();
+  update(ref(db, `groups/${groupId}/items/${itemId}`), { attached: null })
+    .catch(e => console.warn('[ip] clear failed:', e.message));
 };
 
 // Override addItem to include attribution and activity
