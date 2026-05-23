@@ -9,14 +9,15 @@ import { join } from 'path';
 import { logger, withRetry, formatBytes } from './utils.js';
 
 const HDRS = {
-  'User-Agent': 'FamilyShoppingBot/2.0 (Israel price transparency compliance)',
+  'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
   'Accept': 'application/xml,text/xml,application/gzip,text/html,*/*',
   'Accept-Language': 'he-IL,he;q=0.9',
+  'Referer': 'https://prices.shufersal.co.il/',
 };
 
 export async function resolveFileUrls(chain) {
   return withRetry(async () => {
-    const res = await fetch(chain.indexUrl, { headers: HDRS, signal: AbortSignal.timeout(15000), redirect: 'follow' });
+    const res = await fetch(chain.indexUrl, { headers: HDRS, signal: AbortSignal.timeout(30000), redirect: 'follow' });
     if (!res.ok) throw new Error(`Index ${res.status}`);
     const body = await res.text();
     return extractUrls(body, chain);
@@ -43,12 +44,16 @@ function extractUrls(body, chain) {
   } catch (_) {}
 
   if (!candidates.price.length) {
-    // HTML parsing
+    // HTML parsing — PriceFull (standard) + Azure Blob Price*.gz (Shufersal)
     let m;
-    const priceRe = /href=["']([^"']*PriceFull[^"']*(?:\.gz|\.xml))["']/gi;
-    const storeRe = /href=["']([^"']*Stores[^"']*(?:\.gz|\.xml))["']/gi;
-    while ((m = priceRe.exec(body))) candidates.price.push(makeAbs(m[1], chain));
-    while ((m = storeRe.exec(body))) candidates.store.push(makeAbs(m[1], chain));
+    const priceRe    = /href=["']([^"']*PriceFull[^"']*(?:\.gz|\.xml))["']/gi;
+    const azurePriceRe = /href=["'](https?:\/\/[^"']*\.blob\.core\.windows\.net\/[^"']*\/Price[^"']*\.gz(?:\?[^"']*)?)["']/gi;
+    const storeRe    = /href=["']([^"']*Stores[^"']*(?:\.gz|\.xml))["']/gi;
+    const azureStoreRe = /href=["'](https?:\/\/[^"']*\.blob\.core\.windows\.net\/[^"']*\/Stores[^"']*\.gz(?:\?[^"']*)?)["']/gi;
+    while ((m = priceRe.exec(body)))     candidates.price.push(makeAbs(m[1], chain));
+    while ((m = azurePriceRe.exec(body))) candidates.price.push(m[1]);
+    while ((m = storeRe.exec(body)))     candidates.store.push(makeAbs(m[1], chain));
+    while ((m = azureStoreRe.exec(body))) candidates.store.push(m[1]);
   }
 
   candidates.price.sort().reverse();

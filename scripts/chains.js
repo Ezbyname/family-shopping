@@ -8,10 +8,10 @@ export const CHAINS = [
     name: 'שופרסל',
     chainId: '7290027600007',
     enabled: true,
-    // Shufersal publishes store list then price files per store
-    indexUrl: 'https://prices.shufersal.co.il/FileObject/UpdateCategory?catID=0&storeId=0&sort=None&order=None&size=10&page=1',
+    // Shufersal: HTML index page with Azure Blob Storage signed URLs (Price*.gz per store)
+    indexUrl: 'https://prices.shufersal.co.il/FileObject/UpdateCategory?catID=0&storeId=0&sort=None&order=None&size=50&page=1',
     baseUrl: 'https://prices.shufersal.co.il',
-    indexType: 'json',
+    indexType: 'html',
   },
   {
     id: 'rami-levy',
