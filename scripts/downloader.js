@@ -15,6 +15,16 @@ const HDRS = {
   'Referer': 'https://prices.shufersal.co.il/',
 };
 
+// Decode HTML entities in URLs extracted from href attributes
+const decodeHtml = s => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+
+// Extract storeId from Shufersal Azure Blob filename:
+// Price7290027600007-001-034-20260522-020000.gz  →  '034'
+function extractStoreIdFromUrl(url) {
+  const m = url.match(/\/Price\d+-\d+-(\d+)-\d{8}/);
+  return m ? m[1] : null;
+}
+
 export async function resolveFileUrls(chain) {
   return withRetry(async () => {
     const res = await fetch(chain.indexUrl, { headers: HDRS, signal: AbortSignal.timeout(30000), redirect: 'follow' });
@@ -51,9 +61,9 @@ function extractUrls(body, chain) {
     const storeRe    = /href=["']([^"']*Stores[^"']*(?:\.gz|\.xml))["']/gi;
     const azureStoreRe = /href=["'](https?:\/\/[^"']*\.blob\.core\.windows\.net\/[^"']*\/Stores[^"']*\.gz(?:\?[^"']*)?)["']/gi;
     while ((m = priceRe.exec(body)))     candidates.price.push(makeAbs(m[1], chain));
-    while ((m = azurePriceRe.exec(body))) candidates.price.push(m[1]);
+    while ((m = azurePriceRe.exec(body))) candidates.price.push(decodeHtml(m[1]));
     while ((m = storeRe.exec(body)))     candidates.store.push(makeAbs(m[1], chain));
-    while ((m = azureStoreRe.exec(body))) candidates.store.push(m[1]);
+    while ((m = azureStoreRe.exec(body))) candidates.store.push(decodeHtml(m[1]));
   }
 
   candidates.price.sort().reverse();
@@ -61,6 +71,47 @@ function extractUrls(body, chain) {
 
   logger.info(`  PriceFull: ${candidates.price.length} | Stores: ${candidates.store.length}`);
   return { priceUrl: candidates.price[0] || null, storeUrl: candidates.store[0] || null };
+}
+
+// Resolve ALL per-store Price URLs from a paginated index (for multiStore chains).
+// Returns Map<storeId, signedUrl> — newest file per store (page 1 = most recent).
+export async function resolveAllPriceUrls(chain, maxStores = 50, maxPages = 10) {
+  const priceByStore = new Map(); // storeId → url
+  const storeByStore = new Map(); // storeId → url (Stores*.gz)
+  const azurePriceRe = /href=["'](https?:\/\/[^"']*\.blob\.core\.windows\.net\/[^"']*\/Price[^"']*\.gz(?:\?[^"']*)?)["']/gi;
+  const azureStoreRe = /href=["'](https?:\/\/[^"']*\.blob\.core\.windows\.net\/[^"']*\/Stores[^"']*\.gz(?:\?[^"']*)?)["']/gi;
+
+  for (let page = 1; page <= maxPages && priceByStore.size < maxStores; page++) {
+    const pageUrl = chain.indexUrl.replace('PAGE', String(page));
+    try {
+      const res = await fetch(pageUrl, { headers: HDRS, signal: AbortSignal.timeout(30000), redirect: 'follow' });
+      if (!res.ok) { logger.warn(`[${chain.name}] Index page ${page}: HTTP ${res.status}`); break; }
+      const body = await res.text();
+
+      let m, newPrice = 0, newStore = 0;
+      azurePriceRe.lastIndex = 0;
+      while ((m = azurePriceRe.exec(body))) {
+        const url = decodeHtml(m[1]);
+        const storeId = extractStoreIdFromUrl(url);
+        if (storeId && !priceByStore.has(storeId)) { priceByStore.set(storeId, url); newPrice++; }
+      }
+      azureStoreRe.lastIndex = 0;
+      while ((m = azureStoreRe.exec(body))) {
+        const url = decodeHtml(m[1]);
+        const storeId = extractStoreIdFromUrl(url);
+        if (storeId && !storeByStore.has(storeId)) { storeByStore.set(storeId, url); newStore++; }
+      }
+
+      logger.info(`[${chain.name}] Page ${page}: +${newPrice} price files, +${newStore} store files (total ${priceByStore.size}/${maxStores})`);
+      if (newPrice === 0 && newStore === 0) break; // no new data on this page
+    } catch (e) {
+      logger.warn(`[${chain.name}] Index page ${page} failed: ${e.message}`);
+      break;
+    }
+  }
+
+  logger.info(`[${chain.name}] Discovered ${priceByStore.size} stores, ${storeByStore.size} store-metadata files`);
+  return { priceByStore, storeByStore };
 }
 
 const makeAbs = (url, chain) => {

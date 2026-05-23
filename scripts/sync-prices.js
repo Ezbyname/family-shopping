@@ -2,10 +2,120 @@
 import { initFirebase, BatchWriter, getDB } from './firebase.js';
 import { CHAINS } from './chains.js';
 import { parseXMLStream } from './xml-parser.js';
-import { resolveFileUrls, downloadToStream } from './downloader.js';
+import { resolveFileUrls, resolveAllPriceUrls, downloadToStream } from './downloader.js';
 import { logger, safeKey } from './utils.js';
 
+// ── Multi-store sync (Shufersal: one Price*.gz per store) ──────────────────
+async function syncChainMultiStore(chain, writer) {
+  logger.info(`\n${'━'.repeat(50)}\n[${chain.name}] Multi-store sync`);
+  const result = { chainId: chain.id, chainName: chain.name, count: 0, storeCount: 0, errors: 0, failed: false, skipped: false };
+
+  const maxStores = chain.maxStoresToSync || 50;
+  const maxPages  = chain.maxIndexPages   || 10;
+
+  let priceByStore, storeByStore;
+  try {
+    ({ priceByStore, storeByStore } = await resolveAllPriceUrls(chain, maxStores, maxPages));
+  } catch (e) {
+    logger.fail(`[${chain.name}] Index discovery failed: ${e.message}`);
+    result.failed = true; return result;
+  }
+
+  if (priceByStore.size === 0) {
+    logger.warn(`[${chain.name}] No store price files found`);
+    result.failed = true; return result;
+  }
+
+  const db = getDB();
+  const chainMeta = { chainId: chain.chainId, chainName: chain.name };
+
+  // 1. Sync Stores metadata files (lat/lng) if available
+  for (const [storeId, url] of storeByStore) {
+    try {
+      const stream = await downloadToStream(url, `${chain.name}-stores-${storeId}`);
+      await parseXMLStream(stream, () => {}, async (store) => {
+        const key = safeKey(`${chain.id}_${store.storeId || storeId}`);
+        await writer.queue(`stores/${key}`, { ...store, chainId: chain.chainId, chainName: chain.name });
+        result.storeCount++;
+      }, chainMeta);
+      await writer.flush();
+    } catch (e) { logger.warn(`[${chain.name}] Store-meta ${storeId} failed: ${e.message}`); }
+  }
+
+  // 2. Sync Price files per store
+  for (const [storeId, url] of priceByStore) {
+    logger.info(`[${chain.name}] Syncing store ${storeId} …`);
+    try {
+      const stream = await downloadToStream(url, `${chain.name}-${storeId}`);
+      let storeNameSeen = '';
+
+      const { count, errors } = await parseXMLStream(stream,
+        async (product) => {
+          if (!storeNameSeen && product.storeName) storeNameSeen = product.storeName;
+          const sid  = product.storeId || storeId;
+          const key  = safeKey(`${chain.id}_${sid}`);
+          await writer.queue(`prices/${product.barcode}/${key}`, {
+            barcode:   product.barcode,
+            name:      product.name,
+            chainId:   chain.id,
+            chainName: chain.name,
+            storeId:   sid,
+            storeName: product.storeName || '',
+            price:     product.price,
+            unit:      product.unit      || '',
+            quantity:  product.quantity  || '',
+            brand:     product.brand     || '',
+            updatedAt: product.updatedAt,
+            source:    'official',
+            syncedAt:  Date.now(),
+          });
+        },
+        null,
+        { ...chainMeta, storeId }
+      );
+      await writer.flush();
+      result.count += count;
+      result.errors += errors;
+
+      // Write basic store metadata (will be enriched with coords when Stores files available)
+      if (!storeByStore.has(storeId)) {
+        const key = safeKey(`${chain.id}_${storeId}`);
+        await db.ref(`stores/${key}`).update({
+          chainId: chain.chainId, chainName: chain.name,
+          storeId, storeName: storeNameSeen,
+          updatedAt: new Date().toISOString(),
+        });
+        result.storeCount++;
+      }
+
+      logger.ok(`[${chain.name}] Store ${storeId}: ${count} prices`);
+    } catch (e) {
+      logger.warn(`[${chain.name}] Store ${storeId} failed: ${e.message}`);
+      result.errors++;
+    }
+  }
+
+  // Write sync status
+  try {
+    await writer.writeSyncStatus(chain.id, {
+      chainId: chain.id, chainName: chain.name,
+      lastSyncDate:    new Date().toISOString().split('T')[0],
+      lastSuccessAt:   new Date().toISOString(),
+      storesSynced:    priceByStore.size,
+      itemsProcessed:  result.count,
+      storesProcessed: result.storeCount,
+      errors: result.errors,
+    });
+  } catch (_) {}
+
+  logger.ok(`[${chain.name}] ${result.count.toLocaleString()} prices across ${priceByStore.size} stores`);
+  return result;
+}
+
+// ── Single-file sync (PriceFull*.gz — Rami Levy, Victory, etc.) ────────────
 async function syncChain(chain, writer) {
+  if (chain.multiStore) return syncChainMultiStore(chain, writer);
+
   logger.info(`\n${'━'.repeat(50)}\n[${chain.name}] Starting`);
   const result = { chainId: chain.id, chainName: chain.name, count: 0, storeCount: 0, errors: 0, failed: false, skipped: false };
 

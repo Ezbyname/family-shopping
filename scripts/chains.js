@@ -8,10 +8,13 @@ export const CHAINS = [
     name: 'שופרסל',
     chainId: '7290027600007',
     enabled: true,
-    // Shufersal: HTML index page with Azure Blob Storage signed URLs (Price*.gz per store)
-    indexUrl: 'https://prices.shufersal.co.il/FileObject/UpdateCategory?catID=0&storeId=0&sort=None&order=None&size=50&page=1',
+    // Per-store files on paginated Azure Blob index (no single PriceFull)
+    indexUrl: 'https://prices.shufersal.co.il/FileObject/UpdateCategory?catID=0&storeId=0&sort=None&order=None&size=50&page=PAGE',
     baseUrl: 'https://prices.shufersal.co.il',
     indexType: 'html',
+    multiStore: true,       // download a separate Price*.gz file per store
+    maxStoresToSync: 5,     // start small; raise to 999 for all stores
+    maxIndexPages: 10,      // pages to scan for store discovery
   },
   {
     id: 'rami-levy',
