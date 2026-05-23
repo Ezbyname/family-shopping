@@ -1579,16 +1579,42 @@ window.createGroup=async function(){
   const name=document.getElementById('cn-name').value.trim();
   const grp=document.getElementById('cn-group').value.trim();
   if(!name||!grp){toast('⚠️ מלא שם וקבוצה');return;}
-  // Wait for real Firebase UID — never use a fake local fallback
+
+  // ── Step 1: real Firebase UID (8s timeout) ──
   let fbUser;
-  try { fbUser = await waitForAuthReady(); }
-  catch(e) { toast('❌ בעיית אימות — נסה שוב'); console.error('[auth] createGroup:', e.message); return; }
+  try {
+    const _authTimeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('auth_ready_timeout')),8000));
+    fbUser = await Promise.race([waitForAuthReady(), _authTimeout]);
+  } catch(e) {
+    console.error('[createGroup] auth_ready_failed:', e.message);
+    toast('לא הצלחנו ליצור קבוצה — בעיית אימות');
+    return;
+  }
+
   const code=String(Math.floor(100000+Math.random()*900000));
   groupId=code; groupName=grp;
-  myId=fbUser.uid;   // real Firebase UID guaranteed
+  myId=fbUser.uid;
   myName=name;
-  await set(ref(db,`groups/${code}/info`),{name:grp,code});
-  await set(ref(db,`groups/${code}/members/${myId}`),{name,id:myId,joined:Date.now()});
+  console.log('[createGroup] auth ok | uid:', myId, '| code:', code);
+
+  // ── Step 2: write group info ──
+  try {
+    await set(ref(db,`groups/${code}/info`),{name:grp,code});
+  } catch(e) {
+    console.error('[createGroup] group_write_failed:', e.message);
+    toast('לא הצלחנו ליצור קבוצה — בדוק חיבור והרשאות');
+    return;
+  }
+
+  // ── Step 3: write creator as member ──
+  try {
+    await set(ref(db,`groups/${code}/members/${myId}`),{name,id:myId,joined:Date.now()});
+  } catch(e) {
+    console.error('[createGroup] member_write_failed:', e.message);
+    toast('לא הצלחנו ליצור קבוצה — שגיאת כתיבה לחברים');
+    return;
+  }
+
   saveLocal(); connectToGroup();
 };
 
@@ -1596,17 +1622,44 @@ window.joinGroup=async function(){
   const name=document.getElementById('jn-name').value.trim();
   const code=document.getElementById('jn-code').value.trim();
   if(!name||code.length!==6){toast('⚠️ מלא שם וקוד 6 ספרות');return;}
-  // Wait for real Firebase UID — never use a fake local fallback
+
+  // ── Step 1: real Firebase UID (8s timeout) ──
   let fbUser;
-  try { fbUser = await waitForAuthReady(); }
-  catch(e) { toast('❌ בעיית אימות — נסה שוב'); console.error('[auth] joinGroup:', e.message); return; }
-  const snap=await get(ref(db,`groups/${code}/info`));
-  if(!snap.exists()){toast('❌ קבוצה לא נמצאה');return;}
-  const info=snap.val();
+  try {
+    const _authTimeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('auth_ready_timeout')),8000));
+    fbUser = await Promise.race([waitForAuthReady(), _authTimeout]);
+  } catch(e) {
+    console.error('[joinGroup] auth_ready_failed:', e.message);
+    toast('לא הצלחנו להצטרף — בעיית אימות');
+    return;
+  }
+
+  // ── Step 2: verify group exists ──
+  let info;
+  try {
+    const snap=await get(ref(db,`groups/${code}/info`));
+    if(!snap.exists()){toast('❌ קבוצה לא נמצאה');return;}
+    info=snap.val();
+  } catch(e) {
+    console.error('[joinGroup] group_read_failed:', e.message);
+    toast('❌ שגיאת רשת — נסה שוב');
+    return;
+  }
+
   groupId=code; groupName=info.name;
-  myId=fbUser.uid;   // real Firebase UID guaranteed
+  myId=fbUser.uid;
   myName=name;
-  await set(ref(db,`groups/${code}/members/${myId}`),{name,id:myId,joined:Date.now()});
+  console.log('[joinGroup] auth ok | uid:', myId, '| group:', code);
+
+  // ── Step 3: write member ──
+  try {
+    await set(ref(db,`groups/${code}/members/${myId}`),{name,id:myId,joined:Date.now()});
+  } catch(e) {
+    console.error('[joinGroup] member_write_failed:', e.message);
+    toast('לא הצלחנו להצטרף — בדוק הרשאות');
+    return;
+  }
+
   saveLocal(); connectToGroup();
 };
 
@@ -5325,6 +5378,19 @@ onAuthStateChanged(auth, async (user) => {
     }
   }
 });
+
+// ── DEV DEBUG OBJECT — safe, no secrets ──
+// Available in browser console on localhost and vercel.app
+if (location.hostname.includes('localhost') || location.hostname.includes('vercel.app')) {
+  window.__debugAuth = {
+    getUid:     () => getAuth(app).currentUser?.uid   || '(no firebase auth)',
+    getMyId:    () => myId                            || '(not set)',
+    getGroupId: () => groupId                         || '(not set)',
+    isFakeId:   () => /^u_\d{10,}$/.test(myId),
+    getMembersPath: () => groupId ? `groups/${groupId}/members/${myId}` : '(no group)',
+  };
+  console.log('[debug] window.__debugAuth ready — __debugAuth.getUid() | getMyId() | getGroupId() | isFakeId()');
+}
 
 // ════════════════════════════════════════════════════════════════════
 // ADMIN UNLOCK — hidden long-press gesture on avatar
