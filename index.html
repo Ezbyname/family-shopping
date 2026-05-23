@@ -775,16 +775,14 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 .add-all-btn:disabled{opacity:.4;cursor:default}
 
 .fav-item-card{background:var(--card);border-radius:var(--radius);
-  margin:0 11px 7px;padding:11px 12px;
-  display:flex;align-items:center;gap:10px;
+  margin:0 11px 7px;padding:10px 11px;
+  display:flex;align-items:center;gap:9px;
   border:1.5px solid var(--border);transition:all .15s;position:relative}
 .fav-item-card.in-list{border-color:rgba(52,211,153,.35);
   background:rgba(52,211,153,.04)}
-.fav-item-info{flex:1;min-width:0}
+.fav-item-body{flex:1;min-width:0}
 .fav-item-name{font-size:14px;font-weight:600;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fav-item-meta{font-size:10px;color:var(--muted);margin-top:2px;
-  display:flex;align-items:center;gap:6px}
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
 .fav-in-list-badge{background:rgba(52,211,153,.15);color:var(--green);
   border:1px solid rgba(52,211,153,.3);border-radius:5px;
   padding:1px 6px;font-size:9px;font-weight:700}
@@ -2968,7 +2966,7 @@ async function _bpRunSearch(query, signal) {
       if (resultsEl) resultsEl.innerHTML = '<div class="bp-loading">😕 לא נמצאו מוצרים<br><small>נסה מילה אחרת</small></div>';
       return;
     }
-    const isAttach = _bpMode === 'attach';
+    const isAttach = _bpMode === 'attach' || _bpMode === 'fav-attach';
     if (resultsEl) resultsEl.innerHTML = _bpProducts.slice(0, 14).map((p, i) => {
       const nameHtml = _boldKeyword(p.name, query);
       const sub = [p.brand, p.size].filter(Boolean).join(' · ');
@@ -2999,14 +2997,15 @@ async function _bpRunSearch(query, signal) {
 // openBrandPicker(mode='new')           — from add-bar brand button
 // openBrandPicker('attach', id, name)   — from ip-tile on existing items
 window.openBrandPicker = async function(mode, itemId, itemName) {
-  _bpMode   = (mode === 'attach') ? 'attach' : 'new';
+  _bpMode   = (mode === 'attach') ? 'attach' : (mode === 'fav-attach') ? 'fav-attach' : 'new';
   _bpItemId = itemId || null;
 
   if (_bpAbortCtrl) _bpAbortCtrl.abort();
   _bpAbortCtrl = new AbortController();
   const signal = _bpAbortCtrl.signal;
 
-  const query = _bpMode === 'attach'
+  const isAttachMode = _bpMode === 'attach' || _bpMode === 'fav-attach';
+  const query = isAttachMode
     ? (itemName || '')
     : (document.getElementById('new-item-input')?.value.trim() || '');
   if (!query) return;
@@ -3016,7 +3015,7 @@ window.openBrandPicker = async function(mode, itemId, itemName) {
   const searchWrap  = document.getElementById('bp-search-wrap');
   const searchEl    = document.getElementById('bp-search');
   const queryBar    = document.getElementById('bp-query-bar');
-  if (_bpMode === 'attach') {
+  if (isAttachMode) {
     if (hintEl)     { hintEl.textContent = `עבור: ${itemName}`; hintEl.style.display = 'block'; }
     if (searchWrap) searchWrap.style.display = 'block';
     if (searchEl)   { searchEl.value = query; }
@@ -3042,13 +3041,16 @@ window._bpOnSearchInput = function() {
 };
 
 window.selectBrandProduct = function(nameOrIdx, barcode) {
-  if (_bpMode === 'attach') {
+  if (_bpMode === 'attach' || _bpMode === 'fav-attach') {
     // nameOrIdx is an index into _bpProducts
     const p = _bpProducts[nameOrIdx];
     if (p && _bpItemId) {
       const payload = { name: p.name, brand: p.brand||null, size: p.size||null,
                         barcode: p.barcode||null, image: p.image||null };
-      update(ref(db, `groups/${groupId}/items/${_bpItemId}`), { attached: payload })
+      const path = _bpMode === 'fav-attach'
+        ? `favorites/${groupId}/${_bpItemId}`
+        : `groups/${groupId}/items/${_bpItemId}`;
+      update(ref(db, path), { attached: payload })
         .catch(e => console.warn('[bp-attach] failed:', e.message));
     }
     closeBrandPicker();
@@ -4332,6 +4334,23 @@ window.removeFavorite = async function(favId) {
   } catch (e) { toast('❌ ' + e.message); }
 };
 
+// ── CHANGE DEFAULT QTY OF FAVORITE ──
+window.changeFavQty = function(favId, delta) {
+  const fav = favorites[favId];
+  if (!fav || !groupId) return;
+  const newQty = Math.max(1, (fav.defaultQty || 1) + delta);
+  update(ref(db, `favorites/${groupId}/${favId}`), { defaultQty: newQty })
+    .catch(e => console.warn('[fav-qty] failed:', e.message));
+};
+
+// ── CLEAR ATTACHED PRODUCT FROM FAVORITE ──
+window.clearFavProduct = function(favId, ev) {
+  if (ev) ev.stopPropagation();
+  if (!groupId) return;
+  update(ref(db, `favorites/${groupId}/${favId}`), { attached: null })
+    .catch(e => console.warn('[fav-clear] failed:', e.message));
+};
+
 // ── RENDER FAVORITES PANEL ──
 function renderFavoritesPanel() {
   const wrap = document.getElementById('fav-list-content');
@@ -4363,17 +4382,41 @@ function renderFavoritesPanel() {
   }
 
   wrap.innerHTML = favList.map(fav => {
-    const inList  = isItemInActiveList(fav.name, fav.barcode);
+    const inList = isItemInActiveList(fav.name, fav.barcode);
+    const qty    = fav.defaultQty || 1;
+    const at     = fav.attached;
+
+    // ip-tile — product attachment
+    let ipTile;
+    if (at && at.name) {
+      const label   = esc(at.name.split(' ').slice(0, 3).join(' '));
+      const iconHtml = at.image
+        ? `<img class="ip-tile-img" src="${esc(at.image)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span class="ip-tile-icon" style="display:none">${_ipEmoji(fav.name)}</span>`
+        : `<span class="ip-tile-icon">${_ipEmoji(fav.name)}</span>`;
+      ipTile = `<div class="ip-tile-wrap">
+        <button class="ip-tile has-product" onclick="openBrandPicker('fav-attach','${fav._id}',${JSON.stringify(fav.name)})" title="${label}">
+          ${iconHtml}
+          <span class="ip-tile-label">${label}</span>
+        </button>
+        <button class="ip-clear-btn" onclick="clearFavProduct('${fav._id}',event)" title="הסר מוצר">✕</button>
+      </div>`;
+    } else {
+      ipTile = `<button class="ip-tile" onclick="openBrandPicker('fav-attach','${fav._id}',${JSON.stringify(fav.name)})" title="בחר מוצר ספציפי">
+        <span class="ip-tile-icon">${_ipEmoji(fav.name)}</span>
+        <span class="ip-tile-label" style="color:var(--muted)">בחר מוצר</span>
+      </button>`;
+    }
+
     return `
       <div class="fav-item-card${inList ? ' in-list' : ''}">
-        <div class="fav-item-info">
+        ${ipTile}
+        <div class="fav-item-body">
           <div class="fav-item-name">${esc(fav.name)}</div>
-          <div class="fav-item-meta">
-            ${fav.defaultQty > 1 ? `<span>×${fav.defaultQty}</span>` : ''}
-            ${fav.category ? `<span>${esc(fav.category)}</span>` : ''}
-            ${inList
-              ? `<span class="fav-in-list-badge">✅ ברשימה</span>`
-              : ''}
+          <div class="qty-row">
+            <button class="qty-btn" onclick="changeFavQty('${fav._id}',-1)">−</button>
+            <span class="qty-num">${qty}</span>
+            <button class="qty-btn" onclick="changeFavQty('${fav._id}',1)">+</button>
+            ${inList ? `<span class="fav-in-list-badge">✅ ברשימה</span>` : ''}
           </div>
         </div>
         <div class="fav-actions">
