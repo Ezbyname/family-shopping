@@ -2923,19 +2923,44 @@ window._onAddInputChange = function() {
 };
 
 // Internal search runner — used by both 'new' and 'attach' modes
+// Quick Hebrew→English for OFX search (mirrors server-side HE_EN dict)
+const _BP_HE_EN = {
+  'חלב':'milk','גבינה':'cheese','קוטג':'cottage cheese',"קוטג'":'cottage cheese',
+  'שמנת':'cream','יוגורט':'yogurt','חמאה':'butter','לחם':'bread','פיתה':'pita',
+  'קמח':'flour','ביצים':'eggs','ביצה':'egg','קורנפלקס':'cornflakes',
+  'שיבולת שועל':'oatmeal','גרנולה':'granola','אורז':'rice','פסטה':'pasta',
+  'שמן':'oil','שמן זית':'olive oil','סוכר':'sugar','דבש':'honey','מלח':'salt',
+  'טחינה':'tahini','חומוס':'hummus','קטשופ':'ketchup','מיונז':'mayonnaise',
+  'טונה':'tuna','קפה':'coffee','תה':'tea','מיץ':'juice','שוקולד':'chocolate',
+  'עוגיות':'cookies','במבה':'bamba','ביסלי':'bisli','גלידה':'ice cream',
+  'עוף':'chicken','בשר':'beef','דג':'fish','עגבניות':'tomatoes',
+  'מלפפון':'cucumber','בצל':'onion','שום':'garlic','גזר':'carrot',
+  'תפוח אדמה':'potato','ברוקולי':'broccoli','תפוח':'apple','בננה':'banana',
+};
+function _bpTranslate(q) {
+  const l = q.trim();
+  if (_BP_HE_EN[l]) return _BP_HE_EN[l];
+  for (const [h, e] of Object.entries(_BP_HE_EN)) if (l.includes(h)) return e;
+  return null;
+}
+
 async function _bpRunSearch(query, signal) {
   const resultsEl = document.getElementById('bp-results');
   const queryEl   = document.getElementById('bp-query-text');
   if (queryEl)   queryEl.textContent = `מחפש "${query}"...`;
   if (resultsEl) resultsEl.innerHTML = '<div class="bp-loading">🔍 מחפש מוצרים...</div>';
   try {
-    const enc    = encodeURIComponent(query);
+    const isHeb = /[֐-׿]/.test(query);
+    const enQuery = isHeb ? (_bpTranslate(query) || query) : query;
+    const enc    = encodeURIComponent(enQuery);
+    const encHe  = encodeURIComponent(query);
     const BASE   = 'https://world.openfoodfacts.org/cgi/search.pl';
     const FIELDS = 'product_name,product_name_he,brands,quantity,image_small_url,code,countries_tags';
     const urls   = [
       `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=15&fields=${FIELDS}&tagtype_0=countries&tag_contains_0=contains&tag_0=israel`,
+      isHeb && enQuery !== query ? `${BASE}?search_terms=${encHe}&search_simple=1&action=process&json=1&page_size=8&fields=${FIELDS}` : null,
       `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=20&fields=${FIELDS}`,
-    ];
+    ].filter(Boolean);
     const seen = new Set();
     _bpProducts = [];
     for (const url of urls) {
