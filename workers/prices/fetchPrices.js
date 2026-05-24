@@ -17,10 +17,12 @@ const INDEX_TIMEOUT_MS   = 20_000;  // 20 seconds for index page
 const SAS_EXPIRY_PATTERN = /AuthenticationFailed|Signed expiry time/i; // SAS token expired
 
 const HEADERS = {
-  'User-Agent':      'Mozilla/5.0 (compatible; IsraeliPriceBot/1.0; +https://github.com/Ezbyname/family-shopping)',
+  // Browser UA required — Shufersal silently blocks bot User-Agent strings.
+  // Verified 2026-05-24: bot UA returns empty/403; browser UA returns full index.
+  'User-Agent':      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
   'Accept':          'application/xml, text/xml, application/gzip, text/html, */*',
   'Accept-Language': 'he-IL,he;q=0.9,en;q=0.8',
-  'Accept-Encoding': 'gzip, deflate',
+  'Referer':         'https://prices.shufersal.co.il/',
 };
 
 // ── RETRY WRAPPER ──
@@ -214,4 +216,76 @@ export async function fetchAndDownloadLatest(chain, label, timeoutMs = DEFAULT_T
 
 function redactSasToken(url) {
   return url.replace(/\?.*$/i, '?[SAS-TOKEN-REDACTED]');
+}
+
+// ── MULTI-STORE: EXTRACT STORE ID FROM AZURE BLOB FILENAME ────────────────
+// Price7290027600007-001-034-20260522-020000.gz  →  '034'
+function extractStoreIdFromUrl(url) {
+  const pathname = url.split('?')[0]; // strip SAS token query string
+  const m = pathname.match(/\/Price\d+-\d+-(\d+)-\d{8}/);
+  return m ? m[1] : null;
+}
+
+// ── MULTI-STORE: RESOLVE ALL PER-STORE PRICE URLs FROM PAGINATED INDEX ─────
+// Used by multiStore chains (Shufersal) where each store has its own Price*.gz.
+// Returns Map<storeId, signedUrl> — newest file per store (page 1 = most recent).
+export async function resolveAllPriceUrls(chain, maxStores = 50, maxPages = 10) {
+  const priceByStore = new Map(); // storeId → price file url
+  const storeByStore = new Map(); // storeId → stores metadata file url
+
+  const azurePriceRe = /href=["'](https?:\/\/[^"']*\.blob\.core\.windows\.net\/[^"']*\/Price[^"']*\.gz(?:\?[^"']*)?)["']/gi;
+  const azureStoreRe = /href=["'](https?:\/\/[^"']*\.blob\.core\.windows\.net\/[^"']*\/Stores[^"']*\.gz(?:\?[^"']*)?)["']/gi;
+  const decodeHtml   = (s) => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+
+  for (let page = 1; page <= maxPages && priceByStore.size < maxStores; page++) {
+    const pageUrl = chain.indexUrl.replace('PAGE', String(page));
+    try {
+      const res = await fetch(pageUrl, {
+        headers: HEADERS,
+        signal:  AbortSignal.timeout(INDEX_TIMEOUT_MS),
+        redirect: 'follow',
+      });
+      if (!res.ok) {
+        logger.warn(`[${chain.name}] index page ${page}: HTTP ${res.status}`);
+        break;
+      }
+      const body = await res.text();
+
+      let m, newPrice = 0, newStore = 0;
+
+      azurePriceRe.lastIndex = 0;
+      while ((m = azurePriceRe.exec(body))) {
+        const url     = decodeHtml(m[1]);
+        const storeId = extractStoreIdFromUrl(url);
+        if (storeId && !priceByStore.has(storeId) && priceByStore.size < maxStores) {
+          priceByStore.set(storeId, url);
+          newPrice++;
+        }
+      }
+
+      azureStoreRe.lastIndex = 0;
+      while ((m = azureStoreRe.exec(body))) {
+        const url     = decodeHtml(m[1]);
+        const storeId = extractStoreIdFromUrl(url);
+        if (storeId && !storeByStore.has(storeId)) {
+          storeByStore.set(storeId, url);
+          newStore++;
+        }
+      }
+
+      logger.info(`[${chain.name}] index page ${page}`, {
+        newPrice, newStore, totalStores: priceByStore.size, maxStores,
+      });
+      if (newPrice === 0 && newStore === 0) break; // no new data on this page
+    } catch (e) {
+      logger.warn(`[${chain.name}] index page ${page} failed`, { error: e.message });
+      break;
+    }
+  }
+
+  logger.info(`[${chain.name}] multi-store discovery complete`, {
+    priceStores: priceByStore.size,
+    storeMetaFiles: storeByStore.size,
+  });
+  return { priceByStore, storeByStore };
 }

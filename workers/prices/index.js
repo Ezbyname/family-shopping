@@ -19,15 +19,154 @@ import 'dotenv/config.js';
 import { loadConfig }                        from './config.js';
 import { checkIsraeliIP }                    from './check-ip.js';
 import { CHAINS }                            from './chains.js';
-import { resolveFileUrls, downloadToStream, fetchAndDownloadLatest } from './fetchPrices.js';
+import { resolveFileUrls, downloadToStream, fetchAndDownloadLatest,
+         resolveAllPriceUrls } from './fetchPrices.js';
 import { parseXMLStream }                    from './parseXml.js';
 import { safeKey }                           from './normalizeProduct.js';
 import { initFirebase, BatchWriter, getDB,
          getPriceLastSync, sendAlert }       from './firebaseWriter.js';
 import { logger }                            from './logger.js';
 
+// ── MULTI-STORE SYNC (Shufersal: one Price*.gz per store) ──────────────────
+async function syncChainMultiStore(chain, writer, config) {
+  const label = `[${chain.name}]`;
+  const result = {
+    chainId:      chain.id,
+    chainName:    chain.name,
+    count:        0,
+    storeCount:   0,
+    skipped:      0,
+    errors:       0,
+    failed:       false,
+    alreadySynced: false,
+    failReason:   null,
+  };
+
+  const maxStores = chain.maxStoresToSync || 5;
+  const maxPages  = chain.maxIndexPages   || 10;
+
+  logger.info(`${label} Multi-store sync starting`, {
+    chainId: chain.id, maxStores, maxPages, dryRun: config.dryRun,
+  });
+
+  // ── Resolve per-store price URLs from paginated index ──
+  let priceByStore, storeByStore;
+  try {
+    ({ priceByStore, storeByStore } = await resolveAllPriceUrls(chain, maxStores, maxPages));
+  } catch (e) {
+    result.failed    = true;
+    result.failReason = `Index discovery failed: ${e.message}`;
+    logger.fail(`${label} Index discovery failed`, { error: e.message });
+    return result;
+  }
+
+  if (priceByStore.size === 0) {
+    result.failed    = true;
+    result.failReason = 'No per-store price files found in index';
+    logger.fail(`${label} No store price files found`);
+    return result;
+  }
+
+  const db        = getDB();
+  const chainMeta = { chainId: chain.chainId, chainName: chain.name };
+  const storeIdsSynced = [];
+
+  // ── Sync each store's price file ──
+  for (const [storeId, url] of priceByStore) {
+    logger.info(`${label} Syncing store ${storeId}`, { url: url.split('?')[0] });
+    try {
+      const stream = await downloadToStream(
+        url,
+        `${chain.name}-${storeId}`,
+        config.worker.downloadTimeout,
+        config.worker.downloadRetries,
+      );
+
+      let storeNameSeen = '';
+      const { count, skipped, errors } = await parseXMLStream(
+        stream,
+        async (product) => {
+          if (!storeNameSeen && product.storeName) storeNameSeen = product.storeName;
+          const sid      = product.storeId || storeId;
+          const storeKey = safeKey(`${chain.id}_${sid}`);
+          await writer.queue(`prices/${product.barcode}/${storeKey}`, {
+            barcode:     product.barcode,
+            name:        product.name,
+            price:       product.price,
+            chainId:     chain.id,
+            chainName:   chain.name,
+            storeId:     sid,
+            storeName:   product.storeName || '',
+            unit:        product.unit      || '',
+            quantity:    product.quantity  || '',
+            brand:       product.brand     || '',
+            updatedAt:   product.updatedAt,
+            currency:    'ILS',
+            source:      'official',
+            syncedAt:    Date.now(),
+            lastUpdated: new Date().toISOString(),
+          });
+        },
+        null,
+        { ...chainMeta, storeId },
+      );
+      await writer.flush();
+
+      result.count   += count;
+      result.skipped += skipped;
+      result.errors  += errors;
+      storeIdsSynced.push(storeId);
+
+      // Write basic store metadata (no lat/lng from Price files — needs Stores files)
+      // Note: radius filtering requires lat/lng; this is a placeholder until Stores.gz available.
+      if (!config.dryRun) {
+        const storeKey = safeKey(`${chain.id}_${storeId}`);
+        await db.ref(`stores/${storeKey}`).update({
+          chainId:   chain.chainId,
+          chainName: chain.name,
+          storeId,
+          storeName: storeNameSeen || '',
+          updatedAt: new Date().toISOString(),
+        });
+        result.storeCount++;
+      }
+
+      logger.ok(`${label} Store ${storeId} done`, { items: count, skipped, errors });
+    } catch (e) {
+      logger.warn(`${label} Store ${storeId} failed`, { error: e.message });
+      result.errors++;
+    }
+  }
+
+  // ── Write sync status ──
+  const now = new Date();
+  try {
+    await writer.writeSyncStatus(chain.id, {
+      chainId:         chain.id,
+      chainName:       chain.name,
+      lastSyncDate:    now.toISOString().split('T')[0],
+      lastSuccessAt:   now.toISOString(),
+      itemsProcessed:  result.count,
+      storesProcessed: result.storeCount,
+      storeIds:        storeIdsSynced,
+      maxStoresToSync: maxStores,
+      errors:          result.errors,
+    });
+  } catch (_) {}
+
+  logger.ok(`${label} Multi-store sync complete`, {
+    items:   result.count,
+    stores:  storeIdsSynced.length,
+    errors:  result.errors,
+    dryRun:  config.dryRun,
+  });
+  return result;
+}
+
 // ── SYNC ONE CHAIN ──
 async function syncChain(chain, writer, config) {
+  // Route multi-store chains (Shufersal) to dedicated handler
+  if (chain.multiStore) return syncChainMultiStore(chain, writer, config);
   const label  = `[${chain.name}]`;
   const result = {
     chainId:      chain.id,
