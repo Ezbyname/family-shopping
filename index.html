@@ -1919,6 +1919,10 @@ const CHAIN_META = {
 };
 
 // ── NEARBY MODE ──────────────────────────────────────────────────────────────
+// Set to true once coordinate enrichment has populated stores/{key}.latitude/longitude.
+// Until then the UI shows a clear "unavailable" message and no API calls are made.
+const NEARBY_COORDS_READY = false;
+
 let _nearbyMode   = false;
 let _userLat      = null;
 let _userLng      = null;
@@ -1941,6 +1945,10 @@ function _syncNearbyUI() {
 }
 
 window.toggleNearbyMode = function() {
+  if (!NEARBY_COORDS_READY) {
+    toast('📍 סינון לפי מיקום יהיה זמין בקרוב — נתוני קואורדינטות סניפים בתהליך איסוף');
+    return;
+  }
   _nearbyMode = !_nearbyMode;
   _syncNearbyUI();
   if (_nearbyMode && !_userLat) requestLocation();
@@ -2302,10 +2310,15 @@ function _renderProductModal() {
       📍 סניפים קרובים · ${_nearbyRadius} ק"מ
     </div>
     <div id="pm-nearby" class="store-prices">
-      <div style="text-align:center;padding:14px;color:var(--muted);font-size:12px">
-        <div class="spin" style="width:18px;height:18px;border-width:2px;margin:0 auto 6px"></div>
-        טוען...
-      </div>
+      ${NEARBY_COORDS_READY
+        ? `<div style="text-align:center;padding:14px;color:var(--muted);font-size:12px">
+             <div class="spin" style="width:18px;height:18px;border-width:2px;margin:0 auto 6px"></div>
+             טוען...
+           </div>`
+        : `<div style="text-align:center;padding:14px 18px;color:var(--muted);font-size:12px;line-height:1.5">
+             📍 סינון לפי מיקום אינו זמין עדיין<br>
+             <span style="font-size:11px">קואורדינטות סניפים בתהליך איסוף — בקרוב</span>
+           </div>`}
     </div>` : '';
 
   document.getElementById('pm-body').innerHTML = `
@@ -2324,8 +2337,8 @@ function _renderProductModal() {
     ${_pmProducts.length > 1 ? `<div class="pm-swipe-hint">← החלק לניווט בין מוצרים →</div>` : ''}
   `;
 
-  // Async-populate the nearby section
-  if (_nearbyMode && product.barcode) {
+  // Async-populate the nearby section (skipped entirely until coordinate enrichment lands)
+  if (NEARBY_COORDS_READY && _nearbyMode && product.barcode) {
     if (!_userLat || !_userLng) {
       const el = document.getElementById('pm-nearby');
       if (el) el.innerHTML = `<div class="spr no-data" style="justify-content:center;font-size:12px">
