@@ -71,6 +71,12 @@ async function syncChainMultiStore(chain, writer, config) {
   const chainMeta = { chainId: chain.chainId, chainName: chain.name };
   const storeIdsSynced = [];
 
+  // ── Stats for validation report (collected in both dry-run and live mode) ──
+  const _perStore       = {}; // storeId → { count, sampleBarcode }
+  const _uniqueBarcodes = new Set();
+  let   _totalRows  = 0;
+  let   _invalidRows = 0;   // rows missing barcode | price | storeId
+
   // ── Sync each store's price file ──
   for (const [storeId, url] of priceByStore) {
     logger.info(`${label} Syncing store ${storeId}`, { url: url.split('?')[0] });
@@ -83,13 +89,15 @@ async function syncChainMultiStore(chain, writer, config) {
       );
 
       let storeNameSeen = '';
+      if (!_perStore[storeId]) _perStore[storeId] = { count: 0, sampleBarcode: null };
+
       const { count, skipped, errors } = await parseXMLStream(
         stream,
         async (product) => {
           if (!storeNameSeen && product.storeName) storeNameSeen = product.storeName;
           const sid      = product.storeId || storeId;
           const storeKey = safeKey(`${chain.id}_${sid}`);
-          await writer.queue(`prices/${product.barcode}/${storeKey}`, {
+          const row = {
             barcode:     product.barcode,
             name:        product.name,
             price:       product.price,
@@ -105,7 +113,15 @@ async function syncChainMultiStore(chain, writer, config) {
             source:      'official',
             syncedAt:    Date.now(),
             lastUpdated: new Date().toISOString(),
-          });
+          };
+          await writer.queue(`prices/${product.barcode}/${storeKey}`, row);
+
+          // ── Stat collection ──
+          _uniqueBarcodes.add(product.barcode);
+          _totalRows++;
+          _perStore[storeId].count++;
+          if (!_perStore[storeId].sampleBarcode) _perStore[storeId].sampleBarcode = product.barcode;
+          if (!row.barcode || !row.price || !row.storeId || row.source !== 'official') _invalidRows++;
         },
         null,
         { ...chainMeta, storeId },
@@ -138,7 +154,48 @@ async function syncChainMultiStore(chain, writer, config) {
     }
   }
 
-  // ── Write sync status ──
+  // ── Validation report (printed in both dry-run and live mode) ──────────────
+  logger.info(`${label} ── VALIDATION REPORT ──`);
+  for (const [sid, s] of Object.entries(_perStore)) {
+    logger.info(`${label}   store ${sid}: ${s.count} prices | sample barcode: ${s.sampleBarcode || 'NONE'}`);
+  }
+  logger.info(`${label}   Unique barcodes : ${_uniqueBarcodes.size}`);
+  logger.info(`${label}   Total price rows: ${_totalRows}`);
+  logger.info(`${label}   Invalid rows    : ${_invalidRows}`);
+
+  // ── Validation gate ──────────────────────────────────────────────────────────
+  // Real write is only safe when all criteria pass.
+  // In dry-run: failing here sets result.failed → exit code 1.
+  // In live mode: failing here aborts after prices are written but before
+  //   syncStatus is committed (next run will re-sync from scratch).
+  const _issues = [];
+  if (storeIdsSynced.length < 3)
+    _issues.push(`Only ${storeIdsSynced.length} store(s) synced (need >= 3)`);
+  if (_totalRows < 500)
+    _issues.push(`Only ${_totalRows} price rows total (need > 500)`);
+  if (_invalidRows > 0)
+    _issues.push(`${_invalidRows} row(s) missing barcode | price | storeId | source=official`);
+  const _emptyStoreIds = Object.keys(_perStore).filter(s => !s || s === '0');
+  if (_emptyStoreIds.length > 0)
+    _issues.push(`Empty/zero storeId detected: ${_emptyStoreIds.join(', ')}`);
+
+  if (_issues.length > 0) {
+    logger.fail(`${label} VALIDATION FAILED — ${config.dryRun ? 'do NOT proceed to real write' : 'aborting sync status write'}`, { issues: _issues });
+    result.failed    = true;
+    result.failReason = `Validation: ${_issues.join('; ')}`;
+    return result;
+  }
+
+  logger.ok(`${label} VALIDATION PASSED`, {
+    stores: storeIdsSynced.length, uniqueBarcodes: _uniqueBarcodes.size, totalRows: _totalRows,
+    dryRun: config.dryRun,
+  });
+  if (config.dryRun) {
+    logger.info(`${label} DRY-RUN COMPLETE — safe to proceed with real write`);
+    return result;
+  }
+
+  // ── Write sync status (only on live run after validation passes) ──
   const now = new Date();
   try {
     await writer.writeSyncStatus(chain.id, {
@@ -155,10 +212,9 @@ async function syncChainMultiStore(chain, writer, config) {
   } catch (_) {}
 
   logger.ok(`${label} Multi-store sync complete`, {
-    items:   result.count,
-    stores:  storeIdsSynced.length,
-    errors:  result.errors,
-    dryRun:  config.dryRun,
+    items:  result.count,
+    stores: storeIdsSynced.length,
+    errors: result.errors,
   });
   return result;
 }
