@@ -1,4 +1,18 @@
 // scripts/sync-prices.js — v2.0.0
+import { readFileSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+// Auto-load .env from the scripts/ directory (no dotenv package needed)
+try {
+  const __dir = dirname(fileURLToPath(import.meta.url));
+  const env = readFileSync(resolve(__dir, '.env'), 'utf8');
+  for (const line of env.split('\n')) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*"?([\s\S]*?)"?\s*$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/\\n/g, '\n');
+  }
+} catch (_) { /* .env optional — env vars may be set externally (PM2, shell) */ }
+
 import { initFirebase, BatchWriter, getDB } from './firebase.js';
 import { CHAINS } from './chains.js';
 import { parseXMLStream } from './xml-parser.js';
