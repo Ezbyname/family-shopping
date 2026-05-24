@@ -81,8 +81,10 @@ export function normalizeStore(raw, chainMeta = {}) {
   const hasCoords = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
 
   return {
-    chainId:   String(chainMeta.chainId   || raw.chainId   || '').trim(),
-    chainName: String(chainMeta.chainName || raw.chainName || '').trim(),
+    chainId:      String(chainMeta.chainId   || raw.chainId   || '').trim(),
+    chainName:    String(chainMeta.chainName || raw.chainName || '').trim(),
+    subChainId:   String(raw.subChainId   || '').trim(),
+    subChainName: String(raw.subChainName || '').trim(),
     storeId,
     storeName: String(raw.storeName || '').trim(),
     address:   String(raw.address   || '').trim(),

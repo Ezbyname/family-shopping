@@ -54,8 +54,8 @@ async function syncChainStores(chain, writer, config) {
   }
 
   if (storeByStore.size === 0) {
-    logger.warn(`${label} No Stores.gz files found in index (tried catID 0,1,2)`);
-    logger.warn(`${label} → stores/{key}.hasCoords will remain false → radius filter falls back to include-all`);
+    logger.warn(`${label} No Stores.gz files found in index (tried catID 5,0-4,6-9)`);
+    logger.warn(`${label} → stores/{key} not populated → city/radius filter has no store metadata`);
     result.failed    = true;
     result.failReason = 'No Stores.gz files found';
     return result;
@@ -96,19 +96,21 @@ async function syncChainStores(chain, writer, config) {
           if (!config.dryRun) {
             const storeKey = safeKey(`${chain.id}_${store.storeId}`);
             await writer.queue(`stores/${storeKey}`, {
-              chainId:   chain.chainId,
-              chainName: chain.name,
-              storeId:   store.storeId,
-              storeName: store.storeName,
-              address:   store.address,
-              city:      store.city,
-              zipCode:   store.zipCode,
-              latitude:  store.latitude,
-              longitude: store.longitude,
-              hasCoords: store.hasCoords,
-              active:    true,
-              updatedAt: new Date().toISOString(),
-              source:    'official',
+              chainId:      chain.chainId,
+              chainName:    chain.name,
+              subChainId:   store.subChainId   || '',
+              subChainName: store.subChainName || '',
+              storeId:      store.storeId,
+              storeName:    store.storeName,
+              address:      store.address,
+              city:         store.city,
+              zipCode:      store.zipCode,
+              latitude:     store.latitude,
+              longitude:    store.longitude,
+              hasCoords:    store.hasCoords,
+              active:       true,
+              updatedAt:    new Date().toISOString(),
+              source:       'official',
             });
           }
         },

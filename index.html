@@ -765,6 +765,42 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 .nb-row.best .nb-price{color:var(--green)}
 .nb-dist{font-size:10px;color:var(--muted);margin-top:1px}
 .nb-stale{font-size:9px;color:var(--red);margin-top:1px}
+
+/* ══ CITY FILTER ══ */
+.city-toggle-btn{background:var(--card);border:1.5px solid var(--border);border-radius:11px;
+  padding:0 11px;height:40px;font-size:13px;cursor:pointer;flex-shrink:0;
+  display:flex;align-items:center;gap:4px;font-family:'Heebo',sans-serif;
+  font-weight:700;color:var(--muted);transition:all .2s;}
+.city-toggle-btn.active{background:rgba(99,102,241,.15);border-color:#6366f1;color:#6366f1}
+.city-toggle-btn:active{opacity:.8}
+.city-filter-strip{display:none;flex-direction:row;align-items:center;gap:8px;
+  padding:8px 11px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.city-filter-strip.show{display:flex}
+.city-filter-input{flex:1;background:var(--card);border:1.5px solid var(--border);
+  border-radius:22px;padding:6px 12px;font-family:'Heebo',sans-serif;font-size:13px;
+  font-weight:700;color:var(--text);outline:none;transition:border-color .2s;min-width:0}
+.city-filter-input:focus{border-color:#6366f1}
+.city-filter-input::placeholder{color:var(--muted)}
+.city-filter-clear{background:none;border:none;color:var(--muted);font-size:16px;
+  cursor:pointer;padding:4px 6px;flex-shrink:0;line-height:1}
+.city-filter-clear:active{opacity:.6}
+/* City result cards */
+.city-sec-label{font-size:11px;font-weight:800;color:#6366f1;letter-spacing:.5px;
+  text-transform:uppercase;padding:10px 14px 4px;opacity:.9}
+.city-row{display:flex;align-items:center;gap:10px;padding:9px 14px;
+  border-radius:10px;background:var(--card);margin:0 0 5px}
+.city-row.best{background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25)}
+.city-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.city-info{flex:1;min-width:0}
+.city-trophy{font-size:10px;font-weight:800;color:#6366f1;margin-bottom:1px}
+.city-chain{font-size:12px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.city-store{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px}
+.city-right{text-align:left;flex-shrink:0}
+.city-price{font-size:15px;font-weight:900}
+.city-row.best .city-price{color:#6366f1}
+.city-meta{font-size:10px;color:var(--muted);margin-top:1px}
+.city-stale{font-size:9px;color:var(--red);margin-top:1px}
+
 .override-actions{display:flex;gap:6px;margin-top:6px}
 .override-btn{flex:1;background:var(--card2);border:1px solid var(--border);
   border-radius:8px;padding:6px;font-family:'Heebo',sans-serif;font-size:11px;
@@ -1383,7 +1419,16 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
         maxlength="60" onkeydown="if(event.key==='Enter')searchPrices()">
       <button class="nearby-toggle-btn" id="nearby-toggle-btn"
         onclick="toggleNearbyMode()" title="מצב סניפים קרובים">📍</button>
+      <button class="city-toggle-btn" id="city-toggle-btn"
+        onclick="toggleCityFilter()" title="סינון לפי עיר">🏙</button>
       <button class="price-search-btn" onclick="searchPrices()">🔍</button>
+    </div>
+    <div class="city-filter-strip" id="city-filter-strip">
+      <input class="city-filter-input" id="city-filter-input"
+        placeholder="הכנס עיר... (חיפה, תל אביב, באר שבע...)"
+        maxlength="60" oninput="_onCityInput(this.value)">
+      <button class="city-filter-clear" id="city-filter-clear"
+        onclick="clearCityFilter()" title="נקה עיר">✕</button>
     </div>
     <div class="nearby-strip" id="nearby-strip">
       <button class="nearby-loc-btn" id="nearby-loc-btn" onclick="requestLocation()">
@@ -1995,6 +2040,57 @@ async function _fetchNearby(barcode) {
   } catch (_) { return null; }
 }
 
+// ── CITY FILTER ──────────────────────────────────────────────────────────────
+let _cityFilterActive = false;
+let _cityFilterValue  = '';        // raw text the user typed
+let _cityDebounceTimer = null;
+
+function _syncCityUI() {
+  const btn   = document.getElementById('city-toggle-btn');
+  const strip = document.getElementById('city-filter-strip');
+  if (!btn || !strip) return;
+  const hasCity = _cityFilterActive && _cityFilterValue.trim().length >= 2;
+  btn.classList.toggle('active', _cityFilterActive);
+  strip.classList.toggle('show',  _cityFilterActive);
+}
+
+window.toggleCityFilter = function() {
+  _cityFilterActive = !_cityFilterActive;
+  _syncCityUI();
+  if (_cityFilterActive) {
+    setTimeout(() => document.getElementById('city-filter-input')?.focus(), 80);
+  } else {
+    _cityFilterValue = '';
+    const inp = document.getElementById('city-filter-input');
+    if (inp) inp.value = '';
+  }
+};
+
+window.clearCityFilter = function() {
+  _cityFilterValue = '';
+  _cityFilterActive = false;
+  const inp = document.getElementById('city-filter-input');
+  if (inp) inp.value = '';
+  _syncCityUI();
+};
+
+window._onCityInput = function(val) {
+  _cityFilterValue = val;
+  _syncCityUI();
+};
+
+/** Fetch /api/prices-by-city for the currently active city filter. */
+async function _fetchByCity(barcode) {
+  const city = _cityFilterValue.trim();
+  if (!barcode || city.length < 2) return null;
+  try {
+    const url = `/api/prices-by-city?barcode=${encodeURIComponent(barcode)}&city=${encodeURIComponent(city)}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (_) { return null; }
+}
+
 // Score how well a product name matches the search query
 function matchScore(name, query) {
   const n = (name || '').trim().toLowerCase();
@@ -2332,10 +2428,55 @@ function _renderProductModal() {
     <div class="pm-sec-label">מחירים לפי רשת</div>
     <div class="store-prices">${pricesHtml}</div>
     ${nearbySection}
+    ${(_cityFilterActive && _cityFilterValue.trim().length >= 2 && product.barcode) ? `
+      <div class="city-sec-label">🏙 סניפים ב${esc(_cityFilterValue.trim())}</div>
+      <div id="pm-city" style="padding:0 14px 4px">
+        <div style="text-align:center;padding:12px;color:var(--muted);font-size:12px">
+          <div class="spin" style="width:16px;height:16px;border-width:2px;margin:0 auto 4px"></div>
+          טוען...
+        </div>
+      </div>` : ''}
     <button class="pm-add-btn" onclick="_pmAddToList()">➕ הוסף לרשימה</button>
     <button class="pm-detail-btn" onclick="_pmShowDetail()">השוואה מפורטת ←</button>
     ${_pmProducts.length > 1 ? `<div class="pm-swipe-hint">← החלק לניווט בין מוצרים →</div>` : ''}
   `;
+
+  // Async-populate city filter section
+  if (_cityFilterActive && _cityFilterValue.trim().length >= 2 && product.barcode) {
+    _fetchByCity(product.barcode).then(data => {
+      const el = document.getElementById('pm-city');
+      if (!el) return;
+      if (!data || !data.results || !data.results.length) {
+        el.innerHTML = `<div style="text-align:center;padding:12px;color:var(--muted);font-size:12px">
+          אין מחירים זמינים בעיר שנבחרה</div>`;
+        return;
+      }
+      el.innerHTML = data.results.slice(0, 12).map((r, i) => {
+        const meta      = CHAIN_META[r.chainName] || { color: '#7d8590' };
+        const isBest    = i === 0;
+        const name      = r.storeName || `סניף ${r.storeId}`;
+        const subName   = r.subChainName && r.subChainName !== r.chainName ? r.subChainName : '';
+        const addrLine  = [subName, r.address].filter(Boolean).join(' · ');
+        const age       = r.syncedAt
+          ? Math.round((Date.now() - new Date(r.syncedAt).getTime()) / 3600000) + 'ש׳'
+          : '';
+        return `<div class="city-row${isBest ? ' best' : ''}">
+          <div class="city-dot" style="background:${meta.color}"></div>
+          <div class="city-info">
+            ${isBest ? `<div class="city-trophy">🏆 הכי זול בעיר</div>` : ''}
+            <div class="city-chain" style="color:${meta.color}">${esc(r.chainName)}</div>
+            <div class="city-store">${esc(name)}${r.city ? ' · ' + esc(r.city) : ''}</div>
+            ${addrLine ? `<div class="city-store" style="font-size:10px">${esc(addrLine)}</div>` : ''}
+          </div>
+          <div class="city-right">
+            <div class="city-price">₪${r.price.toFixed(2)}</div>
+            <div class="city-meta">סניף ${esc(String(r.storeId))}${age ? ' · ' + age : ''}</div>
+            ${r.isStale ? `<div class="city-stale">⚠ ישן</div>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+    });
+  }
 
   // Async-populate the nearby section (skipped entirely until coordinate enrichment lands)
   if (NEARBY_COORDS_READY && _nearbyMode && product.barcode) {
