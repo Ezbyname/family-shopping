@@ -251,6 +251,14 @@ git push origin main
 - **Deployment**: Node.js 20+, npm
 - **Testing**: Minimal (config validation, cURL checks, Firebase connectivity)
 
+## VM Paths (Israeli Price-Worker VPS)
+- **User/home**: `/home/yahalom_assets/family-shopping/`
+- **Scripts .env**: `/home/yahalom_assets/family-shopping/scripts/.env`
+- **Worker .env**: `/home/yahalom_assets/family-shopping/workers/prices/.env`
+- **PM2 config**: `/home/yahalom_assets/family-shopping/ecosystem.config.cjs`
+- Both `.env` files contain the 4 `FIREBASE_*` credentials
+- `sync-prices.js` auto-loads `scripts/.env` on startup (no `--env-file` flag needed)
+
 ## Environment Variables
 **Worker (`workers/prices/.env`)**:
 ```
