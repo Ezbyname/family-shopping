@@ -238,9 +238,10 @@ export async function resolveStoreMetaUrls(chain, maxPages = 20) {
   const azureStoreRe = /href=["'](https?:\/\/[^"']*\.blob\.core\.windows\.net\/[^"']*\/Stores[^"']*\.gz(?:\?[^"']*)?)["']/gi;
   const decodeHtml   = (s) => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
 
-  // Try catID=0 (same bucket as prices), then catID=1, 2 as fallback.
+  // catID=5 is where Shufersal publishes Stores*.gz (confirmed 2026-05-24).
+  // Try catID=5 first, then fall back through the rest in case it changes.
   // Stop as soon as any catID yields at least one store file.
-  for (const catId of ['0', '1', '2']) {
+  for (const catId of ['5', '0', '1', '2', '3', '4', '6', '7', '8', '9']) {
     if (storeByStore.size > 0) break;
 
     for (let page = 1; page <= maxPages; page++) {
@@ -265,8 +266,11 @@ export async function resolveStoreMetaUrls(chain, maxPages = 20) {
         azureStoreRe.lastIndex = 0;
         while ((m = azureStoreRe.exec(body))) {
           const url     = decodeHtml(m[1]);
-          const storeId = extractStoreIdFromUrl(url);
-          if (storeId && !storeByStore.has(storeId)) {
+          // Chain-wide Stores file (e.g. Stores7290027600007-000-202605240201.gz) has a
+          // 12-digit datetime, not 8-digit date — extractStoreIdFromUrl returns null for it.
+          // Use 'full' as the key so the file isn't silently dropped.
+          const storeId = extractStoreIdFromUrl(url) || 'full';
+          if (!storeByStore.has(storeId)) {
             storeByStore.set(storeId, url);
             newStore++;
           }
