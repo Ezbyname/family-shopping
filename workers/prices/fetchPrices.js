@@ -220,10 +220,74 @@ function redactSasToken(url) {
 
 // ── MULTI-STORE: EXTRACT STORE ID FROM AZURE BLOB FILENAME ────────────────
 // Price7290027600007-001-034-20260522-020000.gz  →  '034'
+// Stores7290027600007-001-034-20260522-020000.gz →  '034'
 function extractStoreIdFromUrl(url) {
   const pathname = url.split('?')[0]; // strip SAS token query string
-  const m = pathname.match(/\/Price\d+-\d+-(\d+)-\d{8}/);
+  // Matches both Price*.gz and Stores*.gz Azure Blob filenames
+  const m = pathname.match(/\/(?:Price|Stores)\d+-\d+-(\d+)-\d{8}/i);
   return m ? m[1] : null;
+}
+
+// ── MULTI-STORE: RESOLVE STORES.GZ METADATA FILES FROM PAGINATED INDEX ───────
+// SEPARATE from price discovery — scans ALL pages without stopping when price
+// files are found. Tries catID=0 first, then catID=1,2 as fallback (Shufersal
+// may publish Stores files under a different category than prices).
+// Returns Map<storeId, signedUrl>
+export async function resolveStoreMetaUrls(chain, maxPages = 20) {
+  const storeByStore = new Map();
+  const azureStoreRe = /href=["'](https?:\/\/[^"']*\.blob\.core\.windows\.net\/[^"']*\/Stores[^"']*\.gz(?:\?[^"']*)?)["']/gi;
+  const decodeHtml   = (s) => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+
+  // Try catID=0 (same bucket as prices), then catID=1, 2 as fallback.
+  // Stop as soon as any catID yields at least one store file.
+  for (const catId of ['0', '1', '2']) {
+    if (storeByStore.size > 0) break;
+
+    for (let page = 1; page <= maxPages; page++) {
+      // Replace PAGE token AND catID (allows trying alternate categories)
+      const pageUrl = chain.indexUrl
+        .replace('PAGE', String(page))
+        .replace(/catID=\d+/, `catID=${catId}`);
+
+      try {
+        const res = await fetch(pageUrl, {
+          headers:  HEADERS,
+          signal:   AbortSignal.timeout(INDEX_TIMEOUT_MS),
+          redirect: 'follow',
+        });
+        if (!res.ok) {
+          logger.warn(`[${chain.name}] stores catID=${catId} page ${page}: HTTP ${res.status}`);
+          break;
+        }
+        const body = await res.text();
+
+        let m, newStore = 0;
+        azureStoreRe.lastIndex = 0;
+        while ((m = azureStoreRe.exec(body))) {
+          const url     = decodeHtml(m[1]);
+          const storeId = extractStoreIdFromUrl(url);
+          if (storeId && !storeByStore.has(storeId)) {
+            storeByStore.set(storeId, url);
+            newStore++;
+          }
+        }
+
+        logger.info(`[${chain.name}] stores catID=${catId} page ${page}`, {
+          newStore, totalFound: storeByStore.size,
+        });
+
+        // Stop scanning this catID when a page returns nothing new
+        // (skip this rule on page 1 — stores may start on page 2+)
+        if (newStore === 0 && page > 1) break;
+      } catch (e) {
+        logger.warn(`[${chain.name}] stores catID=${catId} page ${page} failed`, { error: e.message });
+        break;
+      }
+    }
+  }
+
+  logger.info(`[${chain.name}] store meta discovery complete`, { storeFiles: storeByStore.size });
+  return storeByStore;
 }
 
 // ── MULTI-STORE: RESOLVE ALL PER-STORE PRICE URLs FROM PAGINATED INDEX ─────

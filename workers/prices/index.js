@@ -20,12 +20,143 @@ import { loadConfig }                        from './config.js';
 import { checkIsraeliIP }                    from './check-ip.js';
 import { CHAINS }                            from './chains.js';
 import { resolveFileUrls, downloadToStream, fetchAndDownloadLatest,
-         resolveAllPriceUrls } from './fetchPrices.js';
+         resolveAllPriceUrls, resolveStoreMetaUrls } from './fetchPrices.js';
 import { parseXMLStream }                    from './parseXml.js';
 import { safeKey }                           from './normalizeProduct.js';
 import { initFirebase, BatchWriter, getDB,
          getPriceLastSync, sendAlert }       from './firebaseWriter.js';
 import { logger }                            from './logger.js';
+
+// ── STORE METADATA SYNC ──────────────────────────────────────────────────────
+// Downloads Stores.gz files, parses lat/lng + address, writes to
+// Firebase stores/{chainId}_{storeId}.  Non-blocking: failure here does NOT
+// abort the price sync — it just means radius filtering will fall back to
+// include-all until the next run that finds store files.
+//
+// Usage:
+//   node index.js shufersal --stores-only    (DRY_RUN or live)
+//   Called automatically after a successful price sync.
+async function syncChainStores(chain, writer, config) {
+  const label  = `[${chain.name}] [stores]`;
+  const result = { count: 0, withCoords: 0, withoutCoords: 0, failed: false, failReason: null };
+
+  logger.info(`${label} Starting store metadata sync`, { dryRun: config.dryRun });
+
+  // Step 1: Discover Stores.gz files in index (independent of price scan)
+  let storeByStore;
+  try {
+    storeByStore = await resolveStoreMetaUrls(chain);
+  } catch (e) {
+    result.failed = true;
+    result.failReason = `Store discovery failed: ${e.message}`;
+    logger.warn(`${label} Discovery failed`, { error: e.message });
+    return result;
+  }
+
+  if (storeByStore.size === 0) {
+    logger.warn(`${label} No Stores.gz files found in index (tried catID 0,1,2)`);
+    logger.warn(`${label} → stores/{key}.hasCoords will remain false → radius filter falls back to include-all`);
+    result.failed    = true;
+    result.failReason = 'No Stores.gz files found';
+    return result;
+  }
+
+  logger.info(`${label} Found ${storeByStore.size} store file(s) — downloading`);
+
+  const db = getDB();
+  const _report       = {};
+  let   _total        = 0;
+  let   _withCoords   = 0;
+  let   _withoutCoords = 0;
+
+  // Step 2: Download + parse each Stores.gz file
+  for (const [storeFileId, url] of storeByStore) {
+    try {
+      const stream = await downloadToStream(
+        url,
+        `${chain.name}-stores-${storeFileId}`,
+        config.worker.downloadTimeout,
+        config.worker.downloadRetries,
+      );
+
+      await parseXMLStream(
+        stream,
+        null, // no product callback — store-only parse
+        async (store) => {
+          _total++;
+          if (store.hasCoords) _withCoords++; else _withoutCoords++;
+          _report[store.storeId] = {
+            storeName: store.storeName,
+            city:      store.city,
+            hasCoords: store.hasCoords,
+            lat:       store.latitude,
+            lng:       store.longitude,
+          };
+
+          if (!config.dryRun) {
+            const storeKey = safeKey(`${chain.id}_${store.storeId}`);
+            await writer.queue(`stores/${storeKey}`, {
+              chainId:   chain.chainId,
+              chainName: chain.name,
+              storeId:   store.storeId,
+              storeName: store.storeName,
+              address:   store.address,
+              city:      store.city,
+              zipCode:   store.zipCode,
+              latitude:  store.latitude,
+              longitude: store.longitude,
+              hasCoords: store.hasCoords,
+              active:    true,
+              updatedAt: new Date().toISOString(),
+              source:    'official',
+            });
+          }
+        },
+        { chainId: chain.chainId, chainName: chain.name },
+      );
+      await writer.flush();
+      logger.ok(`${label} Parsed store file ${storeFileId}`, { entries: _total });
+    } catch (e) {
+      logger.warn(`${label} Store file ${storeFileId} failed`, { error: e.message });
+    }
+  }
+
+  // Step 3: Validation report
+  logger.info(`${label} ── STORE VALIDATION REPORT ──`);
+  logger.info(`${label}   Total stores found  : ${_total}`);
+  logger.info(`${label}   With coordinates    : ${_withCoords}`);
+  logger.info(`${label}   Without coordinates : ${_withoutCoords}`);
+  const sample = Object.entries(_report).slice(0, 8);
+  for (const [sid, s] of sample) {
+    const coord = s.hasCoords ? `${s.lat?.toFixed(4)}, ${s.lng?.toFixed(4)}` : 'NO COORDS';
+    logger.info(`${label}   store ${sid}: ${s.storeName} (${s.city}) [${coord}]`);
+  }
+
+  // Step 4: Gate — warn but don't fail on missing coords
+  if (_total === 0) {
+    logger.warn(`${label} No stores parsed`);
+    result.failed    = true;
+    result.failReason = 'Parsed 0 stores from files';
+    return result;
+  }
+  if (_withCoords === 0) {
+    logger.warn(`${label} ⚠ No stores have lat/lng — nearby filtering will show all results until coords arrive`);
+  } else {
+    logger.ok(`${label} STORE VALIDATION PASSED`, {
+      total: _total, withCoords: _withCoords, withoutCoords: _withoutCoords,
+    });
+  }
+
+  if (config.dryRun) {
+    logger.info(`${label} DRY-RUN COMPLETE — store data NOT written to Firebase`);
+    return result;
+  }
+
+  result.count        = _total;
+  result.withCoords   = _withCoords;
+  result.withoutCoords = _withoutCoords;
+  return result;
+}
 
 // ── MULTI-STORE SYNC (Shufersal: one Price*.gz per store) ──────────────────
 async function syncChainMultiStore(chain, writer, config) {
@@ -193,6 +324,20 @@ async function syncChainMultiStore(chain, writer, config) {
   if (config.dryRun) {
     logger.info(`${label} DRY-RUN COMPLETE — safe to proceed with real write`);
     return result;
+  }
+
+  // ── Sync store metadata (non-blocking — failure does NOT abort price sync) ──
+  if (!config.storesOnly) {
+    try {
+      const storeRes = await syncChainStores(chain, writer, config);
+      if (!storeRes.failed) {
+        logger.ok(`${label} Store metadata synced`, {
+          total: storeRes.count, withCoords: storeRes.withCoords,
+        });
+      }
+    } catch (e) {
+      logger.warn(`${label} Store sync threw (non-blocking)`, { error: e.message });
+    }
   }
 
   // ── Write sync status (only on live run after validation passes) ──
@@ -389,7 +534,8 @@ async function main() {
   }
 
   // ── Step D: Select chains ──
-  const chainArg = process.argv[2];
+  const chainArg   = process.argv.slice(2).find(a => !a.startsWith('--'));
+  const storesOnly = process.argv.includes('--stores-only');
   let chains = CHAINS.filter(c => c.enabled);
 
   if (chainArg) {
@@ -399,6 +545,10 @@ async function main() {
         { available: CHAINS.map(c => c.id).join(', ') });
       process.exit(2);
     }
+  }
+
+  if (storesOnly) {
+    logger.info('--stores-only mode: skipping price sync, running store metadata only');
   }
 
   if (config.worker.enabledChains.length > 0) {
@@ -424,13 +574,24 @@ async function main() {
     dryRun:    config.dryRun,
   });
 
+  // Attach storesOnly flag to config so syncChain* functions can read it
+  config.storesOnly = storesOnly;
+
   // ── Step E: Sync chains (sequential) ──
   const results = [];
   let firebaseWriteError = false;
 
   for (const chain of chains) {
     try {
-      const result = await syncChain(chain, writer, config);
+      let result;
+      if (storesOnly) {
+        // --stores-only: skip price sync, run store metadata only
+        result = await syncChainStores(chain, writer, config);
+        result = { chainId: chain.id, chainName: chain.name, count: result.count || 0,
+                   failed: result.failed, failReason: result.failReason };
+      } else {
+        result = await syncChain(chain, writer, config);
+      }
       results.push(result);
     } catch (err) {
       if (err.exitCode === 4) {

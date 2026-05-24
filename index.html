@@ -730,6 +730,41 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   border-radius:10px;padding:8px 11px;margin-top:6px;font-size:11px;color:var(--red)}
 .community-warning strong{font-weight:700}
 .spr-official-struck{text-decoration:line-through;opacity:.5;font-size:11px;margin-right:4px}
+
+/* ══ NEARBY MODE ══ */
+.nearby-toggle-btn{background:var(--card);border:1.5px solid var(--border);border-radius:11px;
+  padding:0 11px;height:40px;font-size:14px;cursor:pointer;flex-shrink:0;
+  display:flex;align-items:center;gap:4px;font-family:'Heebo',sans-serif;
+  font-size:12px;font-weight:700;color:var(--muted);transition:all .2s;}
+.nearby-toggle-btn.active{background:var(--green-dim);border-color:var(--green);color:var(--green)}
+.nearby-toggle-btn:active{opacity:.8}
+.nearby-strip{display:none;flex-direction:row;align-items:center;gap:8px;
+  padding:8px 11px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.nearby-strip.show{display:flex}
+.nearby-loc-btn{background:var(--card);border:1.5px solid var(--border);border-radius:22px;
+  padding:6px 11px;font-family:'Heebo',sans-serif;font-size:12px;font-weight:700;
+  color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:5px;
+  flex-shrink:0;white-space:nowrap;transition:all .2s;}
+.nearby-loc-btn.has-loc{border-color:var(--green);color:var(--green);background:var(--green-dim)}
+.radius-seg{display:flex;background:var(--card);border-radius:20px;padding:2px;flex:1}
+.radius-seg-btn{flex:1;border:none;background:transparent;color:var(--muted);
+  border-radius:18px;padding:5px 2px;font-family:'Heebo',sans-serif;font-size:11px;
+  font-weight:700;cursor:pointer;transition:all .15s;white-space:nowrap}
+.radius-seg-btn.active{background:var(--accent);color:#111}
+/* nearby rows inside product modal */
+.nb-row{display:flex;align-items:center;gap:10px;background:var(--card2);
+  border-radius:10px;padding:9px 11px;margin-bottom:4px}
+.nb-row.best{background:var(--green-dim);border:1px solid rgba(52,211,153,.2)}
+.nb-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.nb-info{flex:1;min-width:0}
+.nb-chain{font-size:11px;font-weight:800}
+.nb-store{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nb-trophy{font-size:9px;font-weight:700;color:var(--green);margin-bottom:1px}
+.nb-right{text-align:left;flex-shrink:0}
+.nb-price{font-size:15px;font-weight:900}
+.nb-row.best .nb-price{color:var(--green)}
+.nb-dist{font-size:10px;color:var(--muted);margin-top:1px}
+.nb-stale{font-size:9px;color:var(--red);margin-top:1px}
 .override-actions{display:flex;gap:6px;margin-top:6px}
 .override-btn{flex:1;background:var(--card2);border:1px solid var(--border);
   border-radius:8px;padding:6px;font-family:'Heebo',sans-serif;font-size:11px;
@@ -1346,7 +1381,21 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
     <div class="price-search-bar">
       <input class="price-search-input" id="price-search-input" placeholder="חפש מוצר... (קורנפלקס, חלב...)"
         maxlength="60" onkeydown="if(event.key==='Enter')searchPrices()">
+      <button class="nearby-toggle-btn" id="nearby-toggle-btn"
+        onclick="toggleNearbyMode()" title="מצב סניפים קרובים">📍</button>
       <button class="price-search-btn" onclick="searchPrices()">🔍</button>
+    </div>
+    <div class="nearby-strip" id="nearby-strip">
+      <button class="nearby-loc-btn" id="nearby-loc-btn" onclick="requestLocation()">
+        <span id="nearby-loc-icon">📍</span>
+        <span id="nearby-loc-text">מצא מיקום</span>
+      </button>
+      <div class="radius-seg" id="radius-seg">
+        <button class="radius-seg-btn" onclick="setNearbyRadius(1)">1</button>
+        <button class="radius-seg-btn active" onclick="setNearbyRadius(3)">3</button>
+        <button class="radius-seg-btn" onclick="setNearbyRadius(5)">5</button>
+        <button class="radius-seg-btn" onclick="setNearbyRadius(10)">10 ק"מ</button>
+      </div>
     </div>
     <div class="price-toolbar" id="price-tools" style="display:none"></div>
     <div class="sr-filter-row" id="sr-filter-row" style="display:none">
@@ -1869,6 +1918,75 @@ const CHAIN_META = {
   'מחסני להב':  { color: '#f59e0b', bg: '#1c1007' },
 };
 
+// ── NEARBY MODE ──────────────────────────────────────────────────────────────
+let _nearbyMode   = false;
+let _userLat      = null;
+let _userLng      = null;
+let _nearbyRadius = 3; // default 3 km, persisted in localStorage
+
+(function _initNearbyState() {
+  const r = parseInt(localStorage.getItem('nearbyRadius') || '3', 10);
+  if ([1,3,5,10].includes(r)) _nearbyRadius = r;
+})();
+
+function _syncNearbyUI() {
+  const btn   = document.getElementById('nearby-toggle-btn');
+  const strip = document.getElementById('nearby-strip');
+  if (!btn || !strip) return;
+  btn.classList.toggle('active', _nearbyMode);
+  strip.classList.toggle('show', _nearbyMode);
+  document.querySelectorAll('#radius-seg .radius-seg-btn').forEach((b, i) => {
+    b.classList.toggle('active', [1,3,5,10][i] === _nearbyRadius);
+  });
+}
+
+window.toggleNearbyMode = function() {
+  _nearbyMode = !_nearbyMode;
+  _syncNearbyUI();
+  if (_nearbyMode && !_userLat) requestLocation();
+};
+
+window.setNearbyRadius = function(km) {
+  _nearbyRadius = km;
+  localStorage.setItem('nearbyRadius', String(km));
+  _syncNearbyUI();
+};
+
+window.requestLocation = async function() {
+  const locBtn  = document.getElementById('nearby-loc-btn');
+  const locText = document.getElementById('nearby-loc-text');
+  const locIcon = document.getElementById('nearby-loc-icon');
+  if (!navigator.geolocation) { toast('⚠️ GPS לא נתמך בדפדפן זה'); return; }
+  if (locText) locText.textContent = 'מאתר...';
+  if (locIcon) locIcon.textContent = '⏳';
+  try {
+    const pos = await new Promise((resolve, reject) =>
+      navigator.geolocation.getCurrentPosition(resolve, reject,
+        { timeout: 8000, maximumAge: 60000, enableHighAccuracy: false })
+    );
+    _userLat = pos.coords.latitude;
+    _userLng = pos.coords.longitude;
+    if (locBtn) locBtn.classList.add('has-loc');
+    if (locText) locText.textContent = `${_userLat.toFixed(3)}, ${_userLng.toFixed(3)}`;
+    if (locIcon) locIcon.textContent = '✅';
+    toast('📍 מיקום נמצא!');
+  } catch (e) {
+    if (locText) locText.textContent = 'מצא מיקום';
+    if (locIcon) locIcon.textContent = '📍';
+    toast('⚠️ לא ניתן לקבל מיקום — בדוק הרשאות GPS');
+  }
+};
+
+async function _fetchNearby(barcode) {
+  if (!barcode || !_userLat || !_userLng) return null;
+  try {
+    const url = `/api/nearby?barcode=${encodeURIComponent(barcode)}&lat=${_userLat}&lng=${_userLng}&radiusKm=${_nearbyRadius}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (_) { return null; }
+}
+
 // Score how well a product name matches the search query
 function matchScore(name, query) {
   const n = (name || '').trim().toLowerCase();
@@ -2179,6 +2297,17 @@ function _renderProductModal() {
       }).join('')
     : `<div class="spr no-data" style="justify-content:center;font-size:12px">אין מחירים רשמיים</div>`;
 
+  const nearbySection = (_nearbyMode && product.barcode) ? `
+    <div class="pm-sec-label" style="margin-top:14px">
+      📍 סניפים קרובים · ${_nearbyRadius} ק"מ
+    </div>
+    <div id="pm-nearby" class="store-prices">
+      <div style="text-align:center;padding:14px;color:var(--muted);font-size:12px">
+        <div class="spin" style="width:18px;height:18px;border-width:2px;margin:0 auto 6px"></div>
+        טוען...
+      </div>
+    </div>` : '';
+
   document.getElementById('pm-body').innerHTML = `
     <div class="pm-img-row">
       ${product.image
@@ -2189,10 +2318,51 @@ function _renderProductModal() {
     <div class="pm-sub">${[product.brand, product.size].filter(Boolean).map(esc).join(' · ')}</div>
     <div class="pm-sec-label">מחירים לפי רשת</div>
     <div class="store-prices">${pricesHtml}</div>
+    ${nearbySection}
     <button class="pm-add-btn" onclick="_pmAddToList()">➕ הוסף לרשימה</button>
     <button class="pm-detail-btn" onclick="_pmShowDetail()">השוואה מפורטת ←</button>
     ${_pmProducts.length > 1 ? `<div class="pm-swipe-hint">← החלק לניווט בין מוצרים →</div>` : ''}
   `;
+
+  // Async-populate the nearby section
+  if (_nearbyMode && product.barcode) {
+    if (!_userLat || !_userLng) {
+      const el = document.getElementById('pm-nearby');
+      if (el) el.innerHTML = `<div class="spr no-data" style="justify-content:center;font-size:12px">
+        יש לאפשר מיקום לסינון קרוב 📍</div>`;
+    } else {
+      _fetchNearby(product.barcode).then(data => {
+        const el = document.getElementById('pm-nearby');
+        if (!el) return;
+        if (!data || !data.results || !data.results.length) {
+          el.innerHTML = `<div class="spr no-data" style="justify-content:center;font-size:12px">
+            אין סניפים עם מחיר בטווח ${_nearbyRadius} ק"מ</div>`;
+          return;
+        }
+        el.innerHTML = data.results.slice(0, 10).map((r, i) => {
+          const meta   = CHAIN_META[r.chainName] || { color: '#7d8590' };
+          const isBest = i === 0;
+          const name   = r.storeName || `סניף ${r.storeId}`;
+          const age    = r.syncedAt
+            ? Math.round((Date.now() - new Date(r.syncedAt).getTime()) / 3600000) + 'ש׳'
+            : '';
+          return `<div class="nb-row${isBest ? ' best' : ''}">
+            <div class="nb-dot" style="background:${meta.color}"></div>
+            <div class="nb-info">
+              ${isBest ? `<div class="nb-trophy">🏆 הכי זול קרוב</div>` : ''}
+              <div class="nb-chain" style="color:${meta.color}">${esc(r.chainName)}</div>
+              <div class="nb-store">${esc(name)}${r.city ? ' · ' + esc(r.city) : ''}</div>
+            </div>
+            <div class="nb-right">
+              <div class="nb-price">₪${r.price.toFixed(2)}</div>
+              <div class="nb-dist">${r.distanceKm} ק"מ${age ? ' · ' + age : ''}</div>
+              ${r.isStale ? `<div class="nb-stale">⚠ ישן</div>` : ''}
+            </div>
+          </div>`;
+        }).join('');
+      });
+    }
+  }
 }
 
 window._pmAddToList = function() {
