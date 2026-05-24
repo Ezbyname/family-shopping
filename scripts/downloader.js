@@ -93,7 +93,7 @@ export async function resolveAllPriceUrls(chain, maxStores = 50, maxPages = 10) 
       while ((m = azurePriceRe.exec(body))) {
         const url = decodeHtml(m[1]);
         const storeId = extractStoreIdFromUrl(url);
-        if (storeId && !priceByStore.has(storeId)) { priceByStore.set(storeId, url); newPrice++; }
+        if (storeId && !priceByStore.has(storeId) && priceByStore.size < maxStores) { priceByStore.set(storeId, url); newPrice++; }
       }
       azureStoreRe.lastIndex = 0;
       while ((m = azureStoreRe.exec(body))) {
@@ -122,7 +122,8 @@ const makeAbs = (url, chain) => {
 };
 
 export async function downloadToStream(url, label) {
-  const isGz = /\.gz$/i.test(url);
+  // Strip query string before checking extension — SAS token URLs end with ?sv=... not .gz
+  const isGz = /\.gz$/i.test(url.split('?')[0]);
   const tmp = join(tmpdir(), `sync-${Date.now()}-${Math.random().toString(36).slice(2)}.xml${isGz ? '.gz' : ''}`);
 
   await withRetry(async () => {
