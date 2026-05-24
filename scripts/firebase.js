@@ -1,55 +1,81 @@
-// api/_firebase.js — v3.0.0
-// Shared Firebase Admin — lazy init, no top-level imports, no secrets in logs
+// scripts/firebase.js — v3.0.0
+// Firebase Admin for the price-sync worker (sync init + BatchWriter)
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getDatabase }                   from 'firebase-admin/database';
+import { logger, safeKey }               from './utils.js';
 
 let _db = null;
 
-export async function getDB() {
-  if (_db) return _db;
-  const sa  = process.env.FIREBASE_SERVICE_ACCOUNT;
+/** Call once at startup — throws if credentials are missing or malformed. */
+export function initFirebase() {
+  if (_db) return;
+
   const url = process.env.FIREBASE_DATABASE_URL;
-  if (!sa || !url) {
-    console.warn('[firebase] env vars missing — Firebase disabled');
-    return null;
-  }
-  try {
-    const { initializeApp, cert, getApps } = await import('firebase-admin/app');
-    const { getDatabase }                  = await import('firebase-admin/database');
-    if (!getApps().length) {
-      initializeApp({ credential: cert(JSON.parse(sa)), databaseURL: url });
+  if (!url) throw new Error('FIREBASE_DATABASE_URL not set');
+
+  let credential;
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    // Single JSON blob (workers/prices style)
+    credential = cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT));
+  } else {
+    // Individual env vars (scripts/.env style)
+    const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+    if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !privateKey) {
+      throw new Error(
+        'Firebase credentials missing. Need FIREBASE_SERVICE_ACCOUNT (JSON blob) ' +
+        'or all three of FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY'
+      );
     }
-    _db = getDatabase();
-    console.log('[firebase] initialized OK');
-    return _db;
-  } catch (e) {
-    console.error('[firebase] init error:', e.message);
-    return null;
+    credential = cert({
+      projectId:   process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey,
+    });
   }
+
+  if (!getApps().length) {
+    initializeApp({ credential, databaseURL: url });
+  }
+  _db = getDatabase();
+  logger.info('[firebase] initialized');
 }
 
-export function haversine(lat1, lng1, lat2, lng2) {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat/2)**2 +
-    Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+/** Synchronous — must call initFirebase() first. */
+export function getDB() {
+  if (!_db) throw new Error('Firebase not initialized — call initFirebase() first');
+  return _db;
 }
 
-export function setCors(res) {
-  res.setHeader('Access-Control-Allow-Origin',  '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-}
+// ── BatchWriter ────────────────────────────────────────────────────────────────
+// Accumulates writes and flushes as multi-path updates (max 400 per batch,
+// well below Firebase's 500-node limit).
 
-// Validation helpers — shared across all API routes
-export function isValidBarcode(b) {
-  const s = String(b || '').replace(/\D/g, '');
-  return s.length >= 4 && s.length <= 20;
-}
-export function isValidPrice(p) {
-  const n = parseFloat(p);
-  return !isNaN(n) && n > 0 && n < 10000;
-}
-export function sanitize(s, max = 200) {
-  return String(s || '').trim().replace(/[<>]/g, '').substring(0, max);
+const BATCH_MAX = 400;
+
+export class BatchWriter {
+  constructor(db, batchSize = BATCH_MAX) {
+    this._db    = db;
+    this._max   = batchSize;
+    this._queue = {};
+  }
+
+  async queue(path, data) {
+    this._queue[path] = data;
+    if (Object.keys(this._queue).length >= this._max) await this.flush();
+  }
+
+  async flush() {
+    const keys = Object.keys(this._queue);
+    if (!keys.length) return;
+    await this._db.ref('/').update(this._queue);
+    this._queue = {};
+  }
+
+  async writeSyncStatus(chainId, data) {
+    await this._db.ref(`syncStatus/${safeKey(chainId)}`).update(data);
+  }
+
+  async writeSyncSummary(data) {
+    await this._db.ref('syncSummary').update(data);
+  }
 }
