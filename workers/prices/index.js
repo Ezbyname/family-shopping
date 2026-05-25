@@ -211,7 +211,11 @@ async function syncChainMultiStore(chain, writer, config) {
   let   _invalidRows = 0;   // rows missing barcode | price | storeId
 
   // ── Sync each store's price file ──
-  for (const [storeId, url] of priceByStore) {
+  for (const [rawStoreId, url] of priceByStore) {
+    // Strip leading zeros so price keys match the stores sync key format.
+    // Filename gives "034"; XML / stores sync gives "34" — normalise to "34".
+    const storeId = String(parseInt(rawStoreId, 10) || rawStoreId);
+
     logger.info(`${label} Syncing store ${storeId}`, { url: url.split('?')[0] });
     try {
       const stream = await downloadToStream(
@@ -228,7 +232,9 @@ async function syncChainMultiStore(chain, writer, config) {
         stream,
         async (product) => {
           if (!storeNameSeen && product.storeName) storeNameSeen = product.storeName;
-          const sid      = product.storeId || storeId;
+          // Also strip leading zeros from product.storeId if the XML provides one
+          const sidRaw   = product.storeId || storeId;
+          const sid      = String(parseInt(sidRaw, 10) || sidRaw);
           const storeKey = safeKey(`${chain.id}_${sid}`);
           const row = {
             barcode:     product.barcode,
@@ -266,8 +272,8 @@ async function syncChainMultiStore(chain, writer, config) {
       result.errors  += errors;
       storeIdsSynced.push(storeId);
 
-      // Write basic store metadata (no lat/lng from Price files — needs Stores files)
-      // Note: radius filtering requires lat/lng; this is a placeholder until Stores.gz available.
+      // Write basic store metadata placeholder (no lat/lng from Price files).
+      // storeId already has leading zeros stripped — matches the stores sync key.
       if (!config.dryRun) {
         const storeKey = safeKey(`${chain.id}_${storeId}`);
         await db.ref(`stores/${storeKey}`).update({

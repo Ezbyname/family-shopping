@@ -115,6 +115,41 @@ function cityMatches(storeCity, queryCity) {
   return normalizeCity(storeCity) === normalizeCity(queryCity);
 }
 
+/**
+ * Firebase has two key formats for the same physical store because two
+ * different processes write to stores/:
+ *
+ *   Price sync placeholder:  shufersal_001  (storeId from filename, with leading zeros)
+ *   Stores-only sync:        shufersal_1    (storeId from XML content, no leading zeros)
+ *
+ * The price entries use the leading-zero keys (shufersal_001).
+ * The full city/address records landed under the no-zero keys (shufersal_1).
+ *
+ * This function builds a lookup map indexed by the zero-STRIPPED key so that
+ *   findStore("shufersal_001")  →  the full record from shufersal_1.
+ *
+ * When two records share a stripped key, the record WITH city data wins (the
+ * stores-only sync record always has city; the price placeholder never does).
+ */
+function buildStoreLookup(storesData) {
+  const map = {};
+  for (const [k, v] of Object.entries(storesData)) {
+    // "shufersal_001" → "shufersal_1", "shufersal_034" → "shufersal_34"
+    const stripped = k.replace(/_0+(\d)/, '_$1');
+    const existing = map[stripped];
+    // City-bearing record beats a placeholder without city
+    if (!existing || (!existing.city && v.city)) {
+      map[stripped] = v;
+    }
+  }
+  return map;
+}
+
+/** Strip leading zeros from the numeric part of a store key for lookup. */
+function stripKeyZeros(storeKey) {
+  return storeKey.replace(/_0+(\d)/, '_$1');
+}
+
 // ── HANDLER ──────────────────────────────────────────────────────────────────
 
 const STALE_MS = 36 * 3600 * 1000;
@@ -163,12 +198,17 @@ export default async function handler(req, res) {
     const pricesData = pricesSnap.val() || {};
     const storesData = storesSnap.val() || {};
 
+    // Build a zero-normalised store lookup so that price keys like
+    // "shufersal_001" resolve to the full store record at "shufersal_1".
+    const storeLookup = buildStoreLookup(storesData);
+
     const results = [];
 
     for (const [storeKey, priceEntry] of Object.entries(pricesData)) {
       if (!priceEntry?.price || priceEntry.price <= 0) continue;
 
-      const store = storesData[storeKey];
+      // Try both the raw key and the zero-stripped key
+      const store = storeLookup[stripKeyZeros(storeKey)] || storesData[storeKey];
 
       // Require a known store record with city data
       if (!store?.city) continue;
