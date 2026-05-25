@@ -8,7 +8,9 @@
 <meta name="apple-mobile-web-app-title" content="קניות משפחה">
 <meta name="theme-color" content="#0d1117">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
+<!-- iOS home-screen icon (used when "Add to Home Screen") -->
+<link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-512.png">
 <title>קניות משפחה</title>
 <!-- App Version: 3.0.0 | Full feature build -->
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -27,6 +29,21 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);
 
 .screen{display:none;flex-direction:column;height:100%;overflow:hidden}
 .screen.active{display:flex}
+
+/* ── SPLASH SCREEN ──────────────────────────────────────────────────────── */
+#splash-overlay{
+  position:fixed;inset:0;z-index:9999;
+  background:#1b4a1b;          /* fallback — matches image green */
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+  transition:opacity .55s ease;
+}
+#splash-overlay img{
+  width:100%;height:100%;
+  object-fit:cover;
+  display:block;
+}
+#splash-overlay.fade-out{opacity:0}
 
 /* LOADING */
 #loading-screen{justify-content:center;align-items:center;gap:14px;
@@ -1321,6 +1338,11 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
 </head>
 <body>
 
+<!-- SPLASH SCREEN — visible 4 s then fades out -->
+<div id="splash-overlay" aria-hidden="true">
+  <img src="icon-512.png" alt="">
+</div>
+
 <!-- LOADING -->
 <div class="screen active" id="loading-screen">
   <div style="font-size:50px;animation:bob 2s ease infinite">🛒</div>
@@ -1638,6 +1660,21 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
 </div>
 
 <div class="toast" id="toast"></div>
+
+<script>
+// ── Splash screen: show for 4 s then fade out ──
+// Runs inline (no module delay) so the timer starts the instant HTML parses.
+(function() {
+  var el = document.getElementById('splash-overlay');
+  if (!el) return;
+  var DISPLAY_MS  = 4000;   // how long the splash is fully visible
+  var FADE_MS     = 550;    // must match CSS transition duration
+  setTimeout(function() {
+    el.classList.add('fade-out');
+    setTimeout(function() { el.remove(); }, FADE_MS);
+  }, DISPLAY_MS);
+})();
+</script>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
