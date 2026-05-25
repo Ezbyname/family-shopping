@@ -15,7 +15,10 @@
     "test:curl": "bash -c \"echo Testing Shufersal... && curl -s -o /dev/null -w \\\"HTTP %{http_code} from %{url_effective}\\n\\\" -L --max-time 10 https://prices.shufersal.co.il/ && echo Testing Rami Levy... && curl -s -o /dev/null -w \\\"HTTP %{http_code} from %{url_effective}\\n\\\" -L --max-time 10 https://url.retail.pe.il/MF/latest/ && echo Done.\"",
     "test": "node tests/run-tests.js",
     "sync:dry-run": "DRY_RUN=true node index.js",
-    "sync:dry-run:chain": "DRY_RUN=true node index.js"
+    "sync:dry-run:chain": "DRY_RUN=true node index.js",
+    "geocode:dry-run": "node workers/prices/geocode-stores.js --dry-run",
+    "geocode:stores": "GEOCODE_WRITE=true node workers/prices/geocode-stores.js",
+    "verify:stores": "node workers/prices/verify.js --stores"
   },
   "dependencies": {
     "firebase-admin": "^12.1.0",
