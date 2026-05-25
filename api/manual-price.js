@@ -1,9 +1,9 @@
 // api/manual-price.js — v2.0.0
 // POST /api/manual-price — manual price fallback (only when no official price exists)
-import { getDB, cors } from './_firebase.js';
+import { getDB, setCors } from './_firebase.js';
 
 export default async function handler(req, res) {
-  cors(res);
+  setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
