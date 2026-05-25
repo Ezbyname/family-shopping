@@ -36,7 +36,7 @@ module.exports = {
       max_memory_restart: '2G',
       autorestart: false,   // cron job — don't loop-restart on exit
       max_restarts: 3,
-      min_uptime: '30s',    // 50-store sync takes ~3.5 min; 30s gives enough runway before crash-flag
+      min_uptime: '60s',    // full 422-store sync takes ~50 min; 60s gives runway before crash-flag
     },
 
     // ─────────────────────────────────────────────────────────────────

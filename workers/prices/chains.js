@@ -25,7 +25,7 @@ export const CHAINS = [
     baseUrl:         'https://prices.shufersal.co.il',
     indexType:       'html',
     multiStore:      true,  // resolveAllPriceUrls() used instead of resolveFileUrls()
-    maxStoresToSync: 100,   // 50-store verified 2026-05-25 (218k rows, 3.48min); raise to 422 next
+    maxStoresToSync: 422,   // fully verified 2026-05-25: 100→456k rows in 12min; all 422 stores enabled
     maxIndexPages:   10,    // pages to scan for store discovery
   },
   {
