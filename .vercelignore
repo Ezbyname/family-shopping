@@ -1,0 +1,8 @@
+# Vercel ignore — keep the build context lean
+# The price-sync worker runs on an Israeli VPS, not on Vercel
+workers/
+scripts/
+
+# Local dev artifacts
+*.log
+.env
