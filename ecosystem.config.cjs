@@ -36,7 +36,7 @@ module.exports = {
       max_memory_restart: '2G',
       autorestart: false,   // cron job — don't loop-restart on exit
       max_restarts: 3,
-      min_uptime: '2s',     // worker exits in ~2s on success; '10s' falsely flags as unstable
+      min_uptime: '30s',    // 50-store sync takes ~3.5 min; 30s gives enough runway before crash-flag
     },
 
     // ─────────────────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ module.exports = {
       max_memory_restart: '2G',
       autorestart: false,
       max_restarts: 3,
-      min_uptime: '2s',     // sanity exits in ~2s on success; '10s' falsely flags as unstable
+      min_uptime: '30s',    // give enough runway before crash-flag fires
     },
   ],
 };
