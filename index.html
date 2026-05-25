@@ -766,25 +766,56 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 .nb-dist{font-size:10px;color:var(--muted);margin-top:1px}
 .nb-stale{font-size:9px;color:var(--red);margin-top:1px}
 
-/* ══ CITY FILTER ══ */
+/* ══ CITY FILTER — MULTI-CITY CHIP SELECTOR ══ */
 .city-toggle-btn{background:var(--card);border:1.5px solid var(--border);border-radius:11px;
   padding:0 11px;height:40px;font-size:13px;cursor:pointer;flex-shrink:0;
   display:flex;align-items:center;gap:4px;font-family:'Heebo',sans-serif;
   font-weight:700;color:var(--muted);transition:all .2s;}
 .city-toggle-btn.active{background:rgba(99,102,241,.15);border-color:#6366f1;color:#6366f1}
 .city-toggle-btn:active{opacity:.8}
-.city-filter-strip{display:none;flex-direction:row;align-items:center;gap:8px;
+/* Strip that holds chips + input */
+.city-filter-strip{display:none;flex-direction:row;align-items:center;gap:6px;
   padding:8px 11px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
 .city-filter-strip.show{display:flex}
-.city-filter-input{flex:1;background:var(--card);border:1.5px solid var(--border);
-  border-radius:22px;padding:6px 12px;font-family:'Heebo',sans-serif;font-size:13px;
-  font-weight:700;color:var(--text);outline:none;transition:border-color .2s;min-width:0}
-.city-filter-input:focus{border-color:#6366f1}
-.city-filter-input::placeholder{color:var(--muted)}
+/* Chip row = border container that holds chips + text input inline */
+.city-chips-row{flex:1;display:flex;flex-wrap:wrap;gap:5px;align-items:center;
+  min-height:36px;background:var(--card);border:1.5px solid var(--border);
+  border-radius:12px;padding:4px 10px;cursor:text;transition:border-color .2s;min-width:0}
+.city-chips-row:focus-within{border-color:#6366f1}
+/* Individual city chip */
+.city-chip{display:inline-flex;align-items:center;gap:3px;flex-shrink:0;
+  background:rgba(99,102,241,.18);border:1px solid rgba(99,102,241,.4);
+  border-radius:14px;padding:2px 5px 2px 9px;
+  font-family:'Heebo',sans-serif;font-size:12px;font-weight:700;color:#6366f1;
+  white-space:nowrap;max-width:130px;}
+.city-chip-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.city-chip-x{background:none;border:none;color:#6366f1;font-size:14px;
+  cursor:pointer;padding:0 1px;line-height:1;opacity:.7;flex-shrink:0}
+.city-chip-x:active{opacity:.4}
+/* Text input inside the chip row */
+.city-chips-input{flex:1;min-width:80px;background:none;border:none;outline:none;
+  font-family:'Heebo',sans-serif;font-size:13px;font-weight:600;color:var(--text);
+  padding:3px 0;direction:rtl;}
+.city-chips-input::placeholder{color:var(--muted)}
+/* Clear-all button */
 .city-filter-clear{background:none;border:none;color:var(--muted);font-size:16px;
   cursor:pointer;padding:4px 6px;flex-shrink:0;line-height:1}
 .city-filter-clear:active{opacity:.6}
-/* City result cards */
+/* Autocomplete suggestions panel */
+.city-suggestions-panel{display:none;background:var(--card);border:1px solid var(--border);
+  border-radius:12px;margin:0 11px 4px;overflow:hidden;flex-shrink:0;
+  max-height:220px;overflow-y:auto;box-shadow:0 4px 20px rgba(0,0,0,.18)}
+.city-suggestions-panel.open{display:block}
+.city-sug-item{padding:11px 14px;font-family:'Heebo',sans-serif;font-size:14px;
+  font-weight:600;cursor:pointer;display:flex;align-items:center;
+  justify-content:space-between;gap:8px;color:var(--text);direction:rtl;
+  border-bottom:1px solid var(--border);transition:background .1s}
+.city-sug-item:last-child{border-bottom:none}
+.city-sug-item:hover,.city-sug-item.focused{background:rgba(99,102,241,.1)}
+.city-sug-count{font-size:11px;color:var(--muted);font-weight:400;flex-shrink:0}
+.city-sug-empty{padding:13px 14px;color:var(--muted);font-size:12px;
+  text-align:center;font-family:'Heebo',sans-serif}
+/* City result cards in product modal */
 .city-sec-label{font-size:11px;font-weight:800;color:#6366f1;letter-spacing:.5px;
   text-transform:uppercase;padding:10px 14px 4px;opacity:.9}
 .city-row{display:flex;align-items:center;gap:10px;padding:9px 14px;
@@ -1424,12 +1455,18 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
       <button class="price-search-btn" onclick="searchPrices()">🔍</button>
     </div>
     <div class="city-filter-strip" id="city-filter-strip">
-      <input class="city-filter-input" id="city-filter-input"
-        placeholder="הכנס עיר... (חיפה, תל אביב, באר שבע...)"
-        maxlength="60" oninput="_onCityInput(this.value)">
+      <div class="city-chips-row" id="city-chips-row"
+        onclick="document.getElementById('city-filter-input')?.focus()">
+        <div id="city-chips-container"></div>
+        <input class="city-chips-input" id="city-filter-input"
+          placeholder="הוסף עיר..." maxlength="40" autocomplete="off"
+          oninput="_onCityInput(this.value)"
+          onkeydown="_onCityKeydown(event)">
+      </div>
       <button class="city-filter-clear" id="city-filter-clear"
-        onclick="clearCityFilter()" title="נקה עיר">✕</button>
+        onclick="clearCityFilter()" title="נקה הכל">✕</button>
     </div>
+    <div class="city-suggestions-panel" id="city-suggestions-panel"></div>
     <div class="nearby-strip" id="nearby-strip">
       <button class="nearby-loc-btn" id="nearby-loc-btn" onclick="requestLocation()">
         <span id="nearby-loc-icon">📍</span>
@@ -2040,52 +2077,192 @@ async function _fetchNearby(barcode) {
   } catch (_) { return null; }
 }
 
-// ── CITY FILTER ──────────────────────────────────────────────────────────────
-let _cityFilterActive = false;
-let _cityFilterValue  = '';        // raw text the user typed
-let _cityDebounceTimer = null;
+// ── CITY FILTER — MULTI-CITY CHIP SELECTOR ───────────────────────────────────
+let _cityFilterActive  = false;
+let _selectedCities    = [];    // display city names chosen from suggestions
+let _cityDebounce      = null;
+let _citySugItems      = [];    // current suggestion list [{ city, count }]
+let _citySugFocusIdx   = -1;    // keyboard-nav index into _citySugItems
 
+// ── Restore from localStorage ──
+(function _initCityState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('priceFilterCities') || '[]');
+    if (Array.isArray(saved)) {
+      _selectedCities = saved.filter(c => typeof c === 'string' && c.trim().length > 0);
+    }
+  } catch (_) {}
+  // Auto-show strip if persisted cities exist
+  if (_selectedCities.length > 0) _cityFilterActive = true;
+})();
+
+// ── Render chips inside city-chips-container ──
+function _renderCityChips() {
+  const container = document.getElementById('city-chips-container');
+  const input     = document.getElementById('city-filter-input');
+  if (!container) return;
+  container.innerHTML = _selectedCities.map(city =>
+    `<span class="city-chip">
+       <span class="city-chip-label">${esc(city)}</span>
+       <button class="city-chip-x" onclick="_removeCityChip(${JSON.stringify(city)})" title="הסר">×</button>
+     </span>`
+  ).join('');
+  if (input) input.placeholder = _selectedCities.length ? 'הוסף עיר נוספת...' : 'הוסף עיר...';
+}
+
+// ── Sync button + strip visibility ──
 function _syncCityUI() {
   const btn   = document.getElementById('city-toggle-btn');
   const strip = document.getElementById('city-filter-strip');
   if (!btn || !strip) return;
-  const hasCity = _cityFilterActive && _cityFilterValue.trim().length >= 2;
-  btn.classList.toggle('active', _cityFilterActive);
-  strip.classList.toggle('show',  _cityFilterActive);
+  const show = _cityFilterActive || _selectedCities.length > 0;
+  btn.classList.toggle('active', show);
+  strip.classList.toggle('show',  show);
+  _renderCityChips();
 }
 
+// ── Public: toggle filter panel ──
 window.toggleCityFilter = function() {
   _cityFilterActive = !_cityFilterActive;
   _syncCityUI();
   if (_cityFilterActive) {
     setTimeout(() => document.getElementById('city-filter-input')?.focus(), 80);
   } else {
-    _cityFilterValue = '';
-    const inp = document.getElementById('city-filter-input');
-    if (inp) inp.value = '';
+    _hideCitySuggestions();
   }
 };
 
+// ── Public: clear ALL selected cities ──
 window.clearCityFilter = function() {
-  _cityFilterValue = '';
-  _cityFilterActive = false;
+  _selectedCities    = [];
+  _cityFilterActive  = false;
+  _hideCitySuggestions();
   const inp = document.getElementById('city-filter-input');
-  if (inp) inp.value = '';
+  if (inp) { inp.value = ''; }
+  localStorage.setItem('priceFilterCities', '[]');
   _syncCityUI();
 };
 
-window._onCityInput = function(val) {
-  _cityFilterValue = val;
+// ── Add a city chip (called on suggestion tap / Enter) ──
+window._addCityChip = function(city) {
+  if (!city || _selectedCities.includes(city)) return;
+  _selectedCities = [..._selectedCities, city];
+  localStorage.setItem('priceFilterCities', JSON.stringify(_selectedCities));
+  _hideCitySuggestions();
+  const inp = document.getElementById('city-filter-input');
+  if (inp) { inp.value = ''; inp.focus(); }
   _syncCityUI();
 };
 
-/** Fetch /api/prices-by-city for the currently active city filter. */
-async function _fetchByCity(barcode) {
-  const city = _cityFilterValue.trim();
-  if (!barcode || city.length < 2) return null;
+// ── Remove a city chip ──
+window._removeCityChip = function(city) {
+  _selectedCities = _selectedCities.filter(c => c !== city);
+  localStorage.setItem('priceFilterCities', JSON.stringify(_selectedCities));
+  if (_selectedCities.length === 0) _cityFilterActive = false;
+  _syncCityUI();
+};
+
+// ── Render suggestion dropdown ──
+function _renderCitySuggestions(q) {
+  const panel = document.getElementById('city-suggestions-panel');
+  if (!panel) return;
+
+  const filtered = _citySugItems.filter(s => !_selectedCities.includes(s.city));
+  if (!filtered.length) {
+    panel.innerHTML = `<div class="city-sug-empty">לא נמצאו ערים מתאימות</div>`;
+    panel.classList.add('open');
+    return;
+  }
+
+  panel.innerHTML = filtered.map((s, i) => {
+    const label = _highlightMatch(esc(s.city), q);
+    return `<div class="city-sug-item${i === _citySugFocusIdx ? ' focused' : ''}"
+                 onclick="_addCityChip(${JSON.stringify(s.city)})"
+                 data-idx="${i}">
+               <span>${label}</span>
+               <span class="city-sug-count">${s.count} סניף${s.count !== 1 ? 'ים' : ''}</span>
+             </div>`;
+  }).join('');
+  panel.classList.add('open');
+}
+
+/** Bold the matched substring in a city label (safe — esc() already applied). */
+function _highlightMatch(escapedCity, q) {
+  if (!q) return escapedCity;
+  const idx = escapedCity.indexOf(q);
+  if (idx < 0) return escapedCity;
+  return escapedCity.slice(0, idx)
+    + `<strong>${escapedCity.slice(idx, idx + q.length)}</strong>`
+    + escapedCity.slice(idx + q.length);
+}
+
+function _hideCitySuggestions() {
+  const panel = document.getElementById('city-suggestions-panel');
+  if (panel) { panel.innerHTML = ''; panel.classList.remove('open'); }
+  _citySugFocusIdx = -1;
+  _citySugItems    = [];
+}
+
+// ── Fetch suggestions from API ──
+async function _loadCitySuggestions(q) {
   try {
-    const url = `/api/prices-by-city?barcode=${encodeURIComponent(barcode)}&city=${encodeURIComponent(city)}`;
-    const res = await fetch(url);
+    const res = await fetch(`/api/stores-cities?q=${encodeURIComponent(q)}`);
+    if (!res.ok) { _hideCitySuggestions(); return; }
+    _citySugItems    = await res.json();
+    _citySugFocusIdx = -1;
+    _renderCitySuggestions(q);
+  } catch (_) { _hideCitySuggestions(); }
+}
+
+// ── Input handler (debounced 200ms) ──
+window._onCityInput = function(val) {
+  clearTimeout(_cityDebounce);
+  if (!val.trim()) { _hideCitySuggestions(); return; }
+  _cityDebounce = setTimeout(() => _loadCitySuggestions(val.trim()), 200);
+};
+
+// ── Keyboard navigation ──
+window._onCityKeydown = function(e) {
+  const panel   = document.getElementById('city-suggestions-panel');
+  const visible = panel?.classList.contains('open');
+  const filtered = _citySugItems.filter(s => !_selectedCities.includes(s.city));
+
+  if (e.key === 'ArrowDown' && visible) {
+    e.preventDefault();
+    _citySugFocusIdx = Math.min(_citySugFocusIdx + 1, filtered.length - 1);
+    _renderCitySuggestions(e.target.value.trim());
+  } else if (e.key === 'ArrowUp' && visible) {
+    e.preventDefault();
+    _citySugFocusIdx = Math.max(_citySugFocusIdx - 1, -1);
+    _renderCitySuggestions(e.target.value.trim());
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    const pick = _citySugFocusIdx >= 0 ? filtered[_citySugFocusIdx] : filtered[0];
+    if (pick) _addCityChip(pick.city);
+  } else if (e.key === 'Backspace' && !e.target.value && _selectedCities.length > 0) {
+    // Remove last chip on backspace when input is empty
+    _removeCityChip(_selectedCities[_selectedCities.length - 1]);
+  } else if (e.key === 'Escape') {
+    _hideCitySuggestions();
+  }
+};
+
+// Close suggestions when clicking outside
+document.addEventListener('click', e => {
+  const strip = document.getElementById('city-filter-strip');
+  const panel = document.getElementById('city-suggestions-panel');
+  if (!strip?.contains(e.target) && !panel?.contains(e.target)) {
+    _hideCitySuggestions();
+  }
+}, true);
+
+/** Fetch /api/prices-by-city for all selected cities. */
+async function _fetchByCity(barcode) {
+  if (!barcode || _selectedCities.length === 0) return null;
+  try {
+    const params = new URLSearchParams({ barcode });
+    for (const city of _selectedCities) params.append('city', city);
+    const res = await fetch(`/api/prices-by-city?${params.toString()}`);
     if (!res.ok) return null;
     return await res.json();
   } catch (_) { return null; }
@@ -2428,8 +2605,8 @@ function _renderProductModal() {
     <div class="pm-sec-label">מחירים לפי רשת</div>
     <div class="store-prices">${pricesHtml}</div>
     ${nearbySection}
-    ${(_cityFilterActive && _cityFilterValue.trim().length >= 2 && product.barcode) ? `
-      <div class="city-sec-label">🏙 סניפים ב${esc(_cityFilterValue.trim())}</div>
+    ${(_selectedCities.length > 0 && product.barcode) ? `
+      <div class="city-sec-label">🏙 סניפים ב${esc(_selectedCities.join(' / '))}</div>
       <div id="pm-city" style="padding:0 14px 4px">
         <div style="text-align:center;padding:12px;color:var(--muted);font-size:12px">
           <div class="spin" style="width:16px;height:16px;border-width:2px;margin:0 auto 4px"></div>
@@ -2442,13 +2619,13 @@ function _renderProductModal() {
   `;
 
   // Async-populate city filter section
-  if (_cityFilterActive && _cityFilterValue.trim().length >= 2 && product.barcode) {
+  if (_selectedCities.length > 0 && product.barcode) {
     _fetchByCity(product.barcode).then(data => {
       const el = document.getElementById('pm-city');
       if (!el) return;
       if (!data || !data.results || !data.results.length) {
         el.innerHTML = `<div style="text-align:center;padding:12px;color:var(--muted);font-size:12px">
-          אין מחירים זמינים בעיר שנבחרה</div>`;
+          אין מחירים זמינים בערים שנבחרו</div>`;
         return;
       }
       el.innerHTML = data.results.slice(0, 12).map((r, i) => {

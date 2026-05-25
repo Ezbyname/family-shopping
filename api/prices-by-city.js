@@ -1,156 +1,44 @@
-// api/prices-by-city.js — v1.0.0
-// GET /api/prices-by-city?barcode=&city=
+// api/prices-by-city.js — v2.0.0
+// GET /api/prices-by-city?barcode=&city=חיפה
+// GET /api/prices-by-city?barcode=&city=חיפה&city=נשר        (repeated param)
+// GET /api/prices-by-city?barcode=&cities=חיפה,נשר,קריית מוצקין  (comma-joined)
 //
-// Returns all price entries for a barcode whose store metadata city matches
-// the requested city.  Uses official stores/{chainId}_{storeId} records written
-// by the price-sync worker (--stores-only mode).
+// Returns price entries whose store metadata city matches ANY of the selected cities.
 //
-// City matching is fuzzy-normalized (see normalizeCity) to handle:
-//   קרית/קריית prefixes, hyphen vs space, common abbreviations, ה"א variants.
+// City matching uses normalizeCity() from _cityNorm.js:
+//   קרית מוצקין = קריית מוצקין
+//   ת"א = תל אביב
+//   באר-שבע = באר שבע   (hyphens collapsed)
 //
-// Response:
-//   { version, barcode, city, normalizedCity, count, results: [...] }
-//   Each result: { storeKey, chainId, chainName, subChainId, subChainName,
-//                  storeId, storeName, address, city, zipCode,
-//                  barcode, productName, price, currency, source, syncedAt, isStale }
+// Firebase key mismatch handled by buildStoreLookup():
+//   price key  shufersal_001  →  finds store record at  shufersal_1
 //
 // Sort: cheapest → chainName → storeName → storeId
 
 import { getDB, setCors, isValidBarcode } from './_firebase.js';
+import {
+  normalizeCity, cityMatchesAny,
+  buildStoreLookup, stripKeyZeros,
+} from './_cityNorm.js';
 
-// ── CITY NORMALIZATION ────────────────────────────────────────────────────────
-// Strategy:
-//   1. trim + collapse whitespace
-//   2. replace hyphens with space
-//   3. map known abbreviations/aliases to canonical form
-//   4. compare lowercased
-//
-// Final-letter normalization (מנצפכ) is intentionally NOT done — comparing
-// normalised strings pairwise means both sides get the same treatment.
+// ── Parse city/cities query params into a deduplicated array ─────────────────
+function parseCityParams(query) {
+  const cities = [];
 
-const CITY_ALIASES = {
-  // Tel Aviv variants
-  'ת"א':             'תל אביב',
-  'ת.א.':            'תל אביב',
-  'תל אביב יפו':    'תל אביב',
-  'תל אביב-יפו':    'תל אביב',
-  'תל-אביב':        'תל אביב',
-  'תל-אביב-יפו':    'תל אביב',
-  // Jerusalem
-  'ירושלים':         'ירושלים',
-  'י-ם':             'ירושלים',
-  'י"ם':             'ירושלים',
-  // Petah Tikva
-  'פתח תקוה':        'פתח תקווה',
-  'פ"ת':             'פתח תקווה',
-  'פ.ת.':            'פתח תקווה',
-  'פת"ת':            'פתח תקווה',
-  // Beer Sheva
-  'באר-שבע':         'באר שבע',
-  'ב"ש':             'באר שבע',
-  // Ramat Gan
-  'רמת-גן':          'רמת גן',
-  // Kfar Saba
-  'כפר-סבא':         'כפר סבא',
-  // Kiryat prefix — official form uses קריית but many stores write קרית
-  'קרית מוצקין':     'קריית מוצקין',
-  'קרית ים':         'קריית ים',
-  'קרית ביאליק':     'קריית ביאליק',
-  'קרית אתא':        'קריית אתא',
-  'קרית גת':         'קריית גת',
-  'קרית שמונה':      'קריית שמונה',
-  'קרית מלאכי':      'קריית מלאכי',
-  'קרית ארבע':       'קריית ארבע',
-  'קרית עקרון':      'קריית עקרון',
-  'קרית טבעון':      'קריית טבעון',
-  'קרית ענבים':      'קריית ענבים',
-  // Rishon LeZion
-  'ראשון לציון':     'ראשון לציון',
-  'ראשל"צ':          'ראשון לציון',
-  // Bnei Brak
-  'בני-ברק':         'בני ברק',
-  // Holon
-  'חולון':           'חולון',
-  // Bat Yam
-  'בת-ים':           'בת ים',
-  // Rehovot
-  'רחובות':          'רחובות',
-  // Netanya
-  'נתניה':           'נתניה',
-  // Hadera
-  'חדרה':            'חדרה',
-  // Modiin
-  'מודיעין':         'מודיעין',
-  'מודיעין-מכבים-רעות': 'מודיעין',
-  'מודיעין מכבים רעות': 'מודיעין',
-  // Herzliya
-  'הרצליה':          'הרצליה',
-  // Ra\'anana
-  'רעננה':           'רעננה',
-  // Hod HaSharon
-  'הוד השרון':       'הוד השרון',
-  // Givatayim
-  'גבעתיים':         'גבעתיים',
-  // Ashkelon/Ashdod
-  'אשקלון':          'אשקלון',
-  'אשדוד':           'אשדוד',
-  // Haifa
-  'חיפה':            'חיפה',
-};
+  // ?city=X&city=Y  (array when repeated, string when single)
+  const cityParam = query.city;
+  if (Array.isArray(cityParam)) cities.push(...cityParam);
+  else if (cityParam) cities.push(String(cityParam));
 
-/**
- * Normalise a Hebrew city name for comparison.
- * Both the query city and stored city go through this, so the transforms
- * only need to be consistent — not perfect.
- */
-export function normalizeCity(city) {
-  if (!city) return '';
-  let s = String(city).trim();
-  s = s.replace(/-/g, ' ').replace(/\s+/g, ' ').trim();
-  return CITY_ALIASES[s] || s;
-}
-
-function cityMatches(storeCity, queryCity) {
-  if (!storeCity || !queryCity) return false;
-  return normalizeCity(storeCity) === normalizeCity(queryCity);
-}
-
-/**
- * Firebase has two key formats for the same physical store because two
- * different processes write to stores/:
- *
- *   Price sync placeholder:  shufersal_001  (storeId from filename, with leading zeros)
- *   Stores-only sync:        shufersal_1    (storeId from XML content, no leading zeros)
- *
- * The price entries use the leading-zero keys (shufersal_001).
- * The full city/address records landed under the no-zero keys (shufersal_1).
- *
- * This function builds a lookup map indexed by the zero-STRIPPED key so that
- *   findStore("shufersal_001")  →  the full record from shufersal_1.
- *
- * When two records share a stripped key, the record WITH city data wins (the
- * stores-only sync record always has city; the price placeholder never does).
- */
-function buildStoreLookup(storesData) {
-  const map = {};
-  for (const [k, v] of Object.entries(storesData)) {
-    // "shufersal_001" → "shufersal_1", "shufersal_034" → "shufersal_34"
-    const stripped = k.replace(/_0+(\d)/, '_$1');
-    const existing = map[stripped];
-    // City-bearing record beats a placeholder without city
-    if (!existing || (!existing.city && v.city)) {
-      map[stripped] = v;
-    }
+  // ?cities=X,Y,Z  (comma-joined convenience form)
+  const citiesParam = query.cities;
+  if (citiesParam) {
+    cities.push(...String(citiesParam).split(','));
   }
-  return map;
-}
 
-/** Strip leading zeros from the numeric part of a store key for lookup. */
-function stripKeyZeros(storeKey) {
-  return storeKey.replace(/_0+(\d)/, '_$1');
+  // Deduplicate after trimming
+  return [...new Set(cities.map(c => c.trim()).filter(Boolean))];
 }
-
-// ── HANDLER ──────────────────────────────────────────────────────────────────
 
 const STALE_MS = 36 * 3600 * 1000;
 
@@ -159,32 +47,34 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
 
-  const { barcode, city } = req.query || {};
-
   // ── Validate barcode ──
-  const clean = String(barcode || '').replace(/\D/g, '');
+  const clean = String(req.query?.barcode || '').replace(/\D/g, '');
   if (!isValidBarcode(clean)) {
     return res.status(400).json({
       error: 'Missing or invalid barcode (8–14 digits required)',
     });
   }
 
-  // ── Validate city ──
-  const cityRaw = String(city || '').trim();
-  if (!cityRaw || cityRaw.length < 2) {
-    return res.status(400).json({ error: 'city is required (min 2 chars)' });
+  // ── Parse and validate city list ──
+  const cities = parseCityParams(req.query || {});
+  if (cities.length === 0) {
+    return res.status(400).json({ error: 'At least one city is required (city= or cities=)' });
   }
-  if (cityRaw.length > 60) {
-    return res.status(400).json({ error: 'city too long (max 60 chars)' });
+  if (cities.some(c => c.length < 2)) {
+    return res.status(400).json({ error: 'Each city must be at least 2 characters' });
   }
-  const cityNorm = normalizeCity(cityRaw);
+  if (cities.length > 20) {
+    return res.status(400).json({ error: 'Maximum 20 cities per request' });
+  }
+
+  // Build a Set of normalised city names for O(1) matching
+  const cityNorms = new Set(cities.map(normalizeCity));
 
   try {
     const db = await getDB();
     if (!db) {
       return res.status(200).json({
-        version: '1.0.0', barcode: clean, city: cityRaw,
-        normalizedCity: cityNorm, count: 0, results: [],
+        version: '2.0.0', barcode: clean, cities, count: 0, results: [],
         warning: 'Database unavailable',
       });
     }
@@ -198,8 +88,7 @@ export default async function handler(req, res) {
     const pricesData = pricesSnap.val() || {};
     const storesData = storesSnap.val() || {};
 
-    // Build a zero-normalised store lookup so that price keys like
-    // "shufersal_001" resolve to the full store record at "shufersal_1".
+    // Build normalised store lookup (handles shufersal_001 → shufersal_1 mismatch)
     const storeLookup = buildStoreLookup(storesData);
 
     const results = [];
@@ -207,14 +96,13 @@ export default async function handler(req, res) {
     for (const [storeKey, priceEntry] of Object.entries(pricesData)) {
       if (!priceEntry?.price || priceEntry.price <= 0) continue;
 
-      // Try both the raw key and the zero-stripped key
       const store = storeLookup[stripKeyZeros(storeKey)] || storesData[storeKey];
 
-      // Require a known store record with city data
+      // Require a store record with city data
       if (!store?.city) continue;
 
-      // City filter — normalised comparison
-      if (!cityMatches(store.city, cityRaw)) continue;
+      // City filter — matches any of the selected cities
+      if (!cityMatchesAny(store.city, cityNorms)) continue;
 
       const syncedAt = priceEntry.syncedAt
         ? new Date(priceEntry.syncedAt).toISOString()
@@ -225,17 +113,17 @@ export default async function handler(req, res) {
 
       results.push({
         storeKey,
-        chainId:      priceEntry.chainId      || store.chainId      || '',
-        chainName:    priceEntry.chainName    || store.chainName    || '',
+        chainId:      priceEntry.chainId    || store.chainId      || '',
+        chainName:    priceEntry.chainName  || store.chainName    || '',
         subChainId:   store.subChainId  || '',
         subChainName: store.subChainName || '',
-        storeId:      priceEntry.storeId      || store.storeId      || '',
-        storeName:    priceEntry.storeName    || store.storeName    || '',
-        address:      store.address    || '',
-        city:         store.city       || '',
-        zipCode:      store.zipCode    || '',
+        storeId:      priceEntry.storeId   || store.storeId      || '',
+        storeName:    priceEntry.storeName || store.storeName    || '',
+        address:      store.address  || '',
+        city:         store.city     || '',
+        zipCode:      store.zipCode  || '',
         barcode:      clean,
-        productName:  priceEntry.name  || '',
+        productName:  priceEntry.name || '',
         price:        priceEntry.price,
         currency:     'ILS',
         source:       priceEntry.source || 'official',
@@ -255,11 +143,10 @@ export default async function handler(req, res) {
     });
 
     return res.status(200).json({
-      version:       '1.0.0',
-      barcode:       clean,
-      city:          cityRaw,
-      normalizedCity: cityNorm,
-      count:         results.length,
+      version: '2.0.0',
+      barcode: clean,
+      cities,
+      count:   results.length,
       results,
     });
 
