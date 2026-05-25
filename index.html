@@ -1498,7 +1498,8 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
         <button class="radius-seg-btn" onclick="setNearbyRadius(1)">1</button>
         <button class="radius-seg-btn active" onclick="setNearbyRadius(3)">3</button>
         <button class="radius-seg-btn" onclick="setNearbyRadius(5)">5</button>
-        <button class="radius-seg-btn" onclick="setNearbyRadius(10)">10 ק"מ</button>
+        <button class="radius-seg-btn" onclick="setNearbyRadius(10)">10</button>
+        <button class="radius-seg-btn" onclick="setNearbyRadius(25)">25 ק"מ</button>
       </div>
     </div>
     <div class="price-toolbar" id="price-tools" style="display:none"></div>
@@ -2002,9 +2003,17 @@ window.searchPrices = async function(){
     lastSearchQuery = resolvedQuery;
     selectedProduct = null;
     const wrap = document.getElementById('price-content');
-    wrap.innerHTML = `<div class="price-loading"><div class="spin"></div><p>מחפש "${esc(q)}" בכל הסופרמרקטים...</p></div>`;
+    const locationLabel = (_nearbyMode && _userLat)
+      ? ` · 📍 סניפים עד ${_nearbyRadius} ק"מ`
+      : ' בכל הסופרמרקטים';
+    wrap.innerHTML = `<div class="price-loading"><div class="spin"></div><p>מחפש "${esc(q)}"${locationLabel}...</p></div>`;
     try {
-      const res = await fetch(`/api/prices?q=${encodeURIComponent(resolvedQuery)}`);
+      // Pass location when nearby mode is active (API filters by distance server-side)
+      let _apiUrl = `/api/prices?q=${encodeURIComponent(resolvedQuery)}`;
+      if (_nearbyMode && _userLat && _userLng) {
+        _apiUrl += `&lat=${_userLat}&lng=${_userLng}&radiusKm=${_nearbyRadius}`;
+      }
+      const res = await fetch(_apiUrl);
     const data = await res.json();
 
     if(!data.results || !data.results.length){
@@ -2038,9 +2047,8 @@ const CHAIN_META = {
 };
 
 // ── NEARBY MODE ──────────────────────────────────────────────────────────────
-// Set to true once coordinate enrichment has populated stores/{key}.latitude/longitude.
-// Until then the UI shows a clear "unavailable" message and no API calls are made.
-const NEARBY_COORDS_READY = false;
+// Enabled: stores/{key}.latitude/longitude are populated from the 422-store sync.
+const NEARBY_COORDS_READY = true;
 
 let _nearbyMode   = false;
 let _userLat      = null;
@@ -2049,7 +2057,7 @@ let _nearbyRadius = 3; // default 3 km, persisted in localStorage
 
 (function _initNearbyState() {
   const r = parseInt(localStorage.getItem('nearbyRadius') || '3', 10);
-  if ([1,3,5,10].includes(r)) _nearbyRadius = r;
+  if ([1,3,5,10,25].includes(r)) _nearbyRadius = r;
 })();
 
 function _syncNearbyUI() {
@@ -2059,7 +2067,7 @@ function _syncNearbyUI() {
   btn.classList.toggle('active', _nearbyMode);
   strip.classList.toggle('show', _nearbyMode);
   document.querySelectorAll('#radius-seg .radius-seg-btn').forEach((b, i) => {
-    b.classList.toggle('active', [1,3,5,10][i] === _nearbyRadius);
+    b.classList.toggle('active', [1,3,5,10,25][i] === _nearbyRadius);
   });
 }
 
@@ -2077,6 +2085,8 @@ window.setNearbyRadius = function(km) {
   _nearbyRadius = km;
   localStorage.setItem('nearbyRadius', String(km));
   _syncNearbyUI();
+  // Re-run search with new radius when location is active
+  if (_nearbyMode && _userLat && lastSearchQuery) searchPrices();
 };
 
 window.requestLocation = async function() {
@@ -2097,6 +2107,8 @@ window.requestLocation = async function() {
     if (locText) locText.textContent = `${_userLat.toFixed(3)}, ${_userLng.toFixed(3)}`;
     if (locIcon) locIcon.textContent = '✅';
     toast('📍 מיקום נמצא!');
+    // Auto-refresh results with location filter if a search is already active
+    if (lastSearchQuery) searchPrices();
   } catch (e) {
     if (locText) locText.textContent = 'מצא מיקום';
     if (locIcon) locIcon.textContent = '📍';
@@ -2107,10 +2119,28 @@ window.requestLocation = async function() {
 async function _fetchNearby(barcode) {
   if (!barcode || !_userLat || !_userLng) return null;
   try {
-    const url = `/api/nearby?barcode=${encodeURIComponent(barcode)}&lat=${_userLat}&lng=${_userLng}&radiusKm=${_nearbyRadius}`;
+    // Use /api/prices?barcode= with location filter — returns fresh stores within radius
+    const url = `/api/prices?barcode=${encodeURIComponent(barcode)}&lat=${_userLat}&lng=${_userLng}&radiusKm=${_nearbyRadius}`;
     const res = await fetch(url);
     if (!res.ok) return null;
-    return await res.json();
+    const data = await res.json();
+    const ps = Array.isArray(data.prices) ? data.prices : [];
+    if (!ps.length) return null;
+    return {
+      results: ps
+        .map(p => ({
+          chainName:  p.chainName  || '',
+          storeName:  p.storeName  || `סניף ${p.storeId}`,
+          storeId:    p.storeId    || '',
+          city:       p.city       || '',
+          price:      parseFloat(p.displayPrice ?? p.price) || 0,
+          distanceKm: p.distanceKm != null ? p.distanceKm : null,
+          syncedAt:   p.syncedAt   || null,
+          isStale:    p.isStale    || false,
+        }))
+        .filter(p => p.price > 0)
+        .sort((a, b) => a.price - b.price),
+    };
   } catch (_) { return null; }
 }
 
@@ -2333,11 +2363,15 @@ function _normalizeResults(results) {
     const rawPrices = Array.isArray(r.prices) ? r.prices : [];
     const stores = rawPrices
       .map(p => ({
-        store: p.chainName || p.storeName || p.chain || '',
-        price: parseFloat(p.displayPrice ?? p.price) || 0,
-        unit:  p.unit || '',
-        source: p.source || '',
-        isStale: r.isStale || false,
+        store:      p.chainName || p.storeName || p.chain || '',
+        storeName:  p.storeName || '',
+        storeId:    p.storeId   || '',
+        city:       p.city      || '',
+        distanceKm: p.distanceKm != null ? p.distanceKm : null,
+        price:      parseFloat(p.displayPrice ?? p.price) || 0,
+        unit:       p.unit || '',
+        source:     p.source || '',
+        isStale:    p.isStale || false,
       }))
       .filter(sp => sp.price > 0 && sp.store);
     return {
@@ -2595,22 +2629,43 @@ function _renderProductModal() {
   if (!item) return;
   const { product } = item;
 
-  // Cross-chain prices sorted cheapest first
+  // Cross-chain prices sorted cheapest first (one entry per chain from search results)
   const allPrices = product.stores
     .filter(s => s.price > 0)
     .sort((a, b) => a.price - b.price);
   const minPrice = allPrices.length ? allPrices[0].price : null;
+  const maxPrice = allPrices.length ? allPrices[allPrices.length - 1].price : null;
+
+  // Price spread header
+  const modalSpread = (allPrices.length > 1 && maxPrice > minPrice)
+    ? `<div style="display:flex;align-items:center;gap:7px;padding:6px 10px;background:var(--card2);border-radius:9px;margin-bottom:9px;font-size:12px;flex-wrap:wrap">
+         <span style="color:var(--green);font-weight:800">₪${minPrice.toFixed(2)}</span>
+         <span style="color:var(--muted)">→</span>
+         <span style="color:var(--red);font-weight:800">₪${maxPrice.toFixed(2)}</span>
+         <span style="color:var(--muted);font-size:11px;margin-right:auto">חיסכון <strong style="color:var(--accent)">₪${(maxPrice-minPrice).toFixed(2)}</strong></span>
+       </div>`
+    : '';
 
   const pricesHtml = allPrices.length
-    ? allPrices.map(s => {
+    ? modalSpread + allPrices.map(s => {
         const isBest = s.price === minPrice;
         const m2 = CHAIN_META[s.store] || { color: '#7d8590' };
+        // Show storeName (sub-brand) when available and different from chain name
+        const label = (s.storeName && s.storeName !== s.store) ? esc(s.storeName) : esc(s.store);
+        const metaParts = [];
+        if (s.city) metaParts.push(esc(s.city));
+        if (s.distanceKm != null) metaParts.push(`📍 ${s.distanceKm} ק"מ`);
+        const staleBadge = s.isStale ? `<span style="font-size:9px;color:var(--red);margin-right:3px">⚠ ישן</span>` : '';
         return `<div class="spr${isBest ? ' best' : ''}">
-          <span class="spr-name" style="color:${m2.color}">${esc(s.store)}</span>
-          <span style="display:flex;align-items:center;gap:5px">
-            ${isBest ? `<span class="best-badge">🏆</span>` : ''}
-            <span class="spr-price">₪${s.price.toFixed(2)}${s.unit ? ` / ${esc(s.unit)}` : ''}</span>
-          </span>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+              <span class="spr-name" style="color:${m2.color}">${label}</span>
+              ${isBest ? `<span class="best-badge">הכי זול 🏆</span>` : ''}
+              ${staleBadge}
+            </div>
+            ${metaParts.length ? `<div style="font-size:10px;color:var(--muted);margin-top:1px">${metaParts.join(' · ')}</div>` : ''}
+          </div>
+          <span class="spr-price" style="flex-shrink:0;margin-right:8px">₪${s.price.toFixed(2)}${s.unit ? ` / ${esc(s.unit)}` : ''}</span>
         </div>`;
       }).join('')
     : `<div class="spr no-data" style="justify-content:center;font-size:12px">אין מחירים רשמיים</div>`;
@@ -3353,12 +3408,15 @@ window.runBasketCompare = async function() {
   const wrap = document.getElementById('basket-results-wrap');
   wrap.innerHTML = `<div class="price-loading"><div class="spin"></div><p>משווה מחירים...</p></div>`;
 
-  // Get user location
-  let lat = null, lng = null;
-  try {
-    const pos = await new Promise((res,rej) => navigator.geolocation.getCurrentPosition(res,rej,{timeout:5000}));
-    lat = pos.coords.latitude; lng = pos.coords.longitude;
-  } catch (_) { toast('⚠️ לא ניתן לקבל מיקום — מציג ללא סינון מרחק'); }
+  // Reuse already-acquired location from nearby mode; only prompt if needed
+  let lat = _userLat, lng = _userLng;
+  if (!lat && navigator.geolocation) {
+    try {
+      const pos = await new Promise((res,rej) => navigator.geolocation.getCurrentPosition(res,rej,{timeout:5000}));
+      lat = pos.coords.latitude; lng = pos.coords.longitude;
+      _userLat = lat; _userLng = lng;
+    } catch (_) { toast('⚠️ לא ניתן לקבל מיקום — מציג ללא סינון מרחק'); }
+  }
 
   // Build items array (use barcode if available, else name)
   const basketItems = pending
@@ -4039,9 +4097,24 @@ async function fetchAllPriceLayers(barcode) {
 function buildDisplayPrices(layers) {
   const { official, proxy, manual, reports } = layers;
 
+  // De-duplicate official prices by sub-brand (storeName).
+  // Shufersal alone may have 422 raw entries; de-duping keeps one entry per
+  // unique sub-brand name (e.g. "שופרסל דיל", "שופרסל שלי") — cheapest wins.
+  // Fallback key: chainName_storeId (when storeName is absent).
+  const storeNameMap = {};
+  official.forEach(p => {
+    const k = (p.storeName && p.storeName !== p.chainName)
+      ? p.storeName
+      : `${p.chainName || ''}_${p.storeId || ''}`;
+    if (!storeNameMap[k] || p.displayPrice < storeNameMap[k].displayPrice) {
+      storeNameMap[k] = p;
+    }
+  });
+  const officialDeduped = Object.values(storeNameMap);
+
   // Start with official (highest priority)
-  const result = [...official];
-  const coveredChains = new Set(official.map(p => p.chainName||p.chainId||''));
+  const result = [...officialDeduped];
+  const coveredChains = new Set(officialDeduped.map(p => p.chainName||p.chainId||''));
 
   // Add proxy only for chains without official
   proxy.filter(p => !coveredChains.has(p.chainName||p.chainId||'')).forEach(p => {
@@ -4087,8 +4160,12 @@ function buildCommunityWarnings(reports, official) {
 
 // ── RENDER PRICE ROW ──
 function renderPriceRow(p, isFirst, total, warnings) {
-  const store = p.chainName||p.storeName||p.store||'';
-  const chainKey = `${p.chainId||store.replace(/\s/g,'_')}_${p.storeId||'0'}`;
+  // Use storeName (sub-brand) when it differs from chainName for clearer display
+  const chainDisplay = p.chainName || p.chainId || '';
+  const store = (p.storeName && p.storeName !== p.chainName && p.storeName !== p.chainId)
+    ? p.storeName
+    : chainDisplay || p.storeName || p.store || '';
+  const chainKey = `${p.chainId||chainDisplay.replace(/\s/g,'_')}_${p.storeId||'0'}`;
   const isBest = isFirst && total > 1;
   const badge = sourceBadge(p.sourceDisplay||p.source, p.submittedByDisplayName);
 
@@ -4127,13 +4204,26 @@ function renderPriceRow(p, isFirst, total, warnings) {
     </div>`;
   }
 
+  // City + distance meta line
+  const metaParts = [];
+  if (p.city) metaParts.push(esc(p.city));
+  if (p.distanceKm != null) metaParts.push(`📍 ${p.distanceKm} ק"מ`);
+  const metaLine = metaParts.length
+    ? `<div style="font-size:10px;color:var(--muted);margin-top:1px">${metaParts.join(' · ')}</div>`
+    : '';
+
+  // Freshness badge — only flag stale rows (fresh rows are silent = default)
+  const staleBadge = p.isStale
+    ? `<span style="font-size:9px;color:var(--red);background:rgba(248,113,113,.1);padding:1px 5px;border-radius:4px">⚠ ישן</span>`
+    : '';
+
   return `<div class="spr${isBest?' best':''}">
     <div style="flex:1;min-width:0">
       <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-        <span class="spr-name">${esc(store)}</span> ${badge}
+        <span class="spr-name">${esc(store)}</span> ${badge} ${staleBadge}
         ${isBest&&total>1?'<span class="best-badge">הכי זול 🏆</span>':''}
       </div>
-      ${submittedLine}${overrideLine}${warnLine}${actions}
+      ${metaLine}${submittedLine}${overrideLine}${warnLine}${actions}
     </div>
     <span class="spr-price" style="flex-shrink:0;margin-right:8px">₪${p.displayPrice.toFixed(2)}</span>
   </div>`;
@@ -4153,8 +4243,21 @@ window.showProductPricesEnhanced = async function(product) {
   const coveredChains = new Set(prices.map(p=>p.chainName||p.storeName||p.store||''));
   const missing = STORE_LIST_ALL.filter(s=>!coveredChains.has(s));
 
+  // Price spread header — shows ₪min → ₪max + potential saving
+  const minP = prices.length ? prices[0].displayPrice : null;
+  const maxP = prices.length ? prices[prices.length-1].displayPrice : null;
+  const spreadHTML = (prices.length > 1 && maxP > minP) ? `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--card2);border-radius:10px;margin-bottom:10px;flex-wrap:wrap">
+      <span style="font-size:13px;font-weight:900;color:var(--green)">₪${minP.toFixed(2)}</span>
+      <span style="color:var(--muted);font-size:13px">→</span>
+      <span style="font-size:13px;font-weight:900;color:var(--red)">₪${maxP.toFixed(2)}</span>
+      <span style="font-size:11px;color:var(--muted);margin-right:auto">
+        חיסכון עד <strong style="color:var(--accent)">₪${(maxP-minP).toFixed(2)}</strong>
+      </span>
+    </div>` : '';
+
   const pricesHTML = prices.length
-    ? prices.map((p,i)=>renderPriceRow(p,i===0,prices.length,warnings)).join('')
+    ? spreadHTML + prices.map((p,i)=>renderPriceRow(p,i===0,prices.length,warnings)).join('')
     : `<div style="text-align:center;padding:16px;color:var(--muted);font-size:13px">אין מחירים עדיין</div>`;
 
   const missingHTML = missing.length ? `
@@ -4171,8 +4274,7 @@ window.showProductPricesEnhanced = async function(product) {
       </div>`).join('')}
     </div>` : '';
 
-  const savings = prices.length > 1
-    ? (prices[prices.length-1].displayPrice - prices[0].displayPrice).toFixed(2) : null;
+  const savings = (minP && maxP && maxP > minP) ? (maxP - minP).toFixed(2) : null;
 
   wrap.innerHTML = `
     <button onclick="backToResults()" style="background:transparent;border:none;color:var(--muted);font-family:'Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;padding:4px 0 10px;display:flex;align-items:center;gap:4px">← חזרה לתוצאות</button>
@@ -4195,7 +4297,6 @@ window.showProductPricesEnhanced = async function(product) {
       </div>
       <div class="store-prices">${pricesHTML}</div>
       ${missingHTML}
-      ${savings&&parseFloat(savings)>0?`<div class="savings-bar">💰 חיסכון פוטנציאלי: ₪${savings}</div>`:''}
       ${barcode?`<button onclick="openScanner()" class="clear-btn" style="margin-top:10px">📷 סרוק בסופר ועדכן מחיר</button>`:''}
     </div>
     <div style="font-size:10px;color:var(--muted);text-align:center;padding:8px 0">

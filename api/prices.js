@@ -67,7 +67,15 @@ export default async function handler(req, res) {
           error: lastError || 'database_unavailable',
         });
       }
-      const result = await buildLayeredPrices(db, clean, userId, groupId, hasLoc, userLat, userLng, radius, {}, wantStale);
+      // Load store index for distance annotation + radius filtering
+      let storeIndex = {};
+      if (hasLoc) {
+        try {
+          const snap = await db.ref('stores').get();
+          if (snap.exists()) storeIndex = snap.val();
+        } catch (_) {}
+      }
+      const result = await buildLayeredPrices(db, clean, userId, groupId, hasLoc, userLat, userLng, radius, storeIndex, wantStale);
       return res.status(200).json({ version: '6.0.0', barcode: clean, ...result });
     } catch (e) {
       console.error('[prices] barcode error:', e.message);
@@ -266,15 +274,20 @@ async function buildLayeredPrices(db, barcode, userId, groupId, hasLoc, lat, lng
   return { prices: [], source: 'none', communityWarning: null };
 }
 
-// Filter prices to stores within radius
+// Filter prices to stores within radius and annotate each entry with distanceKm
 function filterByRadius(prices, lat, lng, radius, storeIndex) {
-  return prices.filter(p => {
-    const key = `${p.chainId || ''}_${p.storeId || ''}`;
-    const store = storeIndex[key];
-    if (!store?.hasCoords) return true; // include if no coords data yet
-    const dist = haversine(lat, lng, store.latitude, store.longitude);
-    return dist <= radius;
-  });
+  return prices
+    .map(p => {
+      const key = `${p.chainId || ''}_${p.storeId || ''}`;
+      const store = storeIndex[key];
+      if (!store?.hasCoords) return p; // no coords — keep without distance
+      const dist = Math.round(haversine(lat, lng, store.latitude, store.longitude) * 10) / 10;
+      return { ...p, distanceKm: dist };
+    })
+    .filter(p => {
+      if (p.distanceKm == null) return true; // include when no coords available
+      return p.distanceKm <= radius;
+    });
 }
 
 // Build community warning from reports
