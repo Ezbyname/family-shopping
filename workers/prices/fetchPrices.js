@@ -301,10 +301,15 @@ export async function resolveStoreMetaUrls(chain, maxPages = 20) {
 //   PriceFull*.gz   — complete store catalog (5,000–15,000 items/store) ← PREFERRED
 //   PriceUpdate*.gz — only recent price changes (< 100 items/store)      ← fallback
 //
-// The index at catID=0 lists both types. PriceUpdate files are published
-// multiple times per day; PriceFull is published once. We scan all pages
-// to collect PriceFull URLs first, then fall back to PriceUpdate for stores
-// that have no PriceFull in the index.
+// Shufersal catID structure (confirmed 2026-05-24 for Stores; assumed for Price):
+//   catID=0 — PriceUpdate files (incremental, published many times/day)
+//   catID=2 — PriceFull files   (complete catalog, published once/day)
+//   catID=5 — Stores files      (store metadata with address/city)
+//
+// The chain's indexUrl uses catID=0 by default.  resolveAllPriceUrls() first
+// scans that catID for PriceFull.  If none are found, it tries the catIDs in
+// chain.pricefullCatIds (default ['2','1','3']) before falling back to
+// PriceUpdate.
 //
 // Returns { priceByStore: Map<storeId, signedUrl>, storeByStore: Map<storeId, signedUrl> }
 export async function resolveAllPriceUrls(chain, maxStores = 50, maxPages = 10) {
@@ -318,11 +323,61 @@ export async function resolveAllPriceUrls(chain, maxStores = 50, maxPages = 10) 
   const azureStoreRe  = /href=["'](https?:\/\/[^"']*\.blob\.core\.windows\.net\/[^"']*\/Stores[^"']*\.gz(?:\?[^"']*)?)["']/gi;
   const decodeHtml    = (s) => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
 
+  // ── Pass 1: Scan the chain's primary index URL (typically catID=0) ──
+  // Collect both PriceFull and PriceUpdate across all pages.
+  await _scanIndexPages(chain, chain.indexUrl, maxPages, maxStores,
+    priceFullByStore, priceUpdateByStore, storeByStore,
+    azureFullRe, azureUpdateRe, azureStoreRe, decodeHtml);
+
+  // ── Pass 2: If no PriceFull found, scan alternate catIDs (e.g. catID=2) ──
+  // Many chains publish PriceFull under a different catID than PriceUpdate.
+  if (priceFullByStore.size === 0) {
+    const fallbackCatIds = chain.pricefullCatIds || ['2', '1', '3'];
+    for (const catId of fallbackCatIds) {
+      if (priceFullByStore.size >= maxStores) break;
+      const altIndexUrl = chain.indexUrl.replace(/catID=\d+/, `catID=${catId}`);
+      logger.info(`[${chain.name}] No PriceFull at primary catID — trying catID=${catId} for full catalog`);
+      await _scanIndexPages(chain, altIndexUrl, maxPages, maxStores,
+        priceFullByStore, priceUpdateByStore, storeByStore,
+        azureFullRe, azureUpdateRe, azureStoreRe, decodeHtml);
+      if (priceFullByStore.size > 0) break;
+    }
+  }
+
+  // ── Build final map: PriceFull first (complete catalog), then PriceUpdate fallback ──
+  const priceByStore = new Map();
+  for (const [storeId, url] of priceFullByStore) {
+    if (priceByStore.size >= maxStores) break;
+    priceByStore.set(storeId, url);
+  }
+  for (const [storeId, url] of priceUpdateByStore) {
+    if (priceByStore.size >= maxStores) break;
+    if (!priceByStore.has(storeId)) {
+      priceByStore.set(storeId, url);
+      logger.warn(`[${chain.name}] store ${storeId}: no PriceFull found — using PriceUpdate (incomplete catalog)`);
+    }
+  }
+
+  logger.info(`[${chain.name}] multi-store discovery complete`, {
+    priceFullFound:   priceFullByStore.size,
+    priceUpdateFound: priceUpdateByStore.size,
+    usingPriceUpdate: Math.max(0, priceByStore.size - priceFullByStore.size),
+    priceStores:      priceByStore.size,
+    storeMetaFiles:   storeByStore.size,
+  });
+  return { priceByStore, storeByStore };
+}
+
+// Internal helper: scan pages of one index URL, collecting PriceFull / PriceUpdate / Store URLs.
+async function _scanIndexPages(
+  chain, indexUrl, maxPages, maxStores,
+  priceFullByStore, priceUpdateByStore, storeByStore,
+  azureFullRe, azureUpdateRe, azureStoreRe, decodeHtml,
+) {
   for (let page = 1; page <= maxPages; page++) {
-    // Stop only when we have enough PriceFull files — don't stop early for PriceUpdate.
     if (priceFullByStore.size >= maxStores) break;
 
-    const pageUrl = chain.indexUrl.replace('PAGE', String(page));
+    const pageUrl = indexUrl.replace('PAGE', String(page));
     try {
       const res = await fetch(pageUrl, {
         headers: HEADERS,
@@ -330,7 +385,7 @@ export async function resolveAllPriceUrls(chain, maxStores = 50, maxPages = 10) 
         redirect: 'follow',
       });
       if (!res.ok) {
-        logger.warn(`[${chain.name}] index page ${page}: HTTP ${res.status}`);
+        logger.warn(`[${chain.name}] index page ${page} (${pageUrl.match(/catID=\d+/)?.[0] || ''}): HTTP ${res.status}`);
         break;
       }
       const body = await res.text();
@@ -382,29 +437,4 @@ export async function resolveAllPriceUrls(chain, maxStores = 50, maxPages = 10) 
       break;
     }
   }
-
-  // Build final map: PriceFull first (complete catalog), then PriceUpdate fallback
-  // for any stores that have no PriceFull entry in the current index.
-  const priceByStore = new Map();
-  for (const [storeId, url] of priceFullByStore) {
-    if (priceByStore.size >= maxStores) break;
-    priceByStore.set(storeId, url);
-  }
-  for (const [storeId, url] of priceUpdateByStore) {
-    if (priceByStore.size >= maxStores) break;
-    if (!priceByStore.has(storeId)) {
-      priceByStore.set(storeId, url);
-      logger.warn(`[${chain.name}] store ${storeId}: no PriceFull found — using PriceUpdate (incomplete catalog)`);
-    }
-  }
-
-  logger.info(`[${chain.name}] multi-store discovery complete`, {
-    priceFullFound:   priceFullByStore.size,
-    priceUpdateFound: priceUpdateByStore.size,
-    usingPriceUpdate: priceByStore.size - priceFullByStore.size > 0
-                        ? priceByStore.size - priceFullByStore.size : 0,
-    priceStores:      priceByStore.size,
-    storeMetaFiles:   storeByStore.size,
-  });
-  return { priceByStore, storeByStore };
 }

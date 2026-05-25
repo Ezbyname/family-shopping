@@ -14,12 +14,16 @@ export const CHAINS = [
     lastVerified: '2026-05-24',
     sanityRequired: true,
     knownIssue: null,
-    // Paginated Azure Blob index — one Price*.gz per store (NOT a single PriceFull).
-    // PAGE token is replaced with the page number in resolveAllPriceUrls().
-    // SAS token URLs end with ?sv=... — gzip detection strips query string before .gz check.
-    indexUrl: 'https://prices.shufersal.co.il/FileObject/UpdateCategory?catID=0&storeId=0&sort=None&order=None&size=50&page=PAGE',
-    baseUrl:  'https://prices.shufersal.co.il',
-    indexType: 'html',
+    // Paginated Azure Blob index — one Price*.gz per store (NOT a single chain-wide PriceFull).
+    // catID=0 → PriceUpdate files (incremental changes, ~40 items/store, published many/day)
+    // catID=2 → PriceFull files  (complete catalog, 5000+ items/store, published once/day)
+    // catID=5 → Stores files     (confirmed 2026-05-24)
+    // resolveAllPriceUrls() scans catID=0 first, then pricefullCatIds to find PriceFull.
+    // PAGE token is replaced with the page number.  SAS tokens stripped before .gz check.
+    indexUrl:        'https://prices.shufersal.co.il/FileObject/UpdateCategory?catID=0&storeId=0&sort=None&order=None&size=50&page=PAGE',
+    pricefullCatIds: ['2', '1', '3'],  // catIDs to try when catID=0 yields no PriceFull files
+    baseUrl:         'https://prices.shufersal.co.il',
+    indexType:       'html',
     multiStore:      true,  // resolveAllPriceUrls() used instead of resolveFileUrls()
     maxStoresToSync: 5,     // ⬆ raise to 999 only after full end-to-end verification
     maxIndexPages:   10,    // pages to scan for store discovery
