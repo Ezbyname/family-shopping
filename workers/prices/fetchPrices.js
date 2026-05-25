@@ -223,8 +223,11 @@ function redactSasToken(url) {
 // Stores7290027600007-001-034-20260522-020000.gz →  '034'
 function extractStoreIdFromUrl(url) {
   const pathname = url.split('?')[0]; // strip SAS token query string
-  // Matches both Price*.gz and Stores*.gz Azure Blob filenames
-  const m = pathname.match(/\/(?:Price|Stores)\d+-\d+-(\d+)-\d{8}/i);
+  // Matches PriceFull*.gz, PriceUpdate*.gz, Price*.gz, and Stores*.gz Azure Blob filenames.
+  // IMPORTANT: PriceFull and PriceUpdate must come before Price so the longer
+  // prefix wins (otherwise /Price matches the start of /PriceFull but then
+  // \d+ fails on the 'F'/'U' and the storeId is never captured).
+  const m = pathname.match(/\/(?:PriceFull|PriceUpdate|Price|Stores)\d+-\d+-(\d+)-\d{8}/i);
   return m ? m[1] : null;
 }
 
