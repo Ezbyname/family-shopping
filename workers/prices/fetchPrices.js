@@ -296,16 +296,32 @@ export async function resolveStoreMetaUrls(chain, maxPages = 20) {
 
 // ── MULTI-STORE: RESOLVE ALL PER-STORE PRICE URLs FROM PAGINATED INDEX ─────
 // Used by multiStore chains (Shufersal) where each store has its own Price*.gz.
-// Returns Map<storeId, signedUrl> — newest file per store (page 1 = most recent).
+//
+// File type preference (CRITICAL for data completeness):
+//   PriceFull*.gz   — complete store catalog (5,000–15,000 items/store) ← PREFERRED
+//   PriceUpdate*.gz — only recent price changes (< 100 items/store)      ← fallback
+//
+// The index at catID=0 lists both types. PriceUpdate files are published
+// multiple times per day; PriceFull is published once. We scan all pages
+// to collect PriceFull URLs first, then fall back to PriceUpdate for stores
+// that have no PriceFull in the index.
+//
+// Returns { priceByStore: Map<storeId, signedUrl>, storeByStore: Map<storeId, signedUrl> }
 export async function resolveAllPriceUrls(chain, maxStores = 50, maxPages = 10) {
-  const priceByStore = new Map(); // storeId → price file url
-  const storeByStore = new Map(); // storeId → stores metadata file url
+  const priceFullByStore   = new Map(); // storeId → PriceFull url  (preferred: full catalog)
+  const priceUpdateByStore = new Map(); // storeId → PriceUpdate url (fallback: recent changes only)
+  const storeByStore       = new Map(); // storeId → Stores metadata url
 
-  const azurePriceRe = /href=["'](https?:\/\/[^"']*\.blob\.core\.windows\.net\/[^"']*\/Price[^"']*\.gz(?:\?[^"']*)?)["']/gi;
-  const azureStoreRe = /href=["'](https?:\/\/[^"']*\.blob\.core\.windows\.net\/[^"']*\/Stores[^"']*\.gz(?:\?[^"']*)?)["']/gi;
-  const decodeHtml   = (s) => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+  // Separate regexes so we can prefer PriceFull over PriceUpdate per store.
+  const azureFullRe   = /href=["'](https?:\/\/[^"']*\.blob\.core\.windows\.net\/[^"']*\/PriceFull[^"']*\.gz(?:\?[^"']*)?)["']/gi;
+  const azureUpdateRe = /href=["'](https?:\/\/[^"']*\.blob\.core\.windows\.net\/[^"']*\/PriceUpdate[^"']*\.gz(?:\?[^"']*)?)["']/gi;
+  const azureStoreRe  = /href=["'](https?:\/\/[^"']*\.blob\.core\.windows\.net\/[^"']*\/Stores[^"']*\.gz(?:\?[^"']*)?)["']/gi;
+  const decodeHtml    = (s) => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
 
-  for (let page = 1; page <= maxPages && priceByStore.size < maxStores; page++) {
+  for (let page = 1; page <= maxPages; page++) {
+    // Stop only when we have enough PriceFull files — don't stop early for PriceUpdate.
+    if (priceFullByStore.size >= maxStores) break;
+
     const pageUrl = chain.indexUrl.replace('PAGE', String(page));
     try {
       const res = await fetch(pageUrl, {
@@ -319,18 +335,31 @@ export async function resolveAllPriceUrls(chain, maxStores = 50, maxPages = 10) 
       }
       const body = await res.text();
 
-      let m, newPrice = 0, newStore = 0;
+      let m, newFull = 0, newUpdate = 0, newStore = 0;
 
-      azurePriceRe.lastIndex = 0;
-      while ((m = azurePriceRe.exec(body))) {
+      // Collect PriceFull URLs (preferred — complete store catalog)
+      azureFullRe.lastIndex = 0;
+      while ((m = azureFullRe.exec(body))) {
         const url     = decodeHtml(m[1]);
         const storeId = extractStoreIdFromUrl(url);
-        if (storeId && !priceByStore.has(storeId) && priceByStore.size < maxStores) {
-          priceByStore.set(storeId, url);
-          newPrice++;
+        if (storeId && !priceFullByStore.has(storeId)) {
+          priceFullByStore.set(storeId, url);
+          newFull++;
         }
       }
 
+      // Collect PriceUpdate URLs (fallback — only for stores without PriceFull)
+      azureUpdateRe.lastIndex = 0;
+      while ((m = azureUpdateRe.exec(body))) {
+        const url     = decodeHtml(m[1]);
+        const storeId = extractStoreIdFromUrl(url);
+        if (storeId && !priceUpdateByStore.has(storeId)) {
+          priceUpdateByStore.set(storeId, url);
+          newUpdate++;
+        }
+      }
+
+      // Collect Stores metadata URLs (passed through to caller)
       azureStoreRe.lastIndex = 0;
       while ((m = azureStoreRe.exec(body))) {
         const url     = decodeHtml(m[1]);
@@ -342,18 +371,40 @@ export async function resolveAllPriceUrls(chain, maxStores = 50, maxPages = 10) 
       }
 
       logger.info(`[${chain.name}] index page ${page}`, {
-        newPrice, newStore, totalStores: priceByStore.size, maxStores,
+        newFull, newUpdate, newStore,
+        totalFull: priceFullByStore.size, totalUpdate: priceUpdateByStore.size, maxStores,
       });
-      if (newPrice === 0 && newStore === 0) break; // no new data on this page
+
+      // Stop scanning if this page had no new entries at all
+      if (newFull === 0 && newUpdate === 0 && newStore === 0) break;
     } catch (e) {
       logger.warn(`[${chain.name}] index page ${page} failed`, { error: e.message });
       break;
     }
   }
 
+  // Build final map: PriceFull first (complete catalog), then PriceUpdate fallback
+  // for any stores that have no PriceFull entry in the current index.
+  const priceByStore = new Map();
+  for (const [storeId, url] of priceFullByStore) {
+    if (priceByStore.size >= maxStores) break;
+    priceByStore.set(storeId, url);
+  }
+  for (const [storeId, url] of priceUpdateByStore) {
+    if (priceByStore.size >= maxStores) break;
+    if (!priceByStore.has(storeId)) {
+      priceByStore.set(storeId, url);
+      logger.warn(`[${chain.name}] store ${storeId}: no PriceFull found — using PriceUpdate (incomplete catalog)`);
+    }
+  }
+
   logger.info(`[${chain.name}] multi-store discovery complete`, {
-    priceStores: priceByStore.size,
-    storeMetaFiles: storeByStore.size,
+    priceFullFound:   priceFullByStore.size,
+    priceUpdateFound: priceUpdateByStore.size,
+    usingPriceUpdate: priceByStore.size - priceFullByStore.size > 0
+                        ? priceByStore.size - priceFullByStore.size : 0,
+    priceStores:      priceByStore.size,
+    storeMetaFiles:   storeByStore.size,
   });
   return { priceByStore, storeByStore };
 }

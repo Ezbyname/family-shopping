@@ -10,7 +10,7 @@ export const CHAINS = [
     name:     'שופרסל',
     chainId:  '7290027600007',
     enabled:  true,
-    status:   'enabled',           // ✅ Verified 2026-05-24: multi-store, 1,000 prices / 5 stores
+    status:   'enabled',           // ✅ Verified 2026-05-24: multi-store, 422 stores in Firebase; PriceFull preferred over PriceUpdate
     lastVerified: '2026-05-24',
     sanityRequired: true,
     knownIssue: null,
