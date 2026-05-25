@@ -43,7 +43,8 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
 
-  const { barcode, q, lat, lng, radiusKm, groupId, userId } = req.query || {};
+  const { barcode, q, lat, lng, radiusKm, groupId, userId, includeStale } = req.query || {};
+  const wantStale = includeStale === 'true';
 
   const userLat  = parseFloat(lat  || '');
   const userLng  = parseFloat(lng  || '');
@@ -66,7 +67,7 @@ export default async function handler(req, res) {
           error: lastError || 'database_unavailable',
         });
       }
-      const result = await buildLayeredPrices(db, clean, userId, groupId, hasLoc, userLat, userLng, radius);
+      const result = await buildLayeredPrices(db, clean, userId, groupId, hasLoc, userLat, userLng, radius, {}, wantStale);
       return res.status(200).json({ version: '6.0.0', barcode: clean, ...result });
     } catch (e) {
       console.error('[prices] barcode error:', e.message);
@@ -109,7 +110,7 @@ export default async function handler(req, res) {
       }
       const layered = await buildLayeredPrices(
         db, p.barcode, userId, groupId,
-        hasLoc, userLat, userLng, radius, storeIndex
+        hasLoc, userLat, userLng, radius, storeIndex, wantStale
       );
       return { ...p, ...layered };
     }));
@@ -145,7 +146,7 @@ export default async function handler(req, res) {
 // buildLayeredPrices — core priority logic
 // Returns { prices, source, communityWarning }
 // ─────────────────────────────────────────────
-async function buildLayeredPrices(db, barcode, userId, groupId, hasLoc, lat, lng, radius, storeIndex = {}) {
+async function buildLayeredPrices(db, barcode, userId, groupId, hasLoc, lat, lng, radius, storeIndex = {}, includeStale = false) {
   if (!db) return { prices: [], source: 'none', communityWarning: null };
 
   // Fetch all layers in parallel
@@ -185,18 +186,44 @@ async function buildLayeredPrices(db, barcode, userId, groupId, hasLoc, lat, lng
   }
 
   if (official.length > 0) {
+    const STALE_MS = 36 * 3600 * 1000;
+
+    // Tag each row with its own isStale flag.
+    // syncedAt is stored as Date.now() (unix ms) by the price worker.
+    official = official.map(p => ({
+      ...p,
+      isStale: !p.syncedAt || (now - Number(p.syncedAt)) > STALE_MS,
+    }));
+
+    // Partition into fresh / stale
+    const freshRows = official.filter(p => !p.isStale);
+    const staleRows = official.filter(p =>  p.isStale);
+
+    // Sort each partition cheapest-first
+    freshRows.sort((a, b) => a.displayPrice - b.displayPrice);
+    staleRows.sort((a, b) => a.displayPrice - b.displayPrice);
+
+    // By default exclude stale rows; caller opts in with ?includeStale=true
+    const prices = includeStale ? [...freshRows, ...staleRows] : freshRows;
+
+    // Response-level flags
+    const allStale       = freshRows.length === 0;          // true only when every row is stale
+    const hasStaleEntries = staleRows.length > 0;            // true when any mix exists
+
+    // lastUpdated = most recent syncedAt among fresh rows; fall back to stale
+    const bestFresh = freshRows.length ? Math.max(...freshRows.map(p => Number(p.syncedAt))) : 0;
+    const bestStale = staleRows.length ? Math.max(...staleRows.map(p => Number(p.syncedAt))) : 0;
+    const lastUpdatedMs = bestFresh || bestStale;
+    const lastUpdated   = lastUpdatedMs ? new Date(lastUpdatedMs).toISOString() : null;
+
     const warning = buildCommunityWarning(snaps.reports, official);
-    // Stale detection: prices not synced in 36+ hours
-    const STALE_MS  = 36 * 3600 * 1000;
-    const latestSync = Math.max(...official.map(p => p.syncedAt || 0));
-    const isStale    = !latestSync || (Date.now() - latestSync) > STALE_MS;
-    const lastUpdated = latestSync ? new Date(latestSync).toISOString() : null;
     return {
-      prices: official,
+      prices,
       source: 'firebase_cache',
-      isStale,
+      isStale: allStale,
+      hasStaleEntries,
       lastUpdated,
-      warning: isStale ? 'Prices may be outdated — sync pending' : null,
+      warning: allStale ? 'Prices may be outdated — sync pending' : null,
       communityWarning: warning,
     };
   }
