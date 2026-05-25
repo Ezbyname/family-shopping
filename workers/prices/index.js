@@ -160,6 +160,75 @@ async function syncChainStores(chain, writer, config) {
   return result;
 }
 
+// ── LEGACY KEY CLEANUP ────────────────────────────────────────────────────────
+// When storeId normalisation changed ("034" → "34"), Firebase accumulated
+// orphaned keys.  This finds them via the cheap stores/ index, then batch-
+// deletes matching price entries for every barcode written in this sync run.
+// Safe to run on every sync — no-ops instantly if no legacy keys exist.
+async function cleanupLegacyStoreKeys(db, chainId, syncedStoreIds, syncedBarcodes, dryRun) {
+  // Enumerate padded-zero variants that may have been written by old code
+  const candidates = new Set();
+  for (const storeId of syncedStoreIds) {
+    const numId = parseInt(storeId, 10);
+    if (isNaN(numId)) continue;
+    for (const padLen of [2, 3, 4]) {
+      const paddedSid = String(numId).padStart(padLen, '0');
+      if (paddedSid === storeId) continue;         // same format → skip
+      candidates.add(safeKey(`${chainId}_${paddedSid}`));
+    }
+  }
+  if (candidates.size === 0) return { deleted: 0, legacyKeys: [] };
+
+  // Verify which candidates actually exist in stores/ (avoids scanning all prices)
+  const legacyKeys = [];
+  for (const oldKey of candidates) {
+    const snap = await db.ref(`stores/${oldKey}`).get();
+    if (snap.exists()) legacyKeys.push(oldKey);
+  }
+  if (legacyKeys.length === 0) {
+    logger.info('[cleanup] No legacy store keys found in Firebase — skipping');
+    return { deleted: 0, legacyKeys: [] };
+  }
+  logger.info('[cleanup] Legacy store keys confirmed — will remove price entries', { keys: legacyKeys, barcodes: syncedBarcodes.size, dryRun });
+
+  // Batch-delete prices/{barcode}/{oldKey} for every barcode written this run
+  const BATCH_LIMIT = 400;
+  let batch = {}, totalDeleted = 0;
+
+  const flushBatch = async () => {
+    const n = Object.keys(batch).length;
+    if (n === 0) return;
+    if (!dryRun) await db.ref('/').update(batch);
+    totalDeleted += n;
+    batch = {};
+  };
+
+  for (const barcode of syncedBarcodes) {
+    for (const oldKey of legacyKeys) {
+      batch[`prices/${barcode}/${oldKey}`] = null;
+      if (Object.keys(batch).length >= BATCH_LIMIT) await flushBatch();
+    }
+  }
+  await flushBatch();
+
+  // Remove the orphaned stores/ entries
+  for (const oldKey of legacyKeys) {
+    if (!dryRun) {
+      await db.ref(`stores/${oldKey}`).remove();
+      logger.info(`[cleanup] Removed stores/${oldKey}`);
+    } else {
+      logger.info(`[cleanup] [dry-run] Would remove stores/${oldKey}`);
+    }
+  }
+
+  logger.info('[cleanup] Legacy cleanup complete', {
+    priceEntries: dryRun ? `${totalDeleted} would-be-deleted` : `${totalDeleted} deleted`,
+    storeKeysRemoved: legacyKeys.length,
+    dryRun,
+  });
+  return { deleted: totalDeleted, legacyKeys };
+}
+
 // ── MULTI-STORE SYNC (Shufersal: one Price*.gz per store) ──────────────────
 async function syncChainMultiStore(chain, writer, config) {
   const label = `[${chain.name}]`;
@@ -349,6 +418,27 @@ async function syncChainMultiStore(chain, writer, config) {
     stores: storeIdsSynced.length, uniqueBarcodes: _uniqueBarcodes.size, totalRows: _totalRows,
     dryRun: config.dryRun,
   });
+
+  // ── Clean up legacy padded-zero store keys ──────────────────────────────────
+  // Runs in both dry-run (logging only) and live mode (actual deletes).
+  // When storeId normalisation changed ("034" → "34"), old Firebase keys like
+  // shufersal_034 became orphaned.  We detect them by checking stores/{oldKey},
+  // then batch-delete matching price entries for all barcodes from this run.
+  try {
+    const cleanupRes = await cleanupLegacyStoreKeys(
+      db, chain.id, storeIdsSynced, _uniqueBarcodes, config.dryRun,
+    );
+    if (cleanupRes.deleted > 0 || (config.dryRun && cleanupRes.legacyKeys.length > 0)) {
+      logger.ok(`${label} Legacy key cleanup`, {
+        priceEntriesDeleted: cleanupRes.deleted,
+        storeKeysRemoved:    cleanupRes.legacyKeys,
+        dryRun:              config.dryRun,
+      });
+    }
+  } catch (e) {
+    logger.warn(`${label} Legacy key cleanup failed (non-blocking)`, { error: e.message });
+  }
+
   if (config.dryRun) {
     logger.info(`${label} DRY-RUN COMPLETE — safe to proceed with real write`);
     return result;
