@@ -168,15 +168,40 @@ async function main() {
     process.exit(0);
   }
 
-  // ── Write snapshot ─────────────────────────────────────────────────────────
+  // ── Write local snapshot ───────────────────────────────────────────────────
   mkdirSync(resolve(__dirname, 'data'), { recursive: true });
   writeFileSync(SNAPSHOT, JSON.stringify(output, null, 2), 'utf8');
-
-  console.log(`\n✅ Snapshot written → ${SNAPSHOT}`);
+  console.log(`\n✅ Local snapshot written → ${SNAPSHOT}`);
   console.log(`   ${allKeys.length} stores exported (${geocodedCount} geocoded, ${noCoordCount} without coords)`);
+
+  // ── Firebase RTDB backup ───────────────────────────────────────────────────
+  // Rotates: previous ← latest ← new export.
+  // This ensures the snapshot survives VM disk loss / accidental deletion.
+  // storeSnapshot/latest  → current export (full stores map)
+  // storeSnapshot/previous → the export before this one (one-generation rollback)
+  console.log('\nBacking up snapshot to Firebase RTDB (storeSnapshot/)...');
+  try {
+    // Read existing latest → rotate to previous
+    const existingSnap = await db.ref('storeSnapshot/latest').get();
+    if (existingSnap.exists()) {
+      const existing = existingSnap.val();
+      await db.ref('storeSnapshot/previous').set({
+        ...existing,
+        rotatedAt: new Date().toISOString(),
+      });
+    }
+    // Write new latest
+    await db.ref('storeSnapshot/latest').set(output);
+    console.log('  ✅ Firebase backup complete  (storeSnapshot/latest + storeSnapshot/previous)');
+  } catch (e) {
+    console.warn(`  ⚠ Firebase backup failed: ${e.message}`);
+    console.warn('    Local snapshot is still intact — consider manual backup.');
+  }
+
   console.log('\nNext steps:');
   console.log('  • Monthly maintenance: node stores-monthly-update.js --dry-run');
   console.log('  • Full verification:   node verify.js --stores');
+  console.log('  • Firebase backup:     firebase.rtdb/storeSnapshot/latest');
 
   process.exit(0);
 }

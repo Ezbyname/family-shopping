@@ -9,13 +9,17 @@
 //   STORE_MAINTENANCE_WRITE=true node stores-monthly-update.js  # live run
 //
 // ── Scheduling (PM2 ecosystem.config.js or crontab on VPS) ───────────────────
-//   0 3 1 * *   cd /path/to/family-shopping && node workers/prices/stores-monthly-update.js
+//   Daily price sync runs at 03:00.  Monthly maintenance runs at 04:30 on the
+//   1st of each month — 90 min after the sync — so freshly-written updatedAt
+//   timestamps are already in Firebase when we check for "missing stores".
+//
+//   crontab:  30 4 1 * *  cd /path/to/family-shopping && STORE_MAINTENANCE_WRITE=true node workers/prices/stores-monthly-update.js
 //
 //   PM2 cron entry (SEPARATE from daily price sync — add to ecosystem.config.js):
 //     {
 //       name: 'store-maintenance',
 //       script: 'workers/prices/stores-monthly-update.js',
-//       cron_restart: '0 3 1 * *',
+//       cron_restart: '30 4 1 * *',   // 04:30 on the 1st — after daily sync
 //       autorestart: false,
 //       env: { STORE_MAINTENANCE_WRITE: 'true', NODE_ENV: 'production' }
 //     }
@@ -565,6 +569,26 @@ async function main() {
 
   saveSnapshot(newSnapshot);
   counts.snapshotUpdated = Object.keys(updatedStores).length;
+  console.log(`  ✓ Local snapshot: ${SNAPSHOT}  (${counts.snapshotUpdated} stores)`);
+
+  // ── Firebase RTDB backup ───────────────────────────────────────────────────
+  // Mirrors the local snapshot to storeSnapshot/latest with one-generation
+  // rotation (previous).  Survives VM disk loss without extra infrastructure.
+  console.log('\nBacking up snapshot to Firebase RTDB (storeSnapshot/)...');
+  try {
+    const existingSnap = await db.ref('storeSnapshot/latest').get();
+    if (existingSnap.exists()) {
+      await db.ref('storeSnapshot/previous').set({
+        ...existingSnap.val(),
+        rotatedAt: runAt,
+      });
+    }
+    await db.ref('storeSnapshot/latest').set(newSnapshot);
+    console.log('  ✅ Firebase backup complete  (storeSnapshot/latest + storeSnapshot/previous)');
+  } catch (e) {
+    console.warn(`  ⚠ Firebase backup failed: ${e.message}`);
+    console.warn('    Local snapshot is still intact — consider manual backup.');
+  }
 
   // ── Final summary ──────────────────────────────────────────────────────────
   console.log('\n' + '═'.repeat(56));
