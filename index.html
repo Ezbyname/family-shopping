@@ -20,6 +20,7 @@
   --accent:#f0b429;--accent-dim:rgba(240,180,41,.15);
   --green:#34d399;--green-dim:rgba(52,211,153,.12);
   --red:#f87171;--text:#e6edf3;--muted:#7d8590;--border:#30363d;
+  --blue:#60a5fa;--blue-dim:rgba(96,165,250,.12);
   --radius:16px;--safe-b:env(safe-area-inset-bottom,0px);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -1394,6 +1395,129 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
 /* Separator */
 .gs-sep{height:1px;background:rgba(255,255,255,.05);margin:4px 0}
 
+/* ══ PRICE CHIP — shopping list item price preview ══ */
+.price-chip-area{min-height:0;overflow:hidden}
+.price-chip{display:inline-flex;align-items:center;gap:4px;margin-top:5px;cursor:pointer;
+  border-radius:8px;padding:3px 9px;font-family:'Heebo',sans-serif;
+  font-size:11px;font-weight:700;transition:all .15s;max-width:220px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  background:var(--card2);border:1px solid var(--border);color:var(--text);}
+.price-chip:active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+.price-chip.best{background:var(--green-dim);border-color:rgba(52,211,153,.3);color:var(--green)}
+.price-chip.stale{border-color:rgba(248,113,113,.25);color:var(--red)}
+@keyframes shimmer{0%{background-position:200% center}100%{background-position:-200% center}}
+.price-chip-shimmer{display:inline-block;margin-top:5px;height:20px;width:72px;
+  border-radius:7px;
+  background:linear-gradient(90deg,var(--card2) 25%,rgba(255,255,255,.06) 50%,var(--card2) 75%);
+  background-size:200% 100%;animation:shimmer 1.4s ease infinite}
+
+/* ══ PRICE DETAIL BOTTOM SHEET ══ */
+.pd-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);
+  z-index:500;align-items:flex-end;justify-content:center}
+.pd-overlay.show{display:flex}
+.pd-sheet{background:var(--surface);border-radius:24px 24px 0 0;
+  width:100%;max-width:480px;max-height:92vh;display:flex;flex-direction:column;
+  animation:slideUp .25s ease;overflow:hidden}
+.pd-drag{width:36px;height:4px;background:var(--border);border-radius:2px;
+  margin:12px auto 0;flex-shrink:0}
+.pd-head{padding:10px 14px 0;flex-shrink:0}
+.pd-head-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.pd-close{background:var(--card);border:none;color:var(--muted);font-size:13px;
+  cursor:pointer;width:28px;height:28px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pd-product-name{font-size:15px;font-weight:800;flex:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pd-qty-badge{background:var(--accent-dim);color:var(--accent);border-radius:6px;
+  padding:2px 8px;font-size:11px;font-weight:800;flex-shrink:0}
+.pd-toolbar{display:flex;gap:5px;overflow-x:auto;padding:0 0 10px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;-webkit-overflow-scrolling:touch}
+.pd-toolbar::-webkit-scrollbar{height:0}
+.pd-sort-btn,.pd-filter-btn{flex-shrink:0;background:var(--card);border:1.5px solid var(--border);
+  border-radius:20px;padding:4px 11px;font-family:'Heebo',sans-serif;
+  font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap}
+.pd-sort-btn.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+.pd-filter-btn.active{background:rgba(99,102,241,.15);border-color:#6366f1;color:#6366f1}
+.pd-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:10px 14px calc(16px + var(--safe-b))}
+.pd-summary{display:flex;align-items:center;gap:8px;
+  background:var(--card);border-radius:13px;padding:12px 14px;
+  margin-bottom:10px;flex-wrap:wrap}
+.pd-summary-min{font-size:22px;font-weight:900;color:var(--green)}
+.pd-summary-max{font-size:16px;font-weight:700;color:var(--red)}
+.pd-summary-sep{font-size:14px;color:var(--muted)}
+.pd-summary-save{font-size:11px;color:var(--muted);margin-right:auto;text-align:left;line-height:1.4}
+.pd-summary-save strong{color:var(--accent)}
+.pd-row{display:flex;align-items:center;gap:10px;
+  background:var(--card);border-radius:13px;padding:12px 14px;margin-bottom:6px}
+.pd-row.best{background:var(--green-dim);border:1px solid rgba(52,211,153,.2)}
+.pd-row-left{flex:1;min-width:0}
+.pd-row-trophy{font-size:10px;font-weight:800;color:var(--green);margin-bottom:2px}
+.pd-row-chain{font-size:13px;font-weight:800;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.pd-row-store{font-size:11px;color:var(--muted);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pd-row-meta{font-size:10px;color:var(--muted);margin-top:3px;
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pd-row-right{text-align:left;flex-shrink:0;min-width:70px}
+.pd-row-price{font-size:20px;font-weight:900}
+.pd-row.best .pd-row-price{color:var(--green)}
+.pd-row-unit{font-size:10px;color:var(--muted);margin-top:1px}
+.pd-row-stale{font-size:9px;color:var(--red)}
+.pd-row-actions{display:flex;gap:5px;margin-top:6px}
+.pd-row-act{background:var(--card2);border:1px solid var(--border);border-radius:7px;
+  padding:3px 9px;font-family:'Heebo',sans-serif;font-size:10px;font-weight:600;
+  color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap}
+.pd-row-act:active{border-color:var(--accent);color:var(--accent)}
+.pd-manual-btn{width:100%;margin-top:12px;background:var(--card);
+  border:1.5px dashed var(--border);border-radius:13px;
+  padding:12px;font-family:'Heebo',sans-serif;font-size:13px;font-weight:700;
+  color:var(--muted);cursor:pointer;display:flex;align-items:center;
+  justify-content:center;gap:6px;transition:all .15s}
+.pd-manual-btn:active{border-color:var(--accent);color:var(--accent)}
+.pd-loading{text-align:center;padding:40px 20px;color:var(--muted)}
+.pd-loading .spin{width:30px;height:30px;border:3px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;
+  margin:0 auto 10px}
+.pd-empty{text-align:center;padding:32px 20px;color:var(--muted)}
+.pd-empty .pe-icon{font-size:36px;margin-bottom:8px}
+
+/* ══ MANUAL PRICE MODAL v2 — unified override + family ══ */
+.mp2-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);
+  z-index:510;align-items:flex-end;justify-content:center}
+.mp2-overlay.show{display:flex}
+.mp2-sheet{background:var(--surface);border-radius:24px 24px 0 0;
+  width:100%;max-width:480px;max-height:82vh;overflow-y:auto;
+  animation:slideUp .25s ease;padding:0 0 calc(24px + var(--safe-b))}
+.mp2-drag{width:36px;height:4px;background:var(--border);border-radius:2px;
+  margin:12px auto 0}
+.mp2-head{padding:12px 16px 10px;border-bottom:1px solid var(--border)}
+.mp2-title{font-size:16px;font-weight:800;text-align:center;margin-bottom:2px}
+.mp2-product{font-size:12px;color:var(--muted);text-align:center}
+.mp2-tabs{display:flex;gap:6px;padding:12px 16px 0}
+.mp2-tab{flex:1;background:var(--card);border:1.5px solid var(--border);border-radius:11px;
+  padding:9px 6px;font-family:'Heebo',sans-serif;font-size:12px;font-weight:700;
+  color:var(--muted);cursor:pointer;transition:all .15s;text-align:center}
+.mp2-tab.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+.mp2-body{padding:14px 16px 0}
+.mp2-hint{background:var(--card);border-radius:10px;padding:10px 12px;
+  font-size:11px;color:var(--muted);line-height:1.55;margin-bottom:12px}
+.mp2-hint strong{color:var(--text);font-weight:700}
+.mp2-store-input{background:var(--card);border:1.5px solid var(--border);border-radius:12px;
+  padding:10px 13px;font-family:'Heebo',sans-serif;font-size:14px;color:var(--text);
+  outline:none;width:100%;margin-bottom:8px;direction:rtl}
+.mp2-store-input:focus{border-color:var(--accent)}
+.mp2-store-input::placeholder{color:var(--muted)}
+.mp2-price-row{display:flex;align-items:center;gap:8px;direction:ltr;margin-bottom:10px}
+.mp2-currency{font-size:18px;font-weight:900;color:var(--accent)}
+.mp2-price-input{flex:1;background:var(--card);border:1.5px solid var(--border);
+  border-radius:12px;padding:10px;color:var(--text);font-family:'Heebo',sans-serif;
+  font-size:20px;font-weight:800;text-align:center;outline:none;direction:ltr}
+.mp2-price-input:focus{border-color:var(--accent)}
+.mp2-save-btn{width:100%;background:var(--accent);color:#111;border:none;
+  border-radius:13px;padding:13px;font-family:'Heebo',sans-serif;
+  font-size:15px;font-weight:800;cursor:pointer;transition:opacity .15s}
+.mp2-save-btn:active{opacity:.8}
+
 </style>
 </head>
 <body>
@@ -2023,6 +2147,8 @@ function renderList(){
     if(curTab!=='fav')html+=`<button class="clear-btn" onclick="clearBought()">🗑 מחק את כל הנקנים</button>`;
   }
   wrap.innerHTML=html;
+  // Load cheapest price chips for pending items with barcodes (non-blocking)
+  if(curTab==='all') setTimeout(loadItemPricesInBackground, 80);
 }
 
 // itemHTML defined below with attribution support
@@ -3724,6 +3850,12 @@ function itemHTML(item) {
     ipTile = '';
   }
 
+  const barcode = item.barcode || item.attached?.barcode || '';
+  const hasPriceSource = !isFavTab && !item.bought && barcode && isValidBarcode(barcode);
+  const priceChipHTML = hasPriceSource
+    ? `<div class="price-chip-area" id="price-chip-${item.id}"><div class="price-chip-shimmer"></div></div>`
+    : '';
+
   return `<div class="item-card${(!isFavTab&&item.bought)?' bought':''}${item.fav?' fav':''}">
     ${ipTile}
     <div class="item-body">
@@ -3739,6 +3871,7 @@ function itemHTML(item) {
         <button class="qty-btn" onclick="changeQty('${item.id}',1)">+</button>
         ${boughtBtn}
       </div>
+      ${priceChipHTML}
     </div>
     <div class="item-acts">
       <button class="fav-star-btn${isFavSaved?' starred':''}"
@@ -6912,6 +7045,429 @@ function adminTimeAgo(iso) {
 
 // initAdminGesture is called from connectToGroup() directly (line above auth block).
 
+// ══════════════════════════════════════════════════
+// PRICE CACHE SYSTEM
+// Dual-layer: in-memory (30 min) + localStorage (6 h)
+// ══════════════════════════════════════════════════
+const _priceCache = {};
+const PRICE_CACHE_TTL   = 30 * 60 * 1000;   // 30 min in-memory
+const PRICE_CACHE_LS_TTL = 6 * 60 * 60 * 1000; // 6 h localStorage
+
+function _pcKey(barcode) { return 'pc_' + barcode; }
+
+function _pcLoadLS(barcode) {
+  try {
+    const raw = localStorage.getItem(_pcKey(barcode));
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (!obj || Date.now() - (obj.ts || 0) > PRICE_CACHE_LS_TTL) return null;
+    return obj;
+  } catch(_) { return null; }
+}
+function _pcSaveLS(barcode, entry) {
+  try { localStorage.setItem(_pcKey(barcode), JSON.stringify(entry)); } catch(_) {}
+}
+function _pcGet(barcode) {
+  const m = _priceCache[barcode];
+  if (m && Date.now() - m.ts < PRICE_CACHE_TTL) return m;
+  const ls = _pcLoadLS(barcode);
+  if (ls) { _priceCache[barcode] = ls; return ls; }
+  return null;
+}
+function _pcSet(barcode, prices) {
+  const entry = { prices, ts: Date.now() };
+  _priceCache[barcode] = entry;
+  _pcSaveLS(barcode, entry);
+}
+function _pcInvalidate(barcode) {
+  delete _priceCache[barcode];
+  try { localStorage.removeItem(_pcKey(barcode)); } catch(_) {}
+}
+
+// Fetch prices for a barcode, using cache when available.
+// Returns { prices, ts, fromCache } or null on failure.
+// API barcode mode returns: { barcode, prices: [...], source, isStale, ... }
+async function _fetchPricesForBarcode(barcode) {
+  const cached = _pcGet(barcode);
+  if (cached) return { ...cached, fromCache: true };
+  try {
+    let url = `/api/prices?barcode=${encodeURIComponent(barcode)}`;
+    if (_hasLoc()) url += `&lat=${_locLat()}&lng=${_locLng()}&radiusKm=${_nearbyRadius}&includeApproximate=true`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    // Barcode mode returns { prices: [...] } at the top level
+    const prices = (data.prices || []).filter(p => (p.displayPrice || p.price || 0) > 0);
+    _pcSet(barcode, prices);
+    return { prices, ts: Date.now(), fromCache: false };
+  } catch(e) {
+    console.warn('[priceCache] fetch failed:', barcode, e.message);
+    // Return stale cache rather than null — better stale than empty
+    const stale = _priceCache[barcode] || _pcLoadLS(barcode);
+    if (stale) return { ...stale, stale: true, fromCache: true };
+    return null;
+  }
+}
+
+// ══════════════════════════════════════════════════
+// SHOPPING LIST PRICE CHIPS
+// ══════════════════════════════════════════════════
+let _chipBatchTimer = null;
+
+async function loadItemPricesInBackground() {
+  clearTimeout(_chipBatchTimer);
+  _chipBatchTimer = setTimeout(async () => {
+    const pending = Object.entries(items)
+      .map(([id, v]) => ({ ...v, id }))
+      .filter(i => !i.bought);
+
+    for (const item of pending) {
+      const barcode = item.barcode || item.attached?.barcode;
+      if (!barcode || !isValidBarcode(barcode)) continue;
+      const chipArea = document.getElementById('price-chip-' + item.id);
+      if (!chipArea) continue;
+      if (chipArea.dataset.loaded === '1') continue; // already resolved
+
+      try {
+        const result = await _fetchPricesForBarcode(barcode);
+        // If chipArea was removed (list re-rendered), skip
+        if (!document.contains(chipArea)) continue;
+        if (!result?.prices?.length) { chipArea.innerHTML = ''; continue; }
+
+        const prices = result.prices;
+        const best = prices[0];
+        const qty  = item.qty || 1;
+        const totalP = (best.displayPrice || best.price || 0) * qty;
+        const isStale = best.isStale || result.stale;
+        const hasMulti = prices.length > 1;
+
+        chipArea.dataset.loaded = '1';
+        chipArea.innerHTML = `<button class="price-chip${hasMulti?' best':''}${isStale?' stale':''}"
+          onclick="openPriceDetailModal(${JSON.stringify(barcode)},${JSON.stringify(item.name||'')},${qty})"
+          title="השווה מחירים">
+          <span>₪${totalP.toFixed(2)}</span>
+          <span style="font-size:9px;opacity:.75">${esc(best.chainName||best.storeName||'')}</span>
+          ${qty > 1 ? `<span style="opacity:.6">×${qty}</span>` : ''}
+          ${isStale ? '<span style="color:var(--red)">⚠</span>' : ''}
+        </button>`;
+      } catch(e) {
+        const el = document.getElementById('price-chip-' + item.id);
+        if (el) el.innerHTML = '';
+      }
+    }
+  }, 150);
+}
+
+// ══════════════════════════════════════════════════
+// PRICE DETAIL BOTTOM SHEET
+// ══════════════════════════════════════════════════
+let _pdBarcode = null;
+let _pdName    = '';
+let _pdQty     = 1;
+let _pdSort    = 'cheapest';
+let _pdFilters = new Set();
+let _pdPrices  = [];
+
+window.openPriceDetailModal = async function(barcode, name, qty) {
+  if (!barcode) return;
+  _pdBarcode = barcode;
+  _pdName    = name || '';
+  _pdQty     = qty  || 1;
+  _pdSort    = 'cheapest';
+  _pdFilters = new Set();
+
+  const overlay = document.getElementById('price-detail-overlay');
+  const body    = document.getElementById('pd-body');
+
+  const nameEl = document.getElementById('pd-product-name');
+  const qtyEl  = document.getElementById('pd-qty-badge');
+  if (nameEl) nameEl.textContent = _pdName || 'מחירים';
+  if (qtyEl) { qtyEl.style.display = _pdQty > 1 ? '' : 'none'; qtyEl.textContent = '×' + _pdQty; }
+
+  // Reset sort/filter UI
+  document.querySelectorAll('.pd-sort-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.pd-filter-btn').forEach(b => b.classList.remove('active'));
+  const cheapBtn = document.getElementById('pd-sort-cheapest');
+  if (cheapBtn) cheapBtn.classList.add('active');
+
+  if (body) body.innerHTML = `<div class="pd-loading"><div class="spin"></div><p>טוען מחירים...</p></div>`;
+  overlay?.classList.add('show');
+  document.body.classList.add('sheet-open');
+
+  // Fetch (cache-aware)
+  const result = await _fetchPricesForBarcode(barcode);
+  _pdPrices = result?.prices || [];
+
+  // Fallback: search by name if barcode returns nothing
+  if (!_pdPrices.length && _pdName) {
+    try {
+      let url = `/api/prices?q=${encodeURIComponent(_pdName)}`;
+      if (_hasLoc()) url += `&lat=${_locLat()}&lng=${_locLng()}&radiusKm=${_nearbyRadius}`;
+      const res  = await fetch(url);
+      const data = await res.json();
+      // Search mode returns results[].prices
+      const match = (data.results || []).find(r => r.barcode === barcode) || data.results?.[0];
+      _pdPrices = (match?.prices || []).filter(p => (p.displayPrice || p.price || 0) > 0);
+      if (_pdPrices.length) _pcSet(barcode, _pdPrices);
+    } catch(_) {}
+  }
+
+  _renderPriceDetail();
+};
+
+window.closePriceDetail = function() {
+  document.getElementById('price-detail-overlay')?.classList.remove('show');
+  document.body.classList.remove('sheet-open');
+};
+
+window.setPdSort = function(mode) {
+  _pdSort = mode;
+  document.querySelectorAll('.pd-sort-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('pd-sort-' + mode)?.classList.add('active');
+  _renderPriceDetail();
+};
+
+window.togglePdFilter = function(type) {
+  const btn = document.getElementById('pd-filter-' + type);
+  if (_pdFilters.has(type)) { _pdFilters.delete(type); btn?.classList.remove('active'); }
+  else                      { _pdFilters.add(type);    btn?.classList.add('active');    }
+  _renderPriceDetail();
+};
+
+function _renderPriceDetail() {
+  const body = document.getElementById('pd-body');
+  if (!body) return;
+
+  if (!_pdPrices.length) {
+    body.innerHTML = `
+      <div class="pd-empty">
+        <div class="pe-icon">🔍</div>
+        <div style="font-size:14px;font-weight:700;margin-bottom:6px">אין מחירים זמינים</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:14px">לא נמצאו מחירים רשמיים. הוסף ידנית:</div>
+      </div>
+      <button class="pd-manual-btn" onclick="openMp2(${JSON.stringify(_pdBarcode)},${JSON.stringify(_pdName)},false,'',0)">
+        📝 הוסף מחיר ידנית
+      </button>`;
+    return;
+  }
+
+  // Apply source filter
+  let filtered = [..._pdPrices];
+  if (_pdFilters.size > 0) {
+    filtered = filtered.filter(p => {
+      const src = p.source || '';
+      if (_pdFilters.has('official') && (src === 'official' || src === 'user_override' || src === 'proxy')) return true;
+      if (_pdFilters.has('manual')   && src === 'manual')  return true;
+      if (_pdFilters.has('approx')   && p.approximateLocation)  return true;
+      return false;
+    });
+  }
+
+  // Apply sort
+  if (_pdSort === 'nearest') {
+    filtered.sort((a, b) => (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999));
+  } else if (_pdSort === 'fresh') {
+    filtered.sort((a, b) => {
+      const ta = a.syncedAt ? new Date(a.syncedAt).getTime() : 0;
+      const tb = b.syncedAt ? new Date(b.syncedAt).getTime() : 0;
+      return tb - ta;
+    });
+  } else {
+    filtered.sort((a, b) => (a.displayPrice || a.price || 0) - (b.displayPrice || b.price || 0));
+  }
+
+  if (!filtered.length) {
+    body.innerHTML = `<div class="pd-empty">
+      <div class="pe-icon">🔍</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px">אין תוצאות לסינון הנוכחי</div>
+      <div style="font-size:12px;color:var(--muted)">נסה להסיר את הסינון</div>
+    </div>`;
+    return;
+  }
+
+  const qty      = _pdQty || 1;
+  const bestRaw  = (filtered[0].displayPrice  || filtered[0].price  || 0);
+  const worstRaw = (filtered[filtered.length-1].displayPrice || filtered[filtered.length-1].price || 0);
+  const bestTot  = bestRaw * qty;
+  const worstTot = worstRaw * qty;
+  const saving   = worstTot - bestTot;
+
+  const summaryHTML = filtered.length > 1 ? `
+    <div class="pd-summary">
+      <div class="pd-summary-min">₪${bestTot.toFixed(2)}</div>
+      <div class="pd-summary-sep">—</div>
+      <div class="pd-summary-max">₪${worstTot.toFixed(2)}</div>
+      ${qty > 1 ? `<div style="font-size:10px;color:var(--muted)">×${qty}</div>` : ''}
+      ${saving > 0.05 ? `<div class="pd-summary-save">אפשר לחסוך עד<br><strong>₪${saving.toFixed(2)}</strong></div>` : ''}
+    </div>` : '';
+
+  const rowsHTML = filtered.map((p, i) => {
+    const isBest     = i === 0;
+    const displayP   = (p.displayPrice || p.price || 0);
+    const totalP     = displayP * qty;
+    const src        = p.source || '';
+    const badge      = sourceBadge(p.sourceDisplay || src, p.submittedByDisplayName);
+    const chainName  = p.chainName || p.chainId || '';
+    const storeName  = (p.storeName && p.storeName !== p.chainName) ? p.storeName : '';
+    const chainKey   = `${p.chainId || chainName.replace(/\s/g,'_')}_${p.storeId || '0'}`;
+    const approxMark = p.approximateLocation ? `<span class="approx-badge">~משוער</span>` : '';
+    const staleMark  = p.isStale ? `<span class="pd-row-stale">⚠ מחיר ישן</span>` : '';
+
+    const metaParts = [];
+    if (p.city) metaParts.push(esc(p.city));
+    if (p.distanceKm != null) metaParts.push(`📍 ${p.distanceKm} ק"מ`);
+    if (p.syncedAt) {
+      const ageH = Math.floor((Date.now() - new Date(p.syncedAt).getTime()) / 3600000);
+      if (ageH < 48) metaParts.push(`🕐 לפני ${ageH < 1 ? '1' : ageH}ש`);
+    }
+
+    const actionBtns = (src === 'official' || src === 'user_override') ? `
+      <div class="pd-row-actions">
+        <button class="pd-row-act" onclick="openMp2(${JSON.stringify(_pdBarcode)},${JSON.stringify(_pdName)},true,${JSON.stringify(chainName)},${displayP})">✏️ תקן</button>
+        <button class="pd-row-act" onclick="openReportModal(${JSON.stringify(chainKey)},${JSON.stringify(chainName)},${displayP},${JSON.stringify(_pdName)})">🚨 דווח</button>
+      </div>` : '';
+
+    return `<div class="pd-row${isBest ? ' best' : ''}">
+      <div class="pd-row-left">
+        ${isBest && filtered.length > 1 ? '<div class="pd-row-trophy">🏆 הכי זול לידך</div>' : ''}
+        <div class="pd-row-chain">${esc(chainName)} ${badge} ${approxMark}</div>
+        ${storeName ? `<div class="pd-row-store">${esc(storeName)}</div>` : ''}
+        <div class="pd-row-meta">${metaParts.join(' · ')} ${staleMark}</div>
+        ${p.override ? '<div style="font-size:10px;color:var(--blue);margin-top:2px">✏️ תיקון אישי שלך</div>' : ''}
+        ${actionBtns}
+      </div>
+      <div class="pd-row-right">
+        <div class="pd-row-price">₪${totalP.toFixed(2)}</div>
+        ${qty > 1 ? `<div class="pd-row-unit">₪${displayP.toFixed(2)} יח'</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const hasOfficial = filtered.some(p => p.source === 'official' || p.source === 'user_override');
+  body.innerHTML = summaryHTML + rowsHTML + `
+    <button class="pd-manual-btn" onclick="openMp2(${JSON.stringify(_pdBarcode)},${JSON.stringify(_pdName)},${hasOfficial},'',0)">
+      📝 ${hasOfficial ? 'תקן / הוסף מחיר' : 'הוסף מחיר ידנית'}
+    </button>`;
+}
+
+// ══════════════════════════════════════════════════
+// MANUAL PRICE MODAL v2 — unified personal + family
+// ══════════════════════════════════════════════════
+let _mp2Context = null;
+let _mp2Tab     = 'override';
+
+window.openMp2 = function(barcode, name, hasOfficial, store, officialPrice) {
+  _mp2Context = { barcode, name, hasOfficial, store: store || '', officialPrice: +officialPrice || 0 };
+  _mp2Tab     = hasOfficial ? 'override' : 'family';
+
+  const titleEl   = document.getElementById('mp2-title');
+  const productEl = document.getElementById('mp2-product');
+  const storeEl   = document.getElementById('mp2-store-input');
+  const priceEl   = document.getElementById('mp2-price-input');
+  const tabOvr    = document.getElementById('mp2-tab-override');
+  const tabFam    = document.getElementById('mp2-tab-family');
+
+  if (titleEl)   titleEl.textContent   = hasOfficial ? '✏️ תיקון / הוספת מחיר' : '📝 הוסף מחיר';
+  if (productEl) productEl.textContent = name || '';
+  if (storeEl)   storeEl.value  = store || '';
+  if (priceEl)   priceEl.value  = '';
+  if (tabOvr)    tabOvr.style.display  = hasOfficial ? '' : 'none';
+
+  setMp2Tab(_mp2Tab);
+  document.getElementById('mp2-overlay')?.classList.add('show');
+  document.body.classList.add('sheet-open');
+  setTimeout(() => priceEl?.focus(), 320);
+};
+
+window.closeMp2 = function() {
+  document.getElementById('mp2-overlay')?.classList.remove('show');
+  document.body.classList.remove('sheet-open');
+};
+
+window.setMp2Tab = function(tab) {
+  _mp2Tab = tab;
+  document.querySelectorAll('.mp2-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('mp2-tab-' + tab)?.classList.add('active');
+
+  const hint    = document.getElementById('mp2-hint');
+  const storeEl = document.getElementById('mp2-store-input');
+
+  if (tab === 'override') {
+    if (hint) hint.innerHTML = `<strong>תיקון אישי</strong> — גלוי רק לך.<br>
+      מחיר המשפחה לא ישתנה; זה שינוי תצוגה אישי בלבד.`;
+    if (storeEl) storeEl.style.display = 'none'; // store already known from context
+  } else {
+    if (hint) hint.innerHTML = `<strong>מחיר משפחה</strong> — גלוי לכל חברי הקבוצה.<br>
+      השתמש כשאין מחיר רשמי עדיין.`;
+    if (storeEl) storeEl.style.display = '';
+  }
+};
+
+window.saveMp2Price = async function() {
+  if (!_mp2Context) return;
+  const { barcode, name, hasOfficial, store, officialPrice } = _mp2Context;
+  const priceEl = document.getElementById('mp2-price-input');
+  const storeEl = document.getElementById('mp2-store-input');
+
+  const price = parseFloat(priceEl?.value);
+  if (!isValidPrice(price)) { toast('⚠️ הכנס מחיר תקין'); return; }
+  if (!isValidBarcode(barcode)) { toast('⚠️ ברקוד לא תקין'); return; }
+
+  if (_mp2Tab === 'override') {
+    // Personal override — save to userPriceOverrides/{myId}/{barcode}/{chainKey}
+    const storeName = store || 'לא ידוע';
+    const chainKey  = storeName.replace(/\s/g,'_') + '_0';
+    const now = new Date().toISOString();
+    try {
+      await set(ref(db, `userPriceOverrides/${myId}/${barcode}/${chainKey}`), {
+        barcode, chainId: chainKey.split('_')[0], chainName: storeName,
+        storeId: '0', storeName, officialPrice: officialPrice || null,
+        overridePrice: Math.round(price * 100) / 100,
+        reason: null, createdAt: now, updatedAt: now, source: 'user_override',
+      });
+      closeMp2();
+      _pcInvalidate(barcode);
+      toast(`✏️ תיקון אישי נשמר ב${storeName}`);
+      _refreshPdAfterSave(barcode);
+    } catch(e) { toast('❌ ' + e.message); }
+  } else {
+    // Family manual — save to manualPrices/{groupId}/{barcode}/{entryId}
+    if (!groupId) { toast('⚠️ לא חובר לקבוצה'); return; }
+    const storeName = sanitize(storeEl?.value || 'לא ידוע', 60);
+    const m = myProfile || {};
+    const entryId = `m_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+    try {
+      await set(ref(db, `manualPrices/${groupId}/${barcode}/${entryId}`), {
+        barcode, name: sanitize(name, 100),
+        price: Math.round(price * 100) / 100,
+        chainName: storeName, storeName, groupId,
+        submittedByUserId:      myId,
+        submittedByDisplayName: myName,
+        submittedByAvatarType:  m.avatarType  || 'emoji',
+        submittedByAvatarValue: m.avatarValue || '👤',
+        submittedByAvatarEmoji: m.avatarEmoji || null,
+        submittedAt: new Date().toISOString(),
+        source: 'manual',
+      });
+      closeMp2();
+      _pcInvalidate(barcode);
+      toast(`💰 ₪${price.toFixed(2)} ב${storeName} נשמר לקבוצה`);
+      _refreshPdAfterSave(barcode);
+    } catch(e) { toast('❌ ' + e.message); }
+  }
+};
+
+// Refresh price detail sheet if open for same barcode
+async function _refreshPdAfterSave(barcode) {
+  const overlay = document.getElementById('price-detail-overlay');
+  if (!overlay?.classList.contains('show') || _pdBarcode !== barcode) return;
+  const body = document.getElementById('pd-body');
+  if (body) body.innerHTML = `<div class="pd-loading"><div class="spin"></div><p>מרענן מחירים...</p></div>`;
+  const res = await _fetchPricesForBarcode(barcode);
+  _pdPrices = res?.prices || [];
+  _renderPriceDetail();
+}
+
 </script>
 
 <!-- ═══ PROFILE SETUP SCREEN ═══ -->
@@ -7249,6 +7805,55 @@ function adminTimeAgo(iso) {
     </div>
   </div>
 
+</div>
+
+<!-- ═══ PRICE DETAIL BOTTOM SHEET ═══ -->
+<div class="pd-overlay" id="price-detail-overlay" onclick="if(event.target===this)closePriceDetail()">
+  <div class="pd-sheet">
+    <div class="pd-drag"></div>
+    <div class="pd-head">
+      <div class="pd-head-top">
+        <button class="pd-close" onclick="closePriceDetail()">✕</button>
+        <div class="pd-product-name" id="pd-product-name">מחירים</div>
+        <div class="pd-qty-badge" id="pd-qty-badge" style="display:none"></div>
+      </div>
+      <div class="pd-toolbar">
+        <button class="pd-sort-btn active" id="pd-sort-cheapest" onclick="setPdSort('cheapest')">🏆 הכי זול</button>
+        <button class="pd-sort-btn" id="pd-sort-nearest" onclick="setPdSort('nearest')">📍 הכי קרוב</button>
+        <button class="pd-sort-btn" id="pd-sort-fresh" onclick="setPdSort('fresh')">🕐 הכי טרי</button>
+        <button class="pd-filter-btn" id="pd-filter-official" onclick="togglePdFilter('official')">✅ רשמי</button>
+        <button class="pd-filter-btn" id="pd-filter-manual" onclick="togglePdFilter('manual')">📝 משפחה</button>
+        <button class="pd-filter-btn" id="pd-filter-approx" onclick="togglePdFilter('approx')">📍~ משוער</button>
+      </div>
+    </div>
+    <div class="pd-body" id="pd-body">
+      <div class="pd-loading"><div class="spin"></div><p>טוען מחירים...</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MANUAL PRICE MODAL v2 (unified override + family) ═══ -->
+<div class="mp2-overlay" id="mp2-overlay" onclick="if(event.target===this)closeMp2()">
+  <div class="mp2-sheet">
+    <div class="mp2-drag"></div>
+    <div class="mp2-head">
+      <div class="mp2-title" id="mp2-title">הוסף מחיר</div>
+      <div class="mp2-product" id="mp2-product"></div>
+    </div>
+    <div class="mp2-tabs">
+      <button class="mp2-tab active" id="mp2-tab-override" onclick="setMp2Tab('override')">✏️ תיקון אישי</button>
+      <button class="mp2-tab" id="mp2-tab-family" onclick="setMp2Tab('family')">👨‍👩‍👧 מחיר משפחה</button>
+    </div>
+    <div class="mp2-body">
+      <div class="mp2-hint" id="mp2-hint"></div>
+      <input class="mp2-store-input" id="mp2-store-input" placeholder="שם החנות (למשל: שופרסל, רמי לוי)" style="display:none">
+      <div class="mp2-price-row">
+        <span class="mp2-currency">₪</span>
+        <input class="mp2-price-input" id="mp2-price-input" type="number" step="0.01" min="0" placeholder="0.00" inputmode="decimal">
+      </div>
+      <button class="mp2-save-btn" onclick="saveMp2Price()">💾 שמור</button>
+    </div>
+  </div>
 </div>
 
 <!-- ═══ NOTIFICATIONS PANEL ═══ -->
