@@ -1,7 +1,21 @@
 node_modules/
-workers/prices/.env
+
+# ── Secret files — NEVER commit these ─────────────────────────────────────────
 .env
+.env.local
+.env.*.local
+workers/prices/.env
+workers/prices/.env.local
+scripts/.env
+scripts/.env.local
+
+# ── Build artefacts ───────────────────────────────────────────────────────────
 package-lock.json
 *.log
 .DS_Store
 Thumbs.db
+.vercel
+
+# ── Generated data files ──────────────────────────────────────────────────────
+# Store snapshot — generated file, updated monthly on VPS
+workers/prices/data/stores-geocoded.json
