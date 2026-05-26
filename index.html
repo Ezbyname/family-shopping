@@ -2328,21 +2328,22 @@ window.clearLocation = function() {
   if (lastSearchQuery) searchPrices();
 };
 
-// Save a manual location to recent list (max 5)
+// Save a manual location to recent list (max 5, deduped by address or label)
 function _saveRecentLocation(loc) {
   if (loc.source !== 'manual') return;
-  _recentLocations = _recentLocations.filter(r => r.address !== loc.address);
+  const key = loc.address || loc.label;
+  _recentLocations = _recentLocations.filter(r => (r.address || r.label) !== key);
   _recentLocations.unshift({ ...loc, lastUsedAt: new Date().toISOString() });
   if (_recentLocations.length > 5) _recentLocations.length = 5;
   try { localStorage.setItem('recentLocations', JSON.stringify(_recentLocations)); } catch(_) {}
 }
 
-// Remove a recent location by address
-window.deleteRecentLocation = function(address, ev) {
+// Remove a recent location by index
+window.deleteRecentLocation = function(idx, ev) {
   ev?.stopPropagation();
-  _recentLocations = _recentLocations.filter(r => r.address !== address);
+  const removed = _recentLocations.splice(idx, 1)[0];
   try { localStorage.setItem('recentLocations', JSON.stringify(_recentLocations)); } catch(_) {}
-  if (_selectedLocation?.address === address) clearLocation();
+  if (removed && _selectedLocation?.address === removed.address) clearLocation();
   else _syncNearbyUI();
 };
 
@@ -2351,17 +2352,17 @@ function _renderRecentLocOpts() {
   const el = document.getElementById('loc-recent-opts');
   if (!el) return;
   if (!_recentLocations.length) { el.innerHTML = ''; return; }
-  el.innerHTML = _recentLocations.map(r => `
-    <div class="loc-opt" onclick="selectRecentLocation(${JSON.stringify(r.address)})">
+  el.innerHTML = _recentLocations.map((r, i) => `
+    <div class="loc-opt" onclick="selectRecentLocation(${i})">
       <span class="loc-opt-ic">📌</span>
       <span class="loc-opt-lbl">${esc(r.label || r.address)}</span>
-      <button class="loc-opt-del" onclick="deleteRecentLocation(${JSON.stringify(r.address)},event)" title="מחק">✕</button>
+      <button class="loc-opt-del" onclick="deleteRecentLocation(${i},event)" title="מחק">✕</button>
     </div>`).join('');
 }
 
-// Select a recent location by address key
-window.selectRecentLocation = function(address) {
-  const loc = _recentLocations.find(r => r.address === address);
+// Select a recent location by index
+window.selectRecentLocation = function(idx) {
+  const loc = _recentLocations[idx];
   if (!loc) return;
   loc.lastUsedAt = new Date().toISOString();
   _setLocation(loc);
