@@ -138,10 +138,29 @@ export default async function handler(req, res) {
       } catch (_) {}
     }
 
+    // Detect when location filter is active but produced 0 nearby prices for every product
+    const hasProductsButNoNearbyPrices = hasLoc &&
+      enriched.length > 0 &&
+      enriched.every(p => !(p.prices?.length));
+
+    // Per-product metadata: how many prices existed before radius stripped them
+    const resultsWithMeta = enriched.slice(0, 20).map(p => ({
+      ...p,
+      ...(hasLoc && {
+        totalPricesBeforeRadius: p.totalPricesBeforeRadius ?? 0,
+        nearbyPricesCount:       (p.prices || []).length,
+      }),
+    }));
+
     return res.status(200).json({
       version: '6.0.0', query, englishQuery: en,
-      results: enriched.slice(0, 20), total: enriched.length,
+      results: resultsWithMeta,
+      total: enriched.length,
       syncStatus,
+      // Location-filter metadata
+      locationFilterApplied:       hasLoc,
+      radiusKm:                    hasLoc ? radius : null,
+      hasProductsButNoNearbyPrices,
     });
 
   } catch (e) {
@@ -180,6 +199,7 @@ async function buildLayeredPrices(db, barcode, userId, groupId, hasLoc, lat, lng
 
   // B. Official XML prices
   let official = [];
+  let officialTotalBeforeRadius = 0; // populated only when hasLoc=true
   if (snaps.official?.exists()) {
     official = Object.entries(snaps.official.val())
       .filter(([, p]) => p?.price > 0)
@@ -189,7 +209,10 @@ async function buildLayeredPrices(db, barcode, userId, groupId, hasLoc, lat, lng
         displayPrice: overrides[key]?.overridePrice ?? p.price,
         override:     overrides[key] ?? null,
       }));
-    if (hasLoc) official = filterByRadius(official, lat, lng, radius, storeIndex);
+    if (hasLoc) {
+      officialTotalBeforeRadius = official.length; // count before strict radius filter
+      official = filterByRadius(official, lat, lng, radius, storeIndex);
+    }
     official.sort((a, b) => a.displayPrice - b.displayPrice);
   }
 
@@ -233,6 +256,11 @@ async function buildLayeredPrices(db, barcode, userId, groupId, hasLoc, lat, lng
       lastUpdated,
       warning: allStale ? 'Prices may be outdated — sync pending' : null,
       communityWarning: warning,
+      // Location-filter metadata (only present when hasLoc=true)
+      ...(hasLoc && {
+        totalPricesBeforeRadius: officialTotalBeforeRadius,
+        nearbyPricesCount:       prices.length,
+      }),
     };
   }
 

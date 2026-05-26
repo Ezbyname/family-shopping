@@ -768,6 +768,62 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   border-radius:18px;padding:5px 2px;font-family:'Heebo',sans-serif;font-size:11px;
   font-weight:700;cursor:pointer;transition:all .15s;white-space:nowrap}
 .radius-seg-btn.active{background:var(--accent);color:#111}
+/* ── Location picker ── */
+.loc-label-bar{display:none;align-items:center;gap:6px;padding:5px 12px;
+  background:var(--card);border-bottom:1px solid var(--border);font-size:11px;
+  font-weight:600;color:var(--green);flex-shrink:0}
+.loc-label-bar.show{display:flex}
+.loc-label-txt{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.loc-clear-btn{background:none;border:none;font-size:14px;cursor:pointer;padding:0 2px;
+  color:var(--muted);line-height:1;flex-shrink:0}
+.loc-source-wrap{position:relative;flex-shrink:0}
+.loc-source-btn{display:flex;align-items:center;gap:5px;background:var(--card);
+  border:1.5px solid var(--border);border-radius:22px;padding:5px 10px;
+  font-family:'Heebo',sans-serif;font-size:12px;font-weight:700;cursor:pointer;
+  color:var(--text);white-space:nowrap;transition:all .2s}
+.loc-source-btn.has-loc{border-color:var(--green);color:var(--green);background:var(--green-dim)}
+.loc-source-btn:active{opacity:.8}
+.loc-dropdown{position:absolute;top:calc(100% + 5px);right:0;min-width:210px;
+  background:var(--surface);border:1.5px solid var(--border);border-radius:14px;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:800;overflow:hidden;
+  display:none;flex-direction:column}
+.loc-dropdown.open{display:flex}
+.loc-opt{padding:11px 14px;font-size:13px;font-weight:600;cursor:pointer;
+  display:flex;align-items:center;gap:9px;transition:background .12s}
+.loc-opt:hover{background:var(--card)}
+.loc-opt:active{background:var(--card2)}
+.loc-opt-ic{font-size:16px;width:22px;text-align:center;flex-shrink:0}
+.loc-opt-lbl{flex:1}
+.loc-opt-del{font-size:12px;color:var(--muted);padding:2px 5px;margin-right:-4px;
+  background:none;border:none;cursor:pointer;border-radius:6px}
+.loc-opt-del:hover{background:var(--card2);color:var(--red)}
+.loc-opt-sep{height:1px;background:var(--border);margin:2px 0}
+/* ── Manual address modal ── */
+.addr-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:900;
+  display:none;align-items:flex-end;justify-content:center}
+.addr-overlay.show{display:flex}
+.addr-modal{background:var(--surface);border-radius:22px 22px 0 0;
+  padding:20px 18px calc(26px + var(--safe-b));width:100%;max-width:480px;
+  animation:slideUp .23s ease}
+.addr-input{width:100%;box-sizing:border-box;background:var(--card);
+  border:1.5px solid var(--border);border-radius:13px;
+  padding:12px 14px;font-family:'Heebo',sans-serif;font-size:15px;
+  color:var(--text);outline:none;direction:rtl;margin:10px 0}
+.addr-input:focus{border-color:var(--accent)}
+.addr-input::placeholder{color:var(--muted)}
+.addr-input.error{border-color:var(--red)}
+.addr-error{font-size:12px;color:var(--red);min-height:16px;margin:-4px 0 6px}
+/* ── No-nearby-results feedback ── */
+.nearby-no-results{padding:22px 18px;text-align:center}
+.nnr-icon{font-size:38px;margin-bottom:8px}
+.nnr-title{font-size:15px;font-weight:800;margin-bottom:5px}
+.nnr-sub{font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.5}
+.nnr-actions{display:flex;flex-direction:column;gap:8px;max-width:300px;margin:0 auto}
+.nnr-btn{padding:12px 18px;border-radius:13px;border:none;font-family:'Heebo',sans-serif;
+  font-size:14px;font-weight:700;cursor:pointer;transition:all .15s}
+.nnr-btn:active{transform:scale(.97);opacity:.85}
+.nnr-btn.primary{background:var(--accent);color:#111}
+.nnr-btn.ghost{background:var(--card2);color:var(--text);border:1.5px solid var(--border)}
 /* nearby rows inside product modal */
 .nb-row{display:flex;align-items:center;gap:10px;background:var(--card2);
   border-radius:10px;padding:9px 11px;margin-bottom:4px}
@@ -1489,17 +1545,41 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
         onclick="clearCityFilter()" title="נקה הכל">✕</button>
     </div>
     <div class="city-suggestions-panel" id="city-suggestions-panel"></div>
+    <!-- Location label bar (visible when location is active) -->
+    <div class="loc-label-bar" id="loc-label-bar">
+      <span>📍</span>
+      <span class="loc-label-txt" id="loc-label-txt">מיקום נבחר</span>
+      <button class="loc-clear-btn" onclick="clearLocation()" title="נקה מיקום">✕</button>
+    </div>
     <div class="nearby-strip" id="nearby-strip">
-      <button class="nearby-loc-btn" id="nearby-loc-btn" onclick="requestLocation()">
-        <span id="nearby-loc-icon">📍</span>
-        <span id="nearby-loc-text">מצא מיקום</span>
-      </button>
+      <!-- Location source picker -->
+      <div class="loc-source-wrap" id="loc-source-wrap">
+        <button class="loc-source-btn" id="loc-source-btn" onclick="toggleLocDropdown()">
+          <span id="loc-source-icon">📍</span>
+          <span id="loc-source-label">בחר מיקום</span>
+          <span>▾</span>
+        </button>
+        <div class="loc-dropdown" id="loc-dropdown">
+          <div class="loc-opt" onclick="selectLocGPS()">
+            <span class="loc-opt-ic">📍</span>
+            <span class="loc-opt-lbl">המיקום שלי עכשיו</span>
+          </div>
+          <div class="loc-opt" onclick="openManualAddressModal()">
+            <span class="loc-opt-ic">🔍</span>
+            <span class="loc-opt-lbl">כתובת ידנית...</span>
+          </div>
+          <div class="loc-opt-sep"></div>
+          <div id="loc-recent-opts"></div>
+        </div>
+      </div>
+      <!-- Radius buttons -->
       <div class="radius-seg" id="radius-seg">
         <button class="radius-seg-btn" onclick="setNearbyRadius(1)">1</button>
         <button class="radius-seg-btn active" onclick="setNearbyRadius(3)">3</button>
         <button class="radius-seg-btn" onclick="setNearbyRadius(5)">5</button>
         <button class="radius-seg-btn" onclick="setNearbyRadius(10)">10</button>
-        <button class="radius-seg-btn" onclick="setNearbyRadius(25)">25 ק"מ</button>
+        <button class="radius-seg-btn" onclick="setNearbyRadius(25)">25</button>
+        <button class="radius-seg-btn" onclick="setNearbyRadius(50)">50 ק"מ</button>
       </div>
     </div>
     <div class="price-toolbar" id="price-tools" style="display:none"></div>
@@ -1518,6 +1598,25 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
     <button class="nav-btn" id="nav-fav" onclick="setTab('fav')"><span class="ni">⭐</span>מועדפים</button>
     <button class="nav-btn" id="nav-price" onclick="setTab('price')"><span class="ni">💰</span>השוואה</button>
     <button class="nav-btn" id="nav-members" onclick="openMembers()"><span class="ni">👥</span>משפחה</button>
+  </div>
+</div>
+
+<!-- MANUAL ADDRESS MODAL -->
+<div class="addr-overlay" id="addr-overlay" onclick="closeManualAddressModal()">
+  <div class="addr-modal" onclick="event.stopPropagation()">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📍 כתובת להשוואת מחירים</div>
+    <input class="addr-input" id="addr-input" type="text" dir="rtl"
+      placeholder="דיזנגוף 100, תל אביב"
+      maxlength="200"
+      onkeydown="if(event.key==='Enter')submitManualAddress()"
+      oninput="document.getElementById('addr-error').textContent=''">
+    <div class="addr-error" id="addr-error"></div>
+    <div class="modal-row">
+      <button class="mbtn ghost" onclick="closeManualAddressModal()">ביטול</button>
+      <button class="mbtn primary" id="addr-submit-btn" onclick="submitManualAddress()">חפש כתובת</button>
+    </div>
+    <div id="addr-result" style="margin-top:12px;font-size:12px;color:var(--muted);text-align:center;min-height:18px"></div>
   </div>
 </div>
 
@@ -2003,36 +2102,119 @@ window.searchPrices = async function(){
     lastSearchQuery = resolvedQuery;
     selectedProduct = null;
     const wrap = document.getElementById('price-content');
-    const locationLabel = (_nearbyMode && _userLat)
+    const locationLabel = _hasLoc()
       ? ` · 📍 סניפים עד ${_nearbyRadius} ק"מ`
       : ' בכל הסופרמרקטים';
     wrap.innerHTML = `<div class="price-loading"><div class="spin"></div><p>מחפש "${esc(q)}"${locationLabel}...</p></div>`;
     try {
-      // Pass location when nearby mode is active (API filters by distance server-side)
       let _apiUrl = `/api/prices?q=${encodeURIComponent(resolvedQuery)}`;
-      if (_nearbyMode && _userLat && _userLng) {
-        _apiUrl += `&lat=${_userLat}&lng=${_userLng}&radiusKm=${_nearbyRadius}`;
+      if (_hasLoc()) {
+        _apiUrl += `&lat=${_locLat()}&lng=${_locLng()}&radiusKm=${_nearbyRadius}`;
       }
-      const res = await fetch(_apiUrl);
-    const data = await res.json();
+      const res  = await fetch(_apiUrl);
+      const data = await res.json();
 
-    if(!data.results || !data.results.length){
-      wrap.innerHTML = `<div class="search-hint"><div class="sh-icon">🔍</div><p>לא נמצאו תוצאות עבור "${esc(q)}"</p><small>נסה שם שונה</small></div>`;
-      return;
-    }
+      if (!data.results || !data.results.length) {
+        wrap.innerHTML = `<div class="search-hint"><div class="sh-icon">🔍</div><p>לא נמצאו תוצאות עבור "${esc(q)}"</p><small>נסה שם שונה</small></div>`;
+        return;
+      }
 
-    searchResults = data.results;
-    // Auto-select if only one result with no prices → show manual fallback with image
-    if (data.results.length === 1 && !data.results[0].storePrices?.length) {
-      wrap.innerHTML = renderManualFallback(q, data.results[0]);
-    } else {
-      renderSearchResults(data.results, q);
-    }
+      // Products exist but radius filtered ALL prices — show friendly no-nearby UI
+      if (data.hasProductsButNoNearbyPrices) {
+        wrap.innerHTML = _renderNearbyNoResults(q, data);
+        return;
+      }
 
+      searchResults = data.results;
+      if (data.results.length === 1 && !data.results[0].storePrices?.length) {
+        wrap.innerHTML = renderManualFallback(q, data.results[0]);
+      } else {
+        renderSearchResults(data.results, q);
+      }
     } catch(e) {
       wrap.innerHTML = renderManualFallback(q, null);
     }
   });
+};
+
+// ── NO-NEARBY-RESULTS: context-aware feedback with action buttons ─────────────
+function _renderNearbyNoResults(q, data) {
+  const radius  = data.radiusKm || _nearbyRadius;
+  const locName = _selectedLocation?.label || 'המיקום הנבחר';
+
+  // Distinguish: coords exist but no stores nearby vs no geocoded stores at all
+  const hasGeocoded = data.results?.some(r => (r.totalPricesBeforeRadius || 0) > 0);
+
+  if (!hasGeocoded) {
+    // Stores haven't been geocoded yet
+    return `<div class="nearby-no-results">
+      <div class="nnr-icon">🗺️</div>
+      <div class="nnr-title">החנויות עדיין לא ממופות למיקום</div>
+      <div class="nnr-sub">טרם בוצע גאוקוד לחנויות.<br>ניתן לחפש ללא סינון קרבה או לשנות מיקום.</div>
+      <div class="nnr-actions">
+        <button class="nnr-btn primary" onclick="searchEverywhere(${JSON.stringify(q)})">🌍 חפש בכל הארץ</button>
+        <button class="nnr-btn ghost" onclick="openManualAddressModal()">📌 בחר מיקום אחר</button>
+      </div>
+    </div>`;
+  }
+
+  // Geocoded stores exist, but none within this radius carry the product
+  const maxBefore = Math.max(...(data.results || []).map(r => r.totalPricesBeforeRadius || 0));
+  return `<div class="nearby-no-results">
+    <div class="nnr-icon">📍</div>
+    <div class="nnr-title">מצאתי מוצרים — אבל לא בחנויות קרובות</div>
+    <div class="nnr-sub">
+      ליד <strong>${esc(locName)}</strong> אין מחיר על "${esc(q)}"<br>
+      בטווח ${radius} ק"מ.
+      ${maxBefore > 0 ? `נמצאו מחירים ב-${maxBefore} חנויות אחרות בארץ.` : ''}
+    </div>
+    <div class="nnr-actions">
+      <button class="nnr-btn primary" onclick="increaseRadius()">🔭 הגדל רדיוס ל-${_nextRadius()} ק"מ</button>
+      <button class="nnr-btn ghost" onclick="searchEverywhere(${JSON.stringify(q)})">🌍 חפש בכל הארץ</button>
+      <button class="nnr-btn ghost" onclick="openManualAddressModal()">📌 בחר מיקום אחר</button>
+    </div>
+  </div>`;
+}
+
+// Return the next larger radius step from the current
+function _nextRadius() {
+  const steps = [1, 3, 5, 10, 25, 50];
+  const idx = steps.indexOf(_nearbyRadius);
+  return idx >= 0 && idx < steps.length - 1 ? steps[idx + 1] : 50;
+}
+
+// Bump to the next radius step and re-search
+window.increaseRadius = function() {
+  setNearbyRadius(_nextRadius());
+};
+
+// Run the search without any location filter (one-shot, does not clear _selectedLocation)
+window.searchEverywhere = async function(q) {
+  const wrap = document.getElementById('price-content');
+  if (!q) q = lastSearchQuery;
+  if (!q) return;
+  wrap.innerHTML = `<div class="price-loading"><div class="spin"></div><p>מחפש "${esc(q)}" בכל הארץ...</p></div>`;
+  try {
+    const res  = await fetch(`/api/prices?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    if (!data.results?.length) {
+      wrap.innerHTML = `<div class="search-hint"><div class="sh-icon">🔍</div>
+        <p>לא נמצאו תוצאות עבור "${esc(q)}"</p><small>נסה שם שונה</small></div>`;
+      return;
+    }
+    searchResults = data.results;
+    // Add a banner noting we're showing all-country results
+    renderSearchResults(data.results, q);
+    const content = document.getElementById('price-content');
+    if (content) {
+      const banner = document.createElement('div');
+      banner.style.cssText = 'text-align:center;font-size:11px;color:var(--muted);padding:6px 0 2px;';
+      banner.textContent = '🌍 מציג מחירים מכל הארץ';
+      content.insertBefore(banner, content.firstChild);
+    }
+  } catch(e) {
+    wrap.innerHTML = renderManualFallback(q, null);
+  }
 };
 
 // ── SEARCH RESULTS v2 ────────────────────────────────────────────────
@@ -2050,25 +2232,66 @@ const CHAIN_META = {
 // Enabled: stores/{key}.latitude/longitude are populated from the 422-store sync.
 const NEARBY_COORDS_READY = true;
 
-let _nearbyMode   = false;
-let _userLat      = null;
-let _userLng      = null;
-let _nearbyRadius = 3; // default 3 km, persisted in localStorage
+let _nearbyMode       = false;
+let _selectedLocation = null;  // { label, lat, lng, source: 'gps'|'manual' }
+let _nearbyRadius     = 3;     // km, persisted in localStorage
+let _recentLocations  = [];    // up to 5 manual locations, persisted in localStorage
+
+// Convenience helpers (replaces raw _userLat / _userLng access)
+const _locLat  = () => _selectedLocation?.lat  ?? null;
+const _locLng  = () => _selectedLocation?.lng  ?? null;
+const _hasLoc  = () => Boolean(_nearbyMode && _selectedLocation?.lat);
 
 (function _initNearbyState() {
   const r = parseInt(localStorage.getItem('nearbyRadius') || '3', 10);
-  if ([1,3,5,10,25].includes(r)) _nearbyRadius = r;
+  if ([1,3,5,10,25,50].includes(r)) _nearbyRadius = r;
+  try {
+    const sl = localStorage.getItem('selectedLocation');
+    if (sl) _selectedLocation = JSON.parse(sl);
+  } catch (_) {}
+  try {
+    const rl = localStorage.getItem('recentLocations');
+    if (rl) _recentLocations = JSON.parse(rl);
+  } catch (_) {}
 })();
 
 function _syncNearbyUI() {
-  const btn   = document.getElementById('nearby-toggle-btn');
-  const strip = document.getElementById('nearby-strip');
+  const btn        = document.getElementById('nearby-toggle-btn');
+  const strip      = document.getElementById('nearby-strip');
+  const labelBar   = document.getElementById('loc-label-bar');
+  const labelTxt   = document.getElementById('loc-label-txt');
+  const srcBtn     = document.getElementById('loc-source-btn');
+  const srcIcon    = document.getElementById('loc-source-icon');
+  const srcLabel   = document.getElementById('loc-source-label');
   if (!btn || !strip) return;
+
   btn.classList.toggle('active', _nearbyMode);
   strip.classList.toggle('show', _nearbyMode);
+
+  // Location label bar (visible when nearby mode ON and location is set)
+  const hasLoc = _hasLoc();
+  if (labelBar) labelBar.classList.toggle('show', hasLoc);
+  if (labelTxt && _selectedLocation) {
+    labelTxt.textContent = `משווה מחירים ליד: ${_selectedLocation.label}`;
+  }
+
+  // Source button state
+  if (srcBtn) srcBtn.classList.toggle('has-loc', Boolean(_selectedLocation));
+  if (srcIcon && srcLabel && _selectedLocation) {
+    srcIcon.textContent  = _selectedLocation.source === 'gps' ? '✅' : '📌';
+    srcLabel.textContent = _selectedLocation.label;
+  } else if (srcLabel) {
+    srcLabel.textContent = 'בחר מיקום';
+    if (srcIcon) srcIcon.textContent = '📍';
+  }
+
+  // Radius buttons
   document.querySelectorAll('#radius-seg .radius-seg-btn').forEach((b, i) => {
-    b.classList.toggle('active', [1,3,5,10,25][i] === _nearbyRadius);
+    b.classList.toggle('active', [1,3,5,10,25,50][i] === _nearbyRadius);
   });
+
+  // Populate recent locations in dropdown
+  _renderRecentLocOpts();
 }
 
 window.toggleNearbyMode = function() {
@@ -2078,49 +2301,198 @@ window.toggleNearbyMode = function() {
   }
   _nearbyMode = !_nearbyMode;
   _syncNearbyUI();
-  if (_nearbyMode && !_userLat) requestLocation();
+  if (_nearbyMode && !_hasLoc()) toggleLocDropdown();
 };
 
 window.setNearbyRadius = function(km) {
   _nearbyRadius = km;
   localStorage.setItem('nearbyRadius', String(km));
   _syncNearbyUI();
-  // Re-run search with new radius when location is active
-  if (_nearbyMode && _userLat && lastSearchQuery) searchPrices();
+  if (_hasLoc() && lastSearchQuery) searchPrices();
 };
 
-window.requestLocation = async function() {
-  const locBtn  = document.getElementById('nearby-loc-btn');
-  const locText = document.getElementById('nearby-loc-text');
-  const locIcon = document.getElementById('nearby-loc-icon');
+// ── LOCATION MANAGEMENT ──────────────────────────────────────────────────────
+
+// Set the active location and persist to localStorage
+function _setLocation(loc) {
+  _selectedLocation = loc;
+  try { localStorage.setItem('selectedLocation', JSON.stringify(loc)); } catch(_) {}
+  _syncNearbyUI();
+}
+
+// Clear the active location
+window.clearLocation = function() {
+  _selectedLocation = null;
+  try { localStorage.removeItem('selectedLocation'); } catch(_) {}
+  _syncNearbyUI();
+  if (lastSearchQuery) searchPrices();
+};
+
+// Save a manual location to recent list (max 5)
+function _saveRecentLocation(loc) {
+  if (loc.source !== 'manual') return;
+  _recentLocations = _recentLocations.filter(r => r.address !== loc.address);
+  _recentLocations.unshift({ ...loc, lastUsedAt: new Date().toISOString() });
+  if (_recentLocations.length > 5) _recentLocations.length = 5;
+  try { localStorage.setItem('recentLocations', JSON.stringify(_recentLocations)); } catch(_) {}
+}
+
+// Remove a recent location by address
+window.deleteRecentLocation = function(address, ev) {
+  ev?.stopPropagation();
+  _recentLocations = _recentLocations.filter(r => r.address !== address);
+  try { localStorage.setItem('recentLocations', JSON.stringify(_recentLocations)); } catch(_) {}
+  if (_selectedLocation?.address === address) clearLocation();
+  else _syncNearbyUI();
+};
+
+// Render recent locations inside the dropdown
+function _renderRecentLocOpts() {
+  const el = document.getElementById('loc-recent-opts');
+  if (!el) return;
+  if (!_recentLocations.length) { el.innerHTML = ''; return; }
+  el.innerHTML = _recentLocations.map(r => `
+    <div class="loc-opt" onclick="selectRecentLocation(${JSON.stringify(r.address)})">
+      <span class="loc-opt-ic">📌</span>
+      <span class="loc-opt-lbl">${esc(r.label || r.address)}</span>
+      <button class="loc-opt-del" onclick="deleteRecentLocation(${JSON.stringify(r.address)},event)" title="מחק">✕</button>
+    </div>`).join('');
+}
+
+// Select a recent location by address key
+window.selectRecentLocation = function(address) {
+  const loc = _recentLocations.find(r => r.address === address);
+  if (!loc) return;
+  loc.lastUsedAt = new Date().toISOString();
+  _setLocation(loc);
+  closeLocDropdown();
+  if (lastSearchQuery) searchPrices();
+};
+
+// ── GPS location ──────────────────────────────────────────────────────────────
+window.selectLocGPS = async function() {
+  closeLocDropdown();
   if (!navigator.geolocation) { toast('⚠️ GPS לא נתמך בדפדפן זה'); return; }
-  if (locText) locText.textContent = 'מאתר...';
-  if (locIcon) locIcon.textContent = '⏳';
+  const srcLabel = document.getElementById('loc-source-label');
+  const srcIcon  = document.getElementById('loc-source-icon');
+  if (srcLabel) srcLabel.textContent = 'מאתר...';
+  if (srcIcon)  srcIcon.textContent  = '⏳';
   try {
     const pos = await new Promise((resolve, reject) =>
       navigator.geolocation.getCurrentPosition(resolve, reject,
         { timeout: 8000, maximumAge: 60000, enableHighAccuracy: false })
     );
-    _userLat = pos.coords.latitude;
-    _userLng = pos.coords.longitude;
-    if (locBtn) locBtn.classList.add('has-loc');
-    if (locText) locText.textContent = `${_userLat.toFixed(3)}, ${_userLng.toFixed(3)}`;
-    if (locIcon) locIcon.textContent = '✅';
+    _setLocation({
+      label:  'המיקום שלי עכשיו',
+      lat:    pos.coords.latitude,
+      lng:    pos.coords.longitude,
+      source: 'gps',
+    });
     toast('📍 מיקום נמצא!');
-    // Auto-refresh results with location filter if a search is already active
     if (lastSearchQuery) searchPrices();
   } catch (e) {
-    if (locText) locText.textContent = 'מצא מיקום';
-    if (locIcon) locIcon.textContent = '📍';
+    _syncNearbyUI(); // restore button state
     toast('⚠️ לא ניתן לקבל מיקום — בדוק הרשאות GPS');
   }
 };
 
-async function _fetchNearby(barcode) {
-  if (!barcode || !_userLat || !_userLng) return null;
+// Backward-compat alias (called from HTML and modal)
+window.requestLocation = window.selectLocGPS;
+
+// ── Location dropdown ────────────────────────────────────────────────────────
+window.toggleLocDropdown = function() {
+  const dd = document.getElementById('loc-dropdown');
+  if (!dd) return;
+  _renderRecentLocOpts();
+  dd.classList.toggle('open');
+  if (dd.classList.contains('open')) {
+    // Close on outside click
+    setTimeout(() => document.addEventListener('click', _closeLocDropdownOutside, { once: true }), 0);
+  }
+};
+
+function _closeLocDropdownOutside(e) {
+  const wrap = document.getElementById('loc-source-wrap');
+  if (wrap && !wrap.contains(e.target)) closeLocDropdown();
+}
+
+window.closeLocDropdown = function() {
+  document.getElementById('loc-dropdown')?.classList.remove('open');
+};
+
+// ── Manual address modal ──────────────────────────────────────────────────────
+window.openManualAddressModal = function() {
+  closeLocDropdown();
+  document.getElementById('addr-input').value = '';
+  document.getElementById('addr-error').textContent = '';
+  document.getElementById('addr-result').textContent = '';
+  document.getElementById('addr-submit-btn').textContent = 'חפש כתובת';
+  document.getElementById('addr-submit-btn').disabled = false;
+  document.getElementById('addr-overlay').classList.add('show');
+  setTimeout(() => document.getElementById('addr-input')?.focus(), 300);
+};
+
+window.closeManualAddressModal = function() {
+  document.getElementById('addr-overlay').classList.remove('show');
+};
+
+window.submitManualAddress = async function() {
+  const input   = document.getElementById('addr-input');
+  const errEl   = document.getElementById('addr-error');
+  const resEl   = document.getElementById('addr-result');
+  const btn     = document.getElementById('addr-submit-btn');
+  const address = (input?.value || '').trim();
+
+  if (!address || address.length < 3) {
+    input?.classList.add('error');
+    errEl.textContent = 'נא להזין כתובת (לפחות 3 תווים)';
+    return;
+  }
+  input?.classList.remove('error');
+  errEl.textContent = '';
+  btn.textContent   = '⏳ מחפש...';
+  btn.disabled      = true;
+  if (resEl) resEl.textContent = '';
+
   try {
-    // Use /api/prices?barcode= with location filter — returns fresh stores within radius
-    const url = `/api/prices?barcode=${encodeURIComponent(barcode)}&lat=${_userLat}&lng=${_userLng}&radiusKm=${_nearbyRadius}`;
+    const res  = await fetch(`/api/geocode?address=${encodeURIComponent(address)}`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      errEl.textContent = data.error || 'כתובת לא נמצאה — נסה לפרט יותר';
+      if (data.suggestion && resEl) resEl.textContent = `אולי התכוונת: ${data.suggestion}`;
+      input?.classList.add('error');
+      btn.textContent = 'חפש כתובת';
+      btn.disabled    = false;
+      return;
+    }
+
+    if (resEl) resEl.textContent = `✅ ${data.formattedAddress}`;
+
+    const loc = {
+      label:            data.formattedAddress || address,
+      address,
+      lat:              data.lat,
+      lng:              data.lng,
+      source:           'manual',
+      createdAt:        new Date().toISOString(),
+    };
+    _saveRecentLocation(loc);
+    _setLocation(loc);
+    closeManualAddressModal();
+    toast(`📌 מיקום נבחר: ${loc.label.slice(0, 40)}`);
+    if (lastSearchQuery) searchPrices();
+  } catch (e) {
+    errEl.textContent = 'שגיאת חיבור — נסה שוב';
+    btn.textContent   = 'חפש כתובת';
+    btn.disabled      = false;
+  }
+};
+
+async function _fetchNearby(barcode) {
+  if (!barcode || !_hasLoc()) return null;
+  try {
+    const url = `/api/prices?barcode=${encodeURIComponent(barcode)}&lat=${_locLat()}&lng=${_locLng()}&radiusKm=${_nearbyRadius}`;
     const res = await fetch(url);
     if (!res.ok) return null;
     const data = await res.json();
@@ -2749,10 +3121,10 @@ function _renderProductModal() {
 
   // Async-populate the nearby section (skipped entirely until coordinate enrichment lands)
   if (NEARBY_COORDS_READY && _nearbyMode && product.barcode) {
-    if (!_userLat || !_userLng) {
+    if (!_hasLoc()) {
       const el = document.getElementById('pm-nearby');
       if (el) el.innerHTML = `<div class="spr no-data" style="justify-content:center;font-size:12px">
-        יש לאפשר מיקום לסינון קרוב 📍</div>`;
+        יש לבחור מיקום לסינון קרוב 📍</div>`;
     } else {
       _fetchNearby(product.barcode).then(data => {
         const el = document.getElementById('pm-nearby');
@@ -3408,15 +3780,10 @@ window.runBasketCompare = async function() {
   const wrap = document.getElementById('basket-results-wrap');
   wrap.innerHTML = `<div class="price-loading"><div class="spin"></div><p>משווה מחירים...</p></div>`;
 
-  // Reuse already-acquired location from nearby mode; only prompt if needed
-  let lat = _userLat, lng = _userLng;
-  if (!lat && navigator.geolocation) {
-    try {
-      const pos = await new Promise((res,rej) => navigator.geolocation.getCurrentPosition(res,rej,{timeout:5000}));
-      lat = pos.coords.latitude; lng = pos.coords.longitude;
-      _userLat = lat; _userLng = lng;
-    } catch (_) { toast('⚠️ לא ניתן לקבל מיקום — מציג ללא סינון מרחק'); }
-  }
+  // Use selectedLocation; if nearby mode off or no location, run without filter
+  const lat = _hasLoc() ? _locLat() : null;
+  const lng = _hasLoc() ? _locLng() : null;
+  const locationLabel = _selectedLocation?.label || null;
 
   // Build items array (use barcode if available, else name)
   const basketItems = pending
@@ -3430,7 +3797,7 @@ window.runBasketCompare = async function() {
 
   try {
     const body = { items: basketItems, radiusKm: basketRadius };
-    if (lat) { body.lat = lat; body.lng = lng; }
+    if (lat) { body.lat = lat; body.lng = lng; body.locationLabel = locationLabel; }
 
     const res = await fetch('/api/basket-compare', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
