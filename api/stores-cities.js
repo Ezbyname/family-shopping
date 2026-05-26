@@ -1,4 +1,4 @@
-// api/stores-cities.js — v1.0.0
+// api/stores-cities.js — v1.1.0
 // GET /api/stores-cities?q=חי
 //
 // Returns up to 10 city autocomplete suggestions built from the live stores/
@@ -16,12 +16,15 @@
 //
 // Cache: 5 min CDN, 10 min stale-while-revalidate (city list changes only on
 // store sync runs, which happen at most twice per day).
+//
+// v1.1.0: reads via fetch() REST API (no Admin SDK WebSocket hang)
 
-import { getDB, setCors } from './_firebase.js';
+import { restGet, getDbUrl, getAdminToken, setCors } from './_firebase.js';
 import { normalizeCity } from './_cityNorm.js';
 
 const MAX_SUGGESTIONS = 10;
-const CACHE_HEADER = 's-maxage=300, stale-while-revalidate=600';
+const CACHE_HEADER    = 's-maxage=300, stale-while-revalidate=600';
+const READ_TIMEOUT_MS = 5_000;
 
 export default async function handler(req, res) {
   setCors(res);
@@ -30,15 +33,17 @@ export default async function handler(req, res) {
 
   const q = String(req.query?.q || '').trim();
 
-  try {
-    const db = await getDB();
-    if (!db) {
-      res.setHeader('Cache-Control', 'no-store');
-      return res.status(200).json([]);
-    }
+  const dbUrl = getDbUrl();
+  if (!dbUrl) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json([]);
+  }
 
-    const storesSnap = await db.ref('stores').once('value');
-    const storesData = storesSnap.val() || {};
+  try {
+    await getAdminToken().catch(() => {});
+
+    const storesRaw = await restGet(dbUrl, 'stores', READ_TIMEOUT_MS);
+    const storesData = (storesRaw && typeof storesRaw === 'object') ? storesRaw : {};
 
     // Aggregate: normalised city → { display city (most complete form), count }
     const cityMap = new Map();

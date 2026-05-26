@@ -1,4 +1,4 @@
-// api/prices-by-city.js — v2.0.0
+// api/prices-by-city.js — v2.1.0
 // GET /api/prices-by-city?barcode=&city=חיפה
 // GET /api/prices-by-city?barcode=&city=חיפה&city=נשר        (repeated param)
 // GET /api/prices-by-city?barcode=&cities=חיפה,נשר,קריית מוצקין  (comma-joined)
@@ -14,8 +14,10 @@
 //   price key  shufersal_001  →  finds store record at  shufersal_1
 //
 // Sort: cheapest → chainName → storeName → storeId
+//
+// v2.1.0: reads via fetch() REST API (no Admin SDK WebSocket hang)
 
-import { getDB, setCors, isValidBarcode } from './_firebase.js';
+import { restGet, getDbUrl, getAdminToken, setCors, isValidBarcode } from './_firebase.js';
 import {
   normalizeCity, cityMatchesAny,
   buildStoreLookup, stripKeyZeros,
@@ -40,7 +42,8 @@ function parseCityParams(query) {
   return [...new Set(cities.map(c => c.trim()).filter(Boolean))];
 }
 
-const STALE_MS = 36 * 3600 * 1000;
+const STALE_MS        = 36 * 3600 * 1000;
+const READ_TIMEOUT_MS = 5_000;
 
 export default async function handler(req, res) {
   setCors(res);
@@ -70,33 +73,36 @@ export default async function handler(req, res) {
   // Build a Set of normalised city names for O(1) matching
   const cityNorms = new Set(cities.map(normalizeCity));
 
+  const dbUrl = getDbUrl();
+  if (!dbUrl) {
+    return res.status(200).json({
+      version: '2.1.0', barcode: clean, cities, count: 0, results: [],
+      warning: 'Database unavailable',
+    });
+  }
+
   try {
-    const db = await getDB();
-    if (!db) {
-      return res.status(200).json({
-        version: '2.0.0', barcode: clean, cities, count: 0, results: [],
-        warning: 'Database unavailable',
-      });
-    }
+    // Pre-warm admin token
+    await getAdminToken().catch(() => {});
 
     // Parallel fetch: prices for this barcode + all store metadata
-    const [pricesSnap, storesSnap] = await Promise.all([
-      db.ref(`prices/${clean}`).once('value'),
-      db.ref('stores').once('value'),
+    const [pricesData, storesData] = await Promise.all([
+      restGet(dbUrl, `prices/${clean}`, READ_TIMEOUT_MS).catch(() => null),
+      restGet(dbUrl, 'stores',          READ_TIMEOUT_MS).catch(() => null),
     ]);
 
-    const pricesData = pricesSnap.val() || {};
-    const storesData = storesSnap.val() || {};
+    const prices = (pricesData && typeof pricesData === 'object') ? pricesData : {};
+    const stores = (storesData && typeof storesData === 'object') ? storesData : {};
 
     // Build normalised store lookup (handles shufersal_001 → shufersal_1 mismatch)
-    const storeLookup = buildStoreLookup(storesData);
+    const storeLookup = buildStoreLookup(stores);
 
     const results = [];
 
-    for (const [storeKey, priceEntry] of Object.entries(pricesData)) {
+    for (const [storeKey, priceEntry] of Object.entries(prices)) {
       if (!priceEntry?.price || priceEntry.price <= 0) continue;
 
-      const store = storeLookup[stripKeyZeros(storeKey)] || storesData[storeKey];
+      const store = storeLookup[stripKeyZeros(storeKey)] || stores[storeKey];
 
       // Require a store record with city data
       if (!store?.city) continue;
@@ -143,7 +149,7 @@ export default async function handler(req, res) {
     });
 
     return res.status(200).json({
-      version: '2.0.0',
+      version: '2.1.0',
       barcode: clean,
       cities,
       count:   results.length,

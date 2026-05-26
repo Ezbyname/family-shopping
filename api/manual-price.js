@@ -1,6 +1,7 @@
-// api/manual-price.js — v2.0.0
+// api/manual-price.js — v2.1.0
 // POST /api/manual-price — manual price fallback (only when no official price exists)
-import { getDB, setCors } from './_firebase.js';
+// v2.1.0: official-price check uses REST; write still uses Admin SDK
+import { getDB, restGet, getDbUrl, getAdminToken, setCors } from './_firebase.js';
 
 export default async function handler(req, res) {
   setCors(res);
@@ -23,16 +24,21 @@ export default async function handler(req, res) {
   if (!cleanChain) return res.status(400).json({ error: 'chainName required' });
 
   try {
-    const db = await getDB();
-    if (!db) return res.status(503).json({ error: 'Database not available' });
+    const dbUrl = getDbUrl();
+    if (!dbUrl) return res.status(503).json({ error: 'Database not available' });
 
-    // Block if official prices already exist
-    const offSnap = await db.ref(`prices/${clean}`).get();
-    if (offSnap.exists()) {
-      const official = Object.values(offSnap.val()).filter(p => p?.price > 0);
+    // Block if official prices already exist — use REST (public read, no Admin SDK hang)
+    await getAdminToken().catch(() => {});
+    const offData = await restGet(dbUrl, `prices/${clean}`, 5_000).catch(() => null);
+    if (offData && typeof offData === 'object') {
+      const official = Object.values(offData).filter(p => p?.price > 0);
       if (official.length > 0)
         return res.status(409).json({ error: 'Official prices exist — manual entry not needed', count: official.length });
     }
+
+    // Write via Admin SDK (service-account auth required for RTDB writes)
+    const db = await getDB();
+    if (!db) return res.status(503).json({ error: 'Database write unavailable' });
 
     const entryId = `m_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
     const entry = {

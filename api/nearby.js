@@ -1,4 +1,4 @@
-// api/nearby.js — v1.0.0
+// api/nearby.js — v1.1.0
 // GET /api/nearby?barcode=&lat=&lng=&radiusKm=
 //
 // Returns all stores within radiusKm that carry the requested barcode,
@@ -11,8 +11,13 @@
 //
 // Response:
 //   { version, barcode, userLat, userLng, radiusKm, count, results: [ ...store+price rows ] }
+//
+// v1.1.0: reads via fetch() REST API (no Admin SDK WebSocket hang)
 
-import { getDB, haversine, setCors, isValidBarcode } from './_firebase.js';
+import { restGet, getDbUrl, getAdminToken, haversine, setCors, isValidBarcode } from './_firebase.js';
+
+const READ_TIMEOUT_MS = 5_000;
+const STALE_MS        = 36 * 3600 * 1000;
 
 export default async function handler(req, res) {
   setCors(res);
@@ -21,7 +26,7 @@ export default async function handler(req, res) {
 
   const { barcode, lat, lng, radiusKm } = req.query || {};
 
-  // ── Input validation ──
+  // ── Input validation ──────────────────────────────────────────────────────
   const clean = String(barcode || '').replace(/\D/g, '');
   if (!isValidBarcode(clean)) {
     return res.status(400).json({
@@ -43,33 +48,35 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'radiusKm must be between 0.1 and 50' });
   }
 
+  const dbUrl = getDbUrl();
+  if (!dbUrl) {
+    return res.status(200).json({
+      version: '1.1.0', barcode: clean,
+      userLat, userLng, radiusKm: radius,
+      count: 0, results: [],
+      warning: 'Database unavailable',
+    });
+  }
+
   try {
-    const db = await getDB();
-    if (!db) {
-      return res.status(200).json({
-        version: '1.0.0', barcode: clean,
-        userLat, userLng, radiusKm: radius,
-        count: 0, results: [],
-        warning: 'Database unavailable',
-      });
-    }
+    // Pre-warm admin token
+    await getAdminToken().catch(() => {});
 
     // Parallel fetch: prices for this barcode + all store metadata
-    const [pricesSnap, storesSnap] = await Promise.all([
-      db.ref(`prices/${clean}`).once('value'),
-      db.ref('stores').once('value'),
+    const [pricesData, storesData] = await Promise.all([
+      restGet(dbUrl, `prices/${clean}`, READ_TIMEOUT_MS).catch(() => null),
+      restGet(dbUrl, 'stores',          READ_TIMEOUT_MS).catch(() => null),
     ]);
 
-    const pricesData = pricesSnap.val() || {};
-    const storesData = storesSnap.val() || {};
+    const prices = (pricesData && typeof pricesData === 'object') ? pricesData : {};
+    const stores = (storesData && typeof storesData === 'object') ? storesData : {};
 
-    const STALE_MS = 36 * 3600 * 1000;
-    const results  = [];
+    const results = [];
 
-    for (const [storeKey, priceEntry] of Object.entries(pricesData)) {
+    for (const [storeKey, priceEntry] of Object.entries(prices)) {
       if (!priceEntry?.price || priceEntry.price <= 0) continue;
 
-      const store = storesData[storeKey];
+      const store = stores[storeKey];
 
       // Strict: skip stores without confirmed coordinates
       if (!store?.hasCoords || store.latitude == null || store.longitude == null) continue;
@@ -111,7 +118,7 @@ export default async function handler(req, res) {
     });
 
     return res.status(200).json({
-      version:  '1.0.0',
+      version:  '1.1.0',
       barcode:  clean,
       userLat,
       userLng,
