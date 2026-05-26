@@ -76,7 +76,7 @@ export default async function handler(req, res) {
           if (snap.exists()) storeIndex = snap.val();
         } catch (_) {}
       }
-      const result = await buildLayeredPrices(db, clean, userId, groupId, hasLoc, userLat, userLng, radius, storeIndex, wantStale);
+      const result = await buildLayeredPrices(db, clean, userId, groupId, hasLoc, userLat, userLng, radius, storeIndex, wantStale, wantApproximate);
       return res.status(200).json({ version: '6.0.0', barcode: clean, ...result });
     } catch (e) {
       console.error('[prices] barcode error:', e.message);
@@ -119,7 +119,7 @@ export default async function handler(req, res) {
       }
       const layered = await buildLayeredPrices(
         db, p.barcode, userId, groupId,
-        hasLoc, userLat, userLng, radius, storeIndex, wantStale
+        hasLoc, userLat, userLng, radius, storeIndex, wantStale, wantApproximate
       );
       return { ...p, ...layered };
     }));
@@ -174,7 +174,7 @@ export default async function handler(req, res) {
 // buildLayeredPrices — core priority logic
 // Returns { prices, source, communityWarning }
 // ─────────────────────────────────────────────
-async function buildLayeredPrices(db, barcode, userId, groupId, hasLoc, lat, lng, radius, storeIndex = {}, includeStale = false) {
+async function buildLayeredPrices(db, barcode, userId, groupId, hasLoc, lat, lng, radius, storeIndex = {}, includeStale = false, includeApproximate = false) {
   if (!db) return { prices: [], source: 'none', communityWarning: null };
 
   // Fetch all layers in parallel
@@ -213,7 +213,7 @@ async function buildLayeredPrices(db, barcode, userId, groupId, hasLoc, lat, lng
     let officialApproxNearby = 0;
     if (hasLoc) {
       officialTotalBeforeRadius = official.length; // count before strict radius filter
-      const filtered = filterByRadius(official, lat, lng, radius, storeIndex, wantApproximate);
+      const filtered = filterByRadius(official, lat, lng, radius, storeIndex, includeApproximate);
       official              = filtered.results;
       officialApproxNearby  = filtered.approximateNearbyCount;
     }
@@ -276,7 +276,7 @@ async function buildLayeredPrices(db, barcode, userId, groupId, hasLoc, lat, lng
     proxy = Object.values(snaps.proxy.val())
       .filter(p => p?.price > 0 && (now - (p.fetchedAt || 0)) < 3_600_000)
       .map(p => ({ ...p, source: 'proxy', displayPrice: p.price }));
-    if (hasLoc) proxy = filterByRadius(proxy, lat, lng, radius, storeIndex, wantApproximate).results;
+    if (hasLoc) proxy = filterByRadius(proxy, lat, lng, radius, storeIndex, includeApproximate).results;
     proxy.sort((a, b) => a.displayPrice - b.displayPrice);
   }
 
