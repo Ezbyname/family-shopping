@@ -25,6 +25,9 @@
 //   RANGE_INTERPOLATED   → street-segment interpolation (good)
 //   GEOMETRIC_CENTER     → area/polygon center (acceptable for stores in malls)
 //   APPROXIMATE          → city-level only → REJECTED (too imprecise for radius)
+//   partial_match        → IGNORED for stores (abbreviated Israeli addresses like
+//                          "א.ת", "ק.שר", mall names always trigger this flag even
+//                          when Google returns a correct precise location)
 
 import 'dotenv/config.js';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
@@ -149,14 +152,12 @@ async function geocodeAddress(address, city) {
 
     const locType = result.geometry?.location_type;
 
-    // Reject APPROXIMATE — city-level precision is useless for 1km radius filtering
+    // Reject APPROXIMATE — city-level precision is useless for 1km radius filtering.
+    // partial_match is intentionally ignored for stores: abbreviated Israeli store
+    // addresses (א.ת, ק.שר, mall names) often trigger partial_match even when Google
+    // returns a correct ROOFTOP/GEOMETRIC_CENTER location.
     if (!TRUSTED_TYPES.has(locType)) {
       return { ok: false, reason: `low-confidence (${locType})`, query };
-    }
-
-    // Reject partial matches — Google found something but not exactly what we asked for
-    if (result.partial_match === true) {
-      return { ok: false, reason: `partial_match (${locType})`, query };
     }
 
     return {
