@@ -6,3 +6,5 @@ package-lock.json
 .DS_Store
 Thumbs.db
 .vercel
+# Store snapshot — generated file, updated monthly on VPS
+workers/prices/data/stores-geocoded.json

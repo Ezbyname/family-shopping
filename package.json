@@ -18,7 +18,11 @@
     "sync:dry-run:chain": "DRY_RUN=true node index.js",
     "geocode:dry-run": "node workers/prices/geocode-stores.js --dry-run",
     "geocode:stores": "GEOCODE_WRITE=true node workers/prices/geocode-stores.js",
-    "verify:stores": "node workers/prices/verify.js --stores"
+    "verify:stores": "node workers/prices/verify.js --stores",
+    "snapshot:export": "SNAPSHOT_WRITE=true node workers/prices/export-store-snapshot.js",
+    "snapshot:dry-run": "node workers/prices/export-store-snapshot.js",
+    "stores:update": "STORE_MAINTENANCE_WRITE=true node workers/prices/stores-monthly-update.js",
+    "stores:update:dry-run": "node workers/prices/stores-monthly-update.js --dry-run"
   },
   "dependencies": {
     "firebase-admin": "^12.1.0",
