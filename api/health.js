@@ -1,20 +1,13 @@
-// api/health.js — v1.0.0
+// api/health.js — v1.1.0
 // GET /api/health  — lightweight Firebase connectivity probe
 // Returns: { ok, timestamp, timings: { initMs, pingMs, totalMs } }
+//
+// v1.1.0: reads via fetch() REST API (no Admin SDK WebSocket) — fast on Vercel
 
-import { getDB, setCors } from './_firebase.js';
+import { getDbUrl, getAdminToken, restGet, setCors } from './_firebase.js';
 
 const INIT_TIMEOUT_MS = 8_000;
 const PING_TIMEOUT_MS = 5_000;
-
-function withTimeout(p, ms, label) {
-  return Promise.race([
-    p,
-    new Promise((_, rej) =>
-      setTimeout(() => rej(Object.assign(new Error(`timeout:${label}`), { isTimeout: true })), ms)
-    ),
-  ]);
-}
 
 export default async function handler(req, res) {
   setCors(res);
@@ -23,46 +16,49 @@ export default async function handler(req, res) {
   const t0 = Date.now();
   const timings = { initMs: null, pingMs: null, totalMs: null };
 
-  // ── 1. Firebase init ─────────────────────────────────────────────────────────
-  let db;
+  // ── 1. Config check ───────────────────────────────────────────────────────
+  const dbUrl = getDbUrl();
+  if (!dbUrl) {
+    timings.totalMs = Date.now() - t0;
+    return res.status(503).json({
+      ok: false,
+      error: 'Firebase not initialized (missing FIREBASE_DATABASE_URL)',
+      timestamp: new Date().toISOString(),
+      timings,
+    });
+  }
+
+  // ── 2. Admin token (measures cold-start OAuth2 fetch; ~0 ms warm) ─────────
   try {
     const tInit = Date.now();
-    db = await withTimeout(getDB(), INIT_TIMEOUT_MS, 'init');
+    await Promise.race([
+      getAdminToken(),
+      new Promise((_, rej) =>
+        setTimeout(() => rej(Object.assign(new Error('timeout:init'), { isTimeout: true })), INIT_TIMEOUT_MS)
+      ),
+    ]);
     timings.initMs = Date.now() - tInit;
   } catch (e) {
     timings.totalMs = Date.now() - t0;
     return res.status(503).json({
       ok: false,
-      error: e.isTimeout ? 'Firebase init timed out' : `Firebase init failed: ${e.message}`,
+      error: e.isTimeout ? 'Admin token fetch timed out' : `Token error: ${e.message}`,
       timestamp: new Date().toISOString(),
       timings,
     });
   }
 
-  if (!db) {
-    timings.totalMs = Date.now() - t0;
-    return res.status(503).json({
-      ok: false,
-      error: 'Firebase not initialized (missing env vars)',
-      timestamp: new Date().toISOString(),
-      timings,
-    });
-  }
-
-  // ── 2. Firebase ping — read syncSummary (tiny node, always exists) ───────────
-  let pingOk = false;
+  // ── 3. Firebase ping — read syncSummary via REST ──────────────────────────
   let pingData = null;
   try {
     const tPing = Date.now();
-    const snap = await withTimeout(db.ref('syncSummary').get(), PING_TIMEOUT_MS, 'ping');
+    const data  = await restGet(dbUrl, 'syncSummary', PING_TIMEOUT_MS);
     timings.pingMs = Date.now() - tPing;
-    pingOk = true;
-    if (snap?.exists()) {
-      const d = snap.val();
-      pingData = { lastSyncDate: d.lastSyncDate, totalProducts: d.totalProducts };
+    if (data !== null) {
+      pingData = { lastSyncDate: data.lastSyncDate, totalProducts: data.totalProducts };
     }
   } catch (e) {
-    timings.pingMs = Date.now() - t0 - (timings.initMs || 0);
+    timings.pingMs  = Date.now() - t0 - (timings.initMs || 0);
     timings.totalMs = Date.now() - t0;
     return res.status(503).json({
       ok: false,
