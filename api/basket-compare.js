@@ -25,7 +25,11 @@ export default async function handler(req, res) {
   const wantApproximate = includeApproximate === true || includeApproximate === 'true';
 
   const validItems = items
-    .map(i => ({ barcode: String(i.barcode || '').replace(/\D/g, ''), qty: Math.max(1, parseInt(i.quantity || 1)) }))
+    .map(i => ({
+      barcode: String(i.barcode || '').replace(/\D/g, ''),
+      qty:     Math.max(1, parseInt(i.quantity || 1)),
+      name:    String(i.name || '').trim().slice(0, 100),
+    }))
     .filter(i => isValidBarcode(i.barcode));
 
   if (!validItems.length) return res.status(400).json({ error: 'No valid barcodes' });
@@ -99,23 +103,23 @@ export default async function handler(req, res) {
   // Calculate basket per store
   const storeResults = nearbyKeys.map(storeKey => {
     const store = storeIndex[storeKey] || {};
-    const foundItems = [], missingBarcodes = [];
+    const foundItems = [], missingItems = [];
     let total = 0, hasFallback = false;
 
-    validItems.forEach(({ barcode, qty }) => {
+    validItems.forEach(({ barcode, qty, name: reqName }) => {
       const p = priceMap[barcode]?.[storeKey];
       if (p?.price > 0) {
         const lineTotal = Math.round(p.price * qty * 100) / 100;
         total += lineTotal;
         if (p.source !== 'official') hasFallback = true;
         foundItems.push({
-          barcode, name: p.name || barcode, quantity: qty,
+          barcode, name: p.name || reqName || barcode, quantity: qty,
           unitPrice: p.price, totalPrice: lineTotal,
           source: p.source || 'official',
           isFallback: p.source !== 'official',
         });
       } else {
-        missingBarcodes.push(barcode);
+        missingItems.push({ barcode, name: reqName || barcode });
       }
     });
 
@@ -133,21 +137,22 @@ export default async function handler(req, res) {
       storeName:      store.storeName  || '',
       city:           store.city       || '',
       address:        store.address    || '',
+      latitude:       store.latitude   ?? null,
+      longitude:      store.longitude  ?? null,
       distanceKm:     dist,
       total,
       availableItems: foundItems.length,
-      missingItems:   missingBarcodes.length,
+      missingItems,                    // [{barcode, name}]
       totalItems:     validItems.length,
       completeness:   Math.round(foundItems.length / validItems.length * 100),
       hasFallbackData: hasFallback,
       items:          foundItems,
-      missingBarcodes,
     };
   }).filter(Boolean);
 
   // Sort: full basket by price first, then partial
-  const full    = storeResults.filter(s => s.missingItems === 0).sort((a, b) => a.total - b.total);
-  const partial = storeResults.filter(s => s.missingItems > 0 && s.availableItems > 0)
+  const full    = storeResults.filter(s => !s.missingItems.length).sort((a, b) => a.total - b.total);
+  const partial = storeResults.filter(s => s.missingItems.length > 0 && s.availableItems > 0)
     .sort((a, b) => b.completeness - a.completeness || a.total - b.total);
 
   return res.status(200).json({

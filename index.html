@@ -1591,6 +1591,160 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
   from{opacity:0;transform:translateY(-6px)}
   to{opacity:1;transform:translateY(0)}}
 
+/* ══ SEARCH CLEAR BUTTON ══ */
+.psi-wrap{flex:1;position:relative;display:flex;align-items:center}
+.psi-wrap .price-search-input{flex:1;padding-left:36px}
+.psi-clear{position:absolute;left:8px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--muted);cursor:pointer;
+  font-size:18px;line-height:1;min-width:32px;min-height:32px;padding:4px;
+  display:none;align-items:center;justify-content:center;border-radius:50%}
+.psi-clear.show{display:flex}
+.psi-clear:active{background:var(--card2)}
+
+/* ══ STORE DETAILS MODAL ══ */
+.sd-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;
+  display:none;align-items:flex-end;justify-content:center}
+.sd-overlay.show{display:flex;animation:fadeIn .2s ease}
+.sd-sheet{background:var(--surface);border-radius:22px 22px 0 0;width:100%;
+  max-width:560px;max-height:90vh;overflow-y:auto;
+  animation:slideUp .28s ease;padding-bottom:calc(28px + var(--safe-b))}
+.sd-drag{width:36px;height:4px;background:var(--border);border-radius:2px;
+  margin:12px auto 0}
+.sd-head{padding:10px 16px 14px;border-bottom:1px solid var(--border)}
+.sd-chain{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.8px;margin-bottom:3px}
+.sd-name{font-size:20px;font-weight:900;color:var(--text);margin-bottom:3px}
+.sd-city{font-size:13px;color:var(--muted)}
+.sd-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}
+.sd-tag{font-size:10px;font-weight:700;border-radius:6px;padding:2px 9px}
+.sd-tag.precise{background:rgba(52,211,153,.12);color:var(--green)}
+.sd-tag.approx{background:rgba(240,180,41,.12);color:var(--accent)}
+.sd-tag.dist{background:var(--card2);color:var(--muted)}
+.sd-body{padding:14px 16px}
+.sd-section{margin-bottom:16px}
+.sd-section-title{font-size:10px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px}
+.sd-section-value{font-size:13px;font-weight:600;color:var(--text);line-height:1.5}
+.sd-hours-grid{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px;
+  padding:2px 0}
+.sd-hours-day{color:var(--muted);font-weight:600;white-space:nowrap}
+.sd-hours-time{color:var(--text)}
+.sd-hours-today .sd-hours-day,.sd-hours-today .sd-hours-time{color:var(--green);font-weight:800}
+.sd-fallback{font-size:12px;color:var(--muted);font-style:italic}
+.sd-actions{display:flex;flex-direction:column;gap:8px;padding:0 16px 4px}
+.sd-nav-btn{display:flex;align-items:center;justify-content:center;gap:8px;
+  background:var(--accent);color:#111;border:none;border-radius:13px;padding:13px;
+  font-family:'Heebo',sans-serif;font-size:14px;font-weight:800;
+  cursor:pointer;transition:opacity .15s;width:100%;text-align:center}
+.sd-nav-btn:active{opacity:.8}
+.sd-ghost-btn{display:flex;align-items:center;justify-content:center;gap:7px;
+  background:var(--card);color:var(--text);border:1.5px solid var(--border);
+  border-radius:13px;padding:11px 14px;font-family:'Heebo',sans-serif;
+  font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;
+  width:100%;text-align:center}
+.sd-ghost-btn:active{background:var(--card2)}
+/* Tappable row in price detail → opens store modal */
+.pd-row[data-tappable]{cursor:pointer}
+.pd-row[data-tappable]:active{opacity:.88}
+
+/* ══ BASKET COMPARE MODAL ══ */
+.bc-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:610;
+  display:none;align-items:flex-end;justify-content:center}
+.bc-overlay.show{display:flex;animation:fadeIn .2s ease}
+.bc-sheet{background:var(--surface);border-radius:22px 22px 0 0;width:100%;
+  max-width:560px;max-height:92vh;display:flex;flex-direction:column;
+  animation:slideUp .28s ease}
+.bc-sheet-head{padding:0 16px 12px;border-bottom:1px solid var(--border);
+  flex-shrink:0;position:relative}
+.bc-drag{width:36px;height:4px;background:var(--border);border-radius:2px;
+  margin:12px auto 14px}
+.bc-close{position:absolute;left:14px;top:14px;background:var(--card2);
+  border:none;border-radius:50%;width:30px;height:30px;font-size:16px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.bc-title{font-size:17px;font-weight:900;text-align:center;margin-bottom:3px}
+.bc-sub{font-size:11px;color:var(--muted);text-align:center}
+.bc-body{flex:1;overflow-y:auto;padding:10px 12px 28px;
+  -webkit-overflow-scrolling:touch}
+.bc-hero{background:linear-gradient(135deg,var(--green-dim),rgba(52,211,153,.03));
+  border:1.5px solid rgba(52,211,153,.3);border-radius:16px;
+  padding:16px;margin-bottom:12px}
+.bc-hero-label{font-size:10px;font-weight:800;color:var(--green);
+  text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px}
+.bc-hero-name{font-size:17px;font-weight:900;margin-bottom:2px}
+.bc-hero-city{font-size:12px;color:var(--muted);margin-bottom:10px}
+.bc-hero-price{font-size:34px;font-weight:900;color:var(--green);line-height:1;
+  margin-bottom:5px}
+.bc-hero-saving{font-size:12px;font-weight:700;color:var(--green);
+  background:rgba(52,211,153,.12);border-radius:6px;padding:2px 10px;
+  display:inline-block;margin-bottom:8px}
+.bc-hero-note{font-size:11px;color:var(--muted);margin-bottom:10px}
+.bc-hero-actions{display:flex;gap:7px}
+.bc-hero-btn{flex:1;background:var(--green);color:#000;border:none;border-radius:11px;
+  padding:10px 6px;font-family:'Heebo',sans-serif;font-size:12px;font-weight:800;
+  cursor:pointer;transition:opacity .15s;text-align:center}
+.bc-hero-btn:active{opacity:.8}
+.bc-hero-btn.ghost{background:var(--card);color:var(--text);border:1.5px solid var(--border)}
+.bc-section-title{font-size:10px;font-weight:800;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.7px;margin:14px 2px 6px;display:block}
+.bc-rank-card{background:var(--card);border-radius:14px;padding:12px 13px;
+  margin-bottom:7px;border:1px solid var(--border)}
+.bc-rank-card.best{border-color:rgba(52,211,153,.35);
+  background:rgba(52,211,153,.04)}
+.bc-rank-top{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.bc-rank-num{width:22px;height:22px;border-radius:50%;background:var(--card2);
+  font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;
+  color:var(--muted);flex-shrink:0}
+.bc-rank-num.best{background:var(--green);color:#000}
+.bc-rank-name{font-size:14px;font-weight:800;flex:1;min-width:0}
+.bc-rank-price{font-size:16px;font-weight:900;flex-shrink:0}
+.bc-rank-price.best{color:var(--green)}
+.bc-rank-meta{font-size:11px;color:var(--muted);margin-bottom:5px;
+  display:flex;gap:8px;flex-wrap:wrap}
+.bc-rank-footer{display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:3px}
+.bc-rank-items{font-size:11px;color:var(--muted)}
+.bc-rank-items strong{color:var(--text)}
+.bc-rank-missing{font-size:11px;color:var(--red);font-weight:700}
+.bc-rank-delta{font-size:11px;font-weight:700;flex-shrink:0}
+.bc-rank-delta.cheaper{color:var(--green)}
+.bc-rank-delta.pricier{color:var(--red)}
+.bc-expand-btn{font-size:11px;font-weight:700;color:var(--accent);background:none;
+  border:none;cursor:pointer;padding:4px 0;font-family:'Heebo',sans-serif;
+  display:block}
+.bc-breakdown{display:none;margin-top:8px;border-top:1px solid var(--border);
+  padding-top:8px}
+.bc-breakdown.show{display:block}
+.bc-item-row{display:flex;align-items:center;padding:4px 0;font-size:12px;gap:4px}
+.bc-item-name{flex:1;color:var(--text);font-weight:600;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bc-item-name.missing{color:var(--red);font-style:italic}
+.bc-item-qty{color:var(--muted);font-size:11px;flex-shrink:0}
+.bc-item-price{font-weight:800;font-size:13px;flex-shrink:0}
+.bc-item-price.missing{color:var(--red);font-size:11px}
+.bc-no-full{background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.2);
+  border-radius:14px;padding:16px;margin-bottom:12px;text-align:center}
+.bc-ns-icon{font-size:36px;margin-bottom:8px}
+.bc-no-full p{font-size:13px;font-weight:700;margin-bottom:5px}
+.bc-no-full small{font-size:11px;color:var(--muted);display:block;margin-bottom:10px}
+.bc-action-btns{display:flex;flex-direction:column;gap:6px}
+.bc-action-btn{background:var(--card);border:1.5px solid var(--border);
+  border-radius:11px;padding:10px;font-family:'Heebo',sans-serif;
+  font-size:13px;font-weight:700;color:var(--text);cursor:pointer;
+  transition:all .15s;width:100%;display:block}
+.bc-action-btn.primary{background:var(--accent);color:#111;border-color:transparent}
+.bc-action-btn:active{opacity:.8}
+.bc-loading{text-align:center;padding:50px 20px;color:var(--muted)}
+.bc-loading .spin{width:36px;height:36px;border:3px solid var(--border);
+  border-top-color:var(--green);border-radius:50%;
+  animation:spin .8s linear infinite;margin:0 auto 12px}
+.bc-loading p{font-size:13px;font-weight:600}
+/* "Compare list" button in basket totals bar */
+.bc-open-btn{background:var(--green-dim);border:1.5px solid rgba(52,211,153,.3);
+  border-radius:11px;padding:7px 12px;font-family:'Heebo',sans-serif;
+  font-size:11px;font-weight:800;color:var(--green);cursor:pointer;
+  flex-shrink:0;transition:all .15s;white-space:nowrap;margin-right:auto}
+.bc-open-btn:active{opacity:.8}
+
 </style>
 </head>
 <body>
@@ -1717,6 +1871,7 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
         <div class="bt-price" id="bt-price">—</div>
       </div>
       <div class="bt-saving" id="bt-saving"></div>
+      <button class="bc-open-btn" onclick="openBasketCompare()">השווה 🛒</button>
     </div>
   </div>
 
@@ -1739,8 +1894,15 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
 
   <div id="price-panel" style="flex:1;overflow:hidden;display:none;flex-direction:column">
     <div class="price-search-bar">
-      <input class="price-search-input" id="price-search-input" placeholder="חפש מוצר... (קורנפלקס, חלב...)"
-        maxlength="60" onkeydown="if(event.key==='Enter')searchPrices()">
+      <div class="psi-wrap">
+        <input class="price-search-input" id="price-search-input"
+          placeholder="חפש מוצר... (קורנפלקס, חלב...)"
+          maxlength="60"
+          onkeydown="if(event.key==='Enter')searchPrices()"
+          oninput="_updatePsiClear()">
+        <button class="psi-clear" id="psi-clear"
+          onclick="clearPriceSearch()" aria-label="נקה חיפוש">×</button>
+      </div>
       <button class="nearby-toggle-btn" id="nearby-toggle-btn"
         onclick="toggleNearbyMode()" title="מצב סניפים קרובים">📍</button>
       <button class="city-toggle-btn" id="city-toggle-btn"
@@ -4099,7 +4261,7 @@ function renderBasketResults(data, totalItems) {
         <span>✅ ${r.availableItems}/${totalItems} פריטים (${completePct}%)</span>
         ${r.city ? `<span>🏙 ${esc(r.city)}</span>` : ''}
       </div>
-      ${r.missingItems > 0 ? `<div class="basket-missing">חסרים ${r.missingItems} פריטים</div>` : ''}
+      ${(Array.isArray(r.missingItems) ? r.missingItems.length : (r.missingItems||0)) > 0 ? `<div class="basket-missing">חסרים ${Array.isArray(r.missingItems) ? r.missingItems.length : r.missingItems} פריטים</div>` : ''}
       <div class="basket-items-mini">
         ${(r.items||[]).slice(0,4).map(i => `
           <div class="basket-item-row">
@@ -7586,6 +7748,9 @@ function _renderPriceDetail() {
     </div>` : '';
 
   // ── Price rows ───────────────────────────────────────────────────────────
+  // Store data is cached in _sdRows[] by index to avoid unsafe inline JSON.
+  window._sdRows = [];
+
   const rowsHTML = filtered.map((p, i) => {
     const isBest      = i === 0;
     const displayP    = (p.displayPrice || p.price || 0);
@@ -7598,25 +7763,41 @@ function _renderPriceDetail() {
     const chainKey    = `${p.chainId || chainName.replace(/\s/g,'_')}_${p.storeId || '0'}`;
     const approxMark  = p.approximateLocation ? `<span class="approx-badge">~משוער</span>` : '';
 
-    // Freshness label (replaces raw ageH)
+    // Freshness label
     const freshInfo   = _freshnessLabel(p.syncedAt);
     const freshBadge  = `<span class="fresh-label ${freshInfo.cls}">${freshInfo.label}</span>`;
 
     const metaParts = [];
-    if (p.city)        metaParts.push(esc(p.city));
+    if (p.city)            metaParts.push(esc(p.city));
     if (p.distanceKm != null) metaParts.push(`📍 ${p.distanceKm} ק"מ`);
+
+    // Cache store data for the details modal (safe index reference, no inline JSON)
+    const sdIdx = window._sdRows.length;
+    window._sdRows.push({
+      chainName, chainId: p.chainId || '',
+      storeId: p.storeId || '', storeName: p.storeName || '',
+      city: p.city || '', address: p.address || '',
+      distanceKm: p.distanceKm ?? null,
+      latitude: p.latitude ?? null, longitude: p.longitude ?? null,
+      approximateLocation: p.approximateLocation || false,
+      openingHours: p.openingHours || null,
+    });
 
     const actionBtns = (src === 'official' || src === 'user_override') ? `
       <div class="pd-row-actions">
-        <button class="pd-row-act" onclick="openMp2(${JSON.stringify(_pdBarcode)},${JSON.stringify(_pdName)},true,${JSON.stringify(chainName)},${displayP})">✏️ תקן</button>
-        <button class="pd-row-act" onclick="openReportModal(${JSON.stringify(chainKey)},${JSON.stringify(chainName)},${displayP},${JSON.stringify(_pdName)})">🚨 דווח</button>
+        <button class="pd-row-act"
+          onclick="event.stopPropagation();openMp2(${JSON.stringify(_pdBarcode)},${JSON.stringify(_pdName)},true,${JSON.stringify(chainName)},${displayP})">✏️ תקן</button>
+        <button class="pd-row-act"
+          onclick="event.stopPropagation();openReportModal(${JSON.stringify(chainKey)},${JSON.stringify(chainName)},${displayP},${JSON.stringify(_pdName)})">🚨 דווח</button>
       </div>` : '';
 
-    // Override rows get a distinct background
+    // Override rows get a distinct background; all rows are tappable → opens store detail
     const rowCls = ['pd-row', isBest ? 'best' : '', isOverride ? 'is-override' : ''].filter(Boolean).join(' ');
 
-    // data-* attrs for future chain logo / store-hours extension
-    return `<div class="${rowCls}" data-barcode="${esc(_pdBarcode)}" data-chain="${esc(chainName)}" data-store="${esc(p.storeId||'')}" data-source="${esc(src)}">
+    return `<div class="${rowCls}" data-tappable="1"
+        data-barcode="${esc(_pdBarcode)}" data-chain="${esc(chainName)}"
+        data-store="${esc(p.storeId||'')}" data-source="${esc(src)}"
+        onclick="openStoreDetail(window._sdRows[${sdIdx}])">
       <div class="pd-row-left">
         ${isBest && filtered.length > 1 ? '<div class="pd-row-trophy">🏆 הכי זול לידך</div>' : ''}
         <div class="pd-row-chain">${esc(chainName)} ${badge} ${approxMark}</div>
@@ -7762,6 +7943,394 @@ async function _refreshPdAfterSave(barcode) {
   const res  = await _fetchPricesForBarcode(barcode).catch(() => null);
   if (res?.prices) { _pdPrices = res.prices; _renderPriceDetail(); }
 }
+
+// ══════════════════════════════════════════════════
+// STAGE 2 — SEARCH CLEAR BUTTON
+// ══════════════════════════════════════════════════
+function _updatePsiClear() {
+  const btn = document.getElementById('psi-clear');
+  if (!btn) return;
+  btn.classList.toggle('show', (document.getElementById('price-search-input')?.value?.length || 0) > 0);
+}
+
+window.clearPriceSearch = function() {
+  const inp = document.getElementById('price-search-input');
+  if (inp) { inp.value = ''; inp.focus(); }
+  _updatePsiClear();
+  const wrap = document.getElementById('price-content');
+  if (wrap) wrap.innerHTML = `<div class="search-hint">
+    <div class="sh-icon">🔍</div>
+    <p>חפש מוצר לקבלת מחירים</p>
+    <small>קורנפלקס, חלב, ביצים...</small>
+  </div>`;
+  searchResults = [];
+  if (typeof lastSearchQuery !== 'undefined') lastSearchQuery = '';
+  if (typeof selectedProduct !== 'undefined') selectedProduct = null;
+  document.getElementById('price-tools')?.setAttribute('style', 'display:none');
+  document.getElementById('sr-filter-row')?.setAttribute('style', 'display:none');
+};
+
+// ══════════════════════════════════════════════════
+// STAGE 1 — STORE DETAILS MODAL
+// ══════════════════════════════════════════════════
+let _sdStore = null;
+
+window.openStoreDetail = function(storeData) {
+  if (!storeData) return;
+  _sdStore = storeData;
+
+  // Header
+  document.getElementById('sd-chain').textContent = storeData.chainName || '';
+  const nameEl = document.getElementById('sd-name');
+  nameEl.textContent = (storeData.storeName && storeData.storeName !== storeData.chainName)
+    ? storeData.storeName : storeData.chainName || '';
+  document.getElementById('sd-city').textContent = storeData.city || '';
+
+  // Confidence + distance tags
+  const tags = [];
+  if (storeData.approximateLocation) {
+    tags.push(`<span class="sd-tag approx">📍 מיקום משוער</span>`);
+  } else if (storeData.latitude) {
+    tags.push(`<span class="sd-tag precise">✅ מיקום מדויק</span>`);
+  }
+  if (storeData.distanceKm != null) {
+    tags.push(`<span class="sd-tag dist">📏 ${storeData.distanceKm} ק"מ ממך</span>`);
+  }
+  document.getElementById('sd-tags').innerHTML = tags.join('');
+
+  // Address section
+  const addrSec = document.getElementById('sd-address-sec');
+  const addrEl  = document.getElementById('sd-address');
+  if (storeData.address || storeData.city) {
+    const parts = [storeData.address, storeData.city].filter(Boolean);
+    addrEl.textContent = parts.join(', ');
+    addrSec.style.display = '';
+  } else {
+    addrSec.style.display = 'none';
+  }
+
+  // Opening hours
+  const hoursSec     = document.getElementById('sd-hours-sec');
+  const hoursContent = document.getElementById('sd-hours-content');
+  const oh = storeData.openingHours;
+  if (oh && typeof oh === 'object' && Object.keys(oh).length > 0) {
+    const dayKeys  = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+    const dayNames = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+    const todayKey = dayKeys[new Date().getDay()];
+    hoursContent.innerHTML = `<div class="sd-hours-grid">` +
+      dayKeys.map((k, idx) => {
+        const isToday = k === todayKey;
+        const cls     = isToday ? ' sd-hours-today' : '';
+        return `<div class="sd-hours-day${cls}">${dayNames[idx]}:</div>
+                <div class="sd-hours-time${cls}">${esc(oh[k] || 'סגור')}</div>`;
+      }).join('') +
+      `</div>`;
+  } else {
+    hoursContent.innerHTML = `<div class="sd-fallback">שעות פעילות לא זמינות כרגע</div>`;
+  }
+  hoursSec.style.display = '';
+
+  document.getElementById('sd-overlay')?.classList.add('show');
+  document.body.classList.add('sheet-open');
+};
+
+window.closeStoreDetail = function() {
+  document.getElementById('sd-overlay')?.classList.remove('show');
+  document.body.classList.remove('sheet-open');
+};
+
+window.navigateToStore = function() {
+  if (!_sdStore) return;
+  const { latitude, longitude, address, storeName, chainName, city } = _sdStore;
+  let url;
+  if (latitude && longitude) {
+    url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=driving`;
+  } else if (address || city) {
+    const q = encodeURIComponent([address, city].filter(Boolean).join(', '));
+    url = `https://www.google.com/maps/search/?api=1&query=${q}`;
+  } else {
+    const q = encodeURIComponent((storeName || chainName || '') + (city ? ' ' + city : ''));
+    url = `https://www.google.com/maps/search/?api=1&query=${q}`;
+  }
+  window.open(url, '_blank');
+};
+
+window.searchStoreProducts = function() {
+  if (!_sdStore) return;
+  closeStoreDetail();
+  setTab('price');
+  const name = _sdStore.storeName || _sdStore.chainName || '';
+  toast(`🔍 חיפוש מוצרים ב${name}`);
+};
+
+window.compareListAtStore = function() {
+  closeStoreDetail();
+  openBasketCompare(_sdStore);
+};
+
+// ══════════════════════════════════════════════════
+// STAGE 3 — FULL BASKET COMPARISON
+// ══════════════════════════════════════════════════
+let _bcAbort = null;
+let _bcFocusStore = null; // optional store to highlight
+
+window.openBasketCompare = async function(focusStore = null) {
+  _bcFocusStore = focusStore || null;
+  const overlay = document.getElementById('bc-overlay');
+  const body    = document.getElementById('bc-body');
+  const sub     = document.getElementById('bc-sub');
+  if (!overlay || !body) return;
+
+  overlay.classList.add('show');
+  document.body.classList.add('sheet-open');
+
+  // Gather items with barcodes
+  const listItems = Object.entries(items || {})
+    .map(([id, v]) => ({ ...v, id }))
+    .filter(i => {
+      if (i.bought) return false;
+      const bc = i.barcode || i.attached?.barcode;
+      return bc && isValidBarcode(bc);
+    });
+
+  if (!listItems.length) {
+    body.innerHTML = `<div style="text-align:center;padding:50px 20px">
+      <div style="font-size:40px;margin-bottom:10px">🛒</div>
+      <div style="font-size:14px;font-weight:700;margin-bottom:6px">אין מוצרים עם ברקוד ברשימה</div>
+      <div style="font-size:12px;color:var(--muted)">הוסף ברקוד למוצרים כדי להשוות מחירים</div>
+    </div>`;
+    if (sub) sub.textContent = '';
+    return;
+  }
+
+  const hasLoc  = _hasLoc();
+  const payload = {
+    items: listItems.map(i => ({
+      barcode:  i.barcode || i.attached?.barcode,
+      name:     i.name || '',
+      quantity: i.qty || 1,
+    })),
+    ...(hasLoc ? { lat: _locLat(), lng: _locLng(), radiusKm: _nearbyRadius } : {}),
+    includeApproximate: false,
+    ...(groupId ? { groupId } : {}),
+  };
+
+  body.innerHTML = `<div class="bc-loading"><div class="spin"></div>
+    <p>משווה את כל הרשימה...</p></div>`;
+  if (sub) sub.textContent =
+    `${listItems.length} מוצרים${hasLoc ? ` · עד ${_nearbyRadius} ק"מ` : ' · כל הארץ'}`;
+
+  try {
+    if (_bcAbort) _bcAbort.abort();
+    const ctrl = new AbortController();
+    _bcAbort   = ctrl;
+    const res  = await fetch('/api/basket-compare', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+      signal:  ctrl.signal,
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    _bcAbort = null;
+    _renderBasketCompare(data, payload.items);
+  } catch (e) {
+    if (e.name === 'AbortError') return;
+    body.innerHTML = `<div style="text-align:center;padding:40px 16px">
+      <div style="font-size:36px;margin-bottom:10px">⚠️</div>
+      <div style="font-size:14px;font-weight:700;margin-bottom:6px">לא ניתן לטעון נתונים</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px">${esc(e.message)}</div>
+      <div class="bc-action-btns">
+        <button class="bc-action-btn primary" onclick="openBasketCompare(_bcFocusStore)">🔄 נסה שוב</button>
+      </div>
+    </div>`;
+  }
+};
+
+window.closeBasketCompare = function() {
+  document.getElementById('bc-overlay')?.classList.remove('show');
+  document.body.classList.remove('sheet-open');
+  if (_bcAbort) { _bcAbort.abort(); _bcAbort = null; }
+};
+
+function _renderBasketCompare(data, requestItems) {
+  const body = document.getElementById('bc-body');
+  if (!body) return;
+
+  const results  = data.results || [];
+  const full     = results.filter(s => !(s.missingItems?.length));
+  const partial  = results.filter(s => (s.missingItems?.length || 0) > 0 && s.availableItems > 0);
+  const cheapest = data.bestFullBasket;
+  const hasLoc   = _hasLoc();
+  let html = '';
+
+  if (!results.length) {
+    body.innerHTML = `<div class="bc-no-full">
+      <div class="bc-ns-icon">🔍</div>
+      <p>לא מצאנו חנויות עם מחירים${hasLoc ? ' בטווח הזה' : ''}</p>
+      <small>ייתכן שהמחירים טרם סונכרנו לאזור שלך</small>
+      <div class="bc-action-btns" style="margin-top:10px">
+        ${hasLoc ? `<button class="bc-action-btn primary" onclick="_bcIncreaseRadius()">🔭 הגדל רדיוס ל-${_nextRadius()} ק"מ</button>` : ''}
+        <button class="bc-action-btn" onclick="_bcSearchAll()">🌍 השווה ללא סינון מיקום</button>
+      </div>
+    </div>`;
+    return;
+  }
+
+  // Hero — cheapest full basket
+  if (cheapest) {
+    const nextTotal = full.length > 1 ? full[1].total : null;
+    const maxTotal  = full.length > 1 ? full[full.length - 1].total : null;
+    const savingVsNext = nextTotal != null ? (nextTotal - cheapest.total) : 0;
+    const savingVsMax  = maxTotal  != null ? (maxTotal  - cheapest.total) : 0;
+    const nameLine = [cheapest.chainName, cheapest.storeName !== cheapest.chainName ? cheapest.storeName : '']
+      .filter(Boolean).join(' — ');
+    html += `<div class="bc-hero">
+      <div class="bc-hero-label">🏆 הכי זול בשבילך</div>
+      <div class="bc-hero-name">${esc(nameLine)}</div>
+      <div class="bc-hero-city">${esc(cheapest.city || '')}${cheapest.distanceKm != null ? ` · 📍 ${cheapest.distanceKm} ק"מ` : ''}</div>
+      <div class="bc-hero-price">₪${cheapest.total.toFixed(2)}</div>
+      ${savingVsNext > 0.05 ? `<div class="bc-hero-saving">חסכת ₪${savingVsNext.toFixed(2)} לעומת הסופר הבא</div>` : ''}
+      ${savingVsMax  > 0.05 ? `<div class="bc-hero-note">אפשר לחסוך עד ₪${savingVsMax.toFixed(2)} לעומת הסופר היקר ביותר</div>` : ''}
+      <div class="bc-hero-actions">
+        <button class="bc-hero-btn" onclick="navigateToStoreDirect(${cheapest.latitude},${cheapest.longitude},${JSON.stringify(cheapest.address||'')},${JSON.stringify(nameLine)})">🗺 נווט</button>
+        <button class="bc-hero-btn ghost" onclick="_bcToggleBreakdown(0)">📋 פירוט</button>
+      </div>
+    </div>`;
+  } else if (!full.length && partial.length) {
+    // No complete basket anywhere
+    html += `<div class="bc-no-full">
+      <div class="bc-ns-icon">⚠️</div>
+      <p>לא מצאנו סופר אחד עם כל הרשימה${hasLoc ? ' בטווח הזה' : ''}</p>
+      <small>הוצגות החנויות עם הכי הרבה מוצרים זמינים</small>
+      <div class="bc-action-btns" style="margin-top:8px">
+        ${hasLoc ? `<button class="bc-action-btn primary" onclick="_bcIncreaseRadius()">🔭 הגדל רדיוס ל-${_nextRadius()} ק"מ</button>` : ''}
+        <button class="bc-action-btn" onclick="_bcSearchAll()">🌍 השווה ללא סינון מיקום</button>
+        <button class="bc-action-btn" onclick="_bcSplitShopping()">✂️ פצל קנייה בין כמה סופרים</button>
+      </div>
+    </div>`;
+  }
+
+  // Full basket results
+  if (full.length > 0) {
+    if (full.length > 1) html += `<span class="bc-section-title">כל הרשימה — ${full.length} חנויות</span>`;
+    full.forEach((s, i) => { html += _bcRenderCard(s, i, cheapest?.total, i === 0 && !!cheapest); });
+  }
+
+  // Partial results
+  if (partial.length > 0) {
+    html += `<span class="bc-section-title">חסרים חלק מהמוצרים</span>`;
+    partial.slice(0, 6).forEach((s, i) => {
+      html += _bcRenderCard(s, full.length + i, cheapest?.total, false);
+    });
+  }
+
+  body.innerHTML = html;
+}
+
+function _bcRenderCard(s, rank, bestTotal, isChampion) {
+  const delta       = (bestTotal != null && !isChampion) ? (s.total - bestTotal) : 0;
+  const missingCnt  = s.missingItems?.length || 0;
+  const missing3    = (s.missingItems || []).slice(0, 3).map(m => esc(m.name || m.barcode)).join('، ');
+  const moreMissing = missingCnt > 3 ? ` ו-${missingCnt - 3} נוספים` : '';
+  const nameParts   = [s.chainName, s.storeName && s.storeName !== s.chainName ? s.storeName : ''].filter(Boolean);
+
+  return `<div class="bc-rank-card${isChampion ? ' best' : ''}" id="bc-card-${rank}">
+    <div class="bc-rank-top">
+      <div class="bc-rank-num${isChampion ? ' best' : ''}">${rank + 1}</div>
+      <div class="bc-rank-name">${nameParts.length > 1
+          ? esc(nameParts[0]) + '<br><span style="font-size:11px;font-weight:400;color:var(--muted)">' + esc(nameParts[1]) + '</span>'
+          : esc(nameParts[0] || '')}</div>
+      <div class="bc-rank-price${isChampion ? ' best' : ''}">₪${s.total.toFixed(2)}</div>
+    </div>
+    <div class="bc-rank-meta">
+      ${s.city ? `<span>${esc(s.city)}</span>` : ''}
+      ${s.distanceKm != null ? `<span>📍 ${s.distanceKm} ק"מ</span>` : ''}
+    </div>
+    <div class="bc-rank-footer">
+      <div class="bc-rank-items">
+        <strong>${s.availableItems}</strong>/${s.totalItems} מוצרים
+        ${missingCnt > 0 ? `<span class="bc-rank-missing"> · חסרים ${missingCnt}: ${missing3}${moreMissing}</span>` : ''}
+      </div>
+      ${isChampion ? `<div class="bc-rank-delta cheaper">🏆 הכי זול</div>`
+        : delta > 0.05 ? `<div class="bc-rank-delta pricier">יקר ב־₪${delta.toFixed(2)}</div>` : ''}
+    </div>
+    <button class="bc-expand-btn" onclick="_bcToggleBreakdown(${rank})">📋 פירוט →</button>
+    <div class="bc-breakdown" id="bc-breakdown-${rank}">
+      ${(s.items || []).map(item => `<div class="bc-item-row">
+        <span class="bc-item-name">${esc(item.name || item.barcode)}</span>
+        <span class="bc-item-qty">×${item.quantity}</span>
+        <span class="bc-item-price">₪${item.totalPrice.toFixed(2)}</span>
+      </div>`).join('')}
+      ${(s.missingItems || []).map(m => `<div class="bc-item-row">
+        <span class="bc-item-name missing">✗ ${esc(m.name || m.barcode)}</span>
+        <span class="bc-item-qty"></span>
+        <span class="bc-item-price missing">לא זמין</span>
+      </div>`).join('')}
+      ${s.latitude && s.longitude ? `<button class="bc-action-btn" style="margin-top:8px"
+        onclick="navigateToStoreDirect(${s.latitude},${s.longitude},${JSON.stringify(s.address||'')},${JSON.stringify(s.chainName||'')})">
+        🗺 נווט לחנות זו
+      </button>` : ''}
+    </div>
+  </div>`;
+}
+
+window._bcToggleBreakdown = function(rank) {
+  const el  = document.getElementById('bc-breakdown-' + rank);
+  const btn = el?.previousElementSibling;
+  if (!el) return;
+  const showing = el.classList.toggle('show');
+  if (btn) btn.textContent = showing ? '📋 הסתר פירוט ↑' : '📋 פירוט →';
+};
+
+window._bcIncreaseRadius = function() {
+  setNearbyRadius(_nextRadius());
+  openBasketCompare(_bcFocusStore);
+};
+
+window._bcSearchAll = async function() {
+  const body = document.getElementById('bc-body');
+  const sub  = document.getElementById('bc-sub');
+  const listItems = Object.entries(items || {})
+    .map(([id, v]) => ({ ...v, id }))
+    .filter(i => !i.bought && (i.barcode || i.attached?.barcode) && isValidBarcode(i.barcode || i.attached?.barcode));
+  const payload = {
+    items: listItems.map(i => ({
+      barcode: i.barcode || i.attached?.barcode, name: i.name || '', quantity: i.qty || 1,
+    })),
+    ...(groupId ? { groupId } : {}),
+  };
+  if (body) body.innerHTML = `<div class="bc-loading"><div class="spin"></div><p>משווה בכל הארץ...</p></div>`;
+  if (sub)  sub.textContent = 'ללא סינון מיקום';
+  try {
+    const res  = await fetch('/api/basket-compare', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    _renderBasketCompare(data, payload.items);
+  } catch (e) {
+    if (body) body.innerHTML = `<div style="text-align:center;padding:30px">
+      <div style="font-size:13px;font-weight:700">⚠️ שגיאה בטעינת הנתונים</div></div>`;
+  }
+};
+
+window._bcSplitShopping = function() {
+  toast('🚧 פיצול קנייה — בקרוב!');
+};
+
+// Navigate directly using coordinates from basket compare results
+window.navigateToStoreDirect = function(lat, lng, address, name) {
+  let url;
+  if (lat && lng) {
+    url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
+  } else if (address) {
+    url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+  } else {
+    url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}`;
+  }
+  window.open(url, '_blank');
+};
 
 </script>
 
@@ -8161,6 +8730,50 @@ async function _refreshPdAfterSave(barcode) {
       </button>
     </div>
     <div class="notif-list" id="notif-list"></div>
+  </div>
+</div>
+
+<!-- ═══ STORE DETAILS MODAL ═══ -->
+<div class="sd-overlay" id="sd-overlay" onclick="if(event.target===this)closeStoreDetail()">
+  <div class="sd-sheet">
+    <div class="sd-drag"></div>
+    <div class="sd-head">
+      <div class="sd-chain" id="sd-chain"></div>
+      <div class="sd-name" id="sd-name"></div>
+      <div class="sd-city" id="sd-city"></div>
+      <div class="sd-tags" id="sd-tags"></div>
+    </div>
+    <div class="sd-body">
+      <div class="sd-section" id="sd-address-sec">
+        <div class="sd-section-title">כתובת</div>
+        <div class="sd-section-value" id="sd-address"></div>
+      </div>
+      <div class="sd-section" id="sd-hours-sec">
+        <div class="sd-section-title">שעות פעילות</div>
+        <div id="sd-hours-content"></div>
+      </div>
+    </div>
+    <div class="sd-actions">
+      <button class="sd-nav-btn" onclick="navigateToStore()">🗺 נווט לחנות</button>
+      <button class="sd-ghost-btn" onclick="searchStoreProducts()">🔍 הצג מוצרים זמינים בסניף</button>
+      <button class="sd-ghost-btn" onclick="compareListAtStore()">🛒 השווה את כל הרשימה בסניף הזה</button>
+      <button class="sd-ghost-btn" onclick="closeStoreDetail()">סגור</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ BASKET COMPARE MODAL ═══ -->
+<div class="bc-overlay" id="bc-overlay" onclick="if(event.target===this)closeBasketCompare()">
+  <div class="bc-sheet">
+    <div class="bc-sheet-head">
+      <div class="bc-drag"></div>
+      <button class="bc-close" onclick="closeBasketCompare()">✕</button>
+      <div class="bc-title">איפה הכי זול לקנות?</div>
+      <div class="bc-sub" id="bc-sub">טוען...</div>
+    </div>
+    <div class="bc-body" id="bc-body">
+      <div class="bc-loading"><div class="spin"></div><p>משווה את כל הרשימה...</p></div>
+    </div>
   </div>
 </div>
 

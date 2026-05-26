@@ -324,10 +324,18 @@ function filterByRadius(prices, lat, lng, radius, storeIndex, includeApproximate
     if (!store?.hasCoords || !store.latitude || !store.longitude) continue;
     const dist = Math.round(haversine(lat, lng, store.latitude, store.longitude) * 10) / 10;
     if (dist > radius) continue;
+    // Enrich with store location data for the Store Details modal
+    const locEnrich = {
+      distanceKm: dist,
+      latitude:   store.latitude  ?? null,
+      longitude:  store.longitude ?? null,
+      address:    p.address  || store.address  || '',
+      city:       p.city     || store.city     || '',
+    };
     if (store.approximateLocation === true) {
-      approx.push({ ...p, distanceKm: dist, approximateLocation: true });
+      approx.push({ ...p, ...locEnrich, approximateLocation: true });
     } else {
-      strict.push({ ...p, distanceKm: dist });
+      strict.push({ ...p, ...locEnrich });
     }
   }
   return {
