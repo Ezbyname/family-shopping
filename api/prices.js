@@ -201,6 +201,7 @@ async function buildLayeredPrices(db, barcode, userId, groupId, hasLoc, lat, lng
   // B. Official XML prices
   let official = [];
   let officialTotalBeforeRadius = 0; // populated only when hasLoc=true
+  let officialApproxNearby = 0;      // approximate stores within radius (always 0 when !hasLoc)
   if (snaps.official?.exists()) {
     official = Object.entries(snaps.official.val())
       .filter(([, p]) => p?.price > 0)
@@ -210,7 +211,6 @@ async function buildLayeredPrices(db, barcode, userId, groupId, hasLoc, lat, lng
         displayPrice: overrides[key]?.overridePrice ?? p.price,
         override:     overrides[key] ?? null,
       }));
-    let officialApproxNearby = 0;
     if (hasLoc) {
       officialTotalBeforeRadius = official.length; // count before strict radius filter
       const filtered = filterByRadius(official, lat, lng, radius, storeIndex, includeApproximate);
