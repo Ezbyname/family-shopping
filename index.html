@@ -7298,17 +7298,22 @@ async function loadItemPricesInBackground() {
         const totalP = (best.displayPrice || best.price || 0) * qty;
         const isStale  = best.isStale || result.stale;
         const hasMulti = prices.length > 1;
-        const newHTML  = `<button class="price-chip${hasMulti?' best':''}${isStale?' stale':''}"
-          onclick="openPriceDetailModal(${JSON.stringify(barcode)},${JSON.stringify(item.name||'')},${qty})"
-          title="השווה מחירים">
-          <span>₪${totalP.toFixed(2)}</span>
-          <span style="font-size:9px;opacity:.7">${esc(best.chainName||best.storeName||'')}</span>
-          ${qty > 1 ? `<span style="opacity:.55">×${qty}</span>` : ''}
-          ${isStale ? '<span style="color:var(--red)">⚠</span>' : ''}
-        </button>`;
+        const chainLabel = esc(best.chainName || best.storeName || '');
 
-        // Only write DOM if content actually changed (no flicker on re-render)
-        if (chipArea.innerHTML !== newHTML) chipArea.innerHTML = newHTML;
+        // Stable fingerprint — browsers normalise innerHTML so string compare is unreliable.
+        // Instead compare the values that would cause a visible change.
+        const fingerprint = `${totalP.toFixed(2)}|${chainLabel}|${isStale?1:0}|${hasMulti?1:0}|${qty}`;
+        if (chipArea.dataset.fingerprint !== fingerprint) {
+          chipArea.innerHTML = `<button class="price-chip${hasMulti?' best':''}${isStale?' stale':''}"
+            onclick="openPriceDetailModal(${JSON.stringify(barcode)},${JSON.stringify(item.name||'')},${qty})"
+            title="השווה מחירים">
+            <span>₪${totalP.toFixed(2)}</span>
+            <span style="font-size:9px;opacity:.7">${chainLabel}</span>
+            ${qty > 1 ? `<span style="opacity:.55">×${qty}</span>` : ''}
+            ${isStale ? '<span style="color:var(--red)">⚠</span>' : ''}
+          </button>`;
+          chipArea.dataset.fingerprint = fingerprint;
+        }
         chipArea.dataset.loaded = '1';
       } catch(e) {
         // Never erase an existing chip on failure
