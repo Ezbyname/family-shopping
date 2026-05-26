@@ -152,16 +152,31 @@ async function geocodeAddress(address, city) {
 
     const locType = result.geometry?.location_type;
 
-    // Reject APPROXIMATE — city-level precision is useless for 1km radius filtering.
     // partial_match is intentionally ignored for stores: abbreviated Israeli store
     // addresses (א.ת, ק.שר, mall names) often trigger partial_match even when Google
     // returns a correct ROOFTOP/GEOMETRIC_CENTER location.
+
+    // APPROXIMATE = city-level fallback. Stored with approximateLocation:true so the
+    // API and basket-compare can exclude them from strict nearby queries.
+    if (locType === 'APPROXIMATE') {
+      return {
+        ok:                  true,
+        approximate:         true,
+        latitude:            result.geometry.location.lat,
+        longitude:           result.geometry.location.lng,
+        confidence:          locType,
+        formattedAddress:    result.formatted_address,
+        query,
+      };
+    }
+
     if (!TRUSTED_TYPES.has(locType)) {
-      return { ok: false, reason: `low-confidence (${locType})`, query };
+      return { ok: false, reason: `unknown location_type (${locType})`, query };
     }
 
     return {
       ok:               true,
+      approximate:      false,
       latitude:         result.geometry.location.lat,
       longitude:        result.geometry.location.lng,
       confidence:       locType,
@@ -284,9 +299,10 @@ async function main() {
       continue;
     }
 
-    const latStr = geo.latitude.toFixed(4);
-    const lngStr = geo.longitude.toFixed(4);
-    process.stdout.write(`✓ ${latStr},${lngStr} [${geo.confidence}]\n`);
+    const latStr  = geo.latitude.toFixed(4);
+    const lngStr  = geo.longitude.toFixed(4);
+    const approxTag = geo.approximate ? ' [~APPROX]' : '';
+    process.stdout.write(`✓ ${latStr},${lngStr} [${geo.confidence}]${approxTag}\n`);
     counts.succeeded++;
 
     if (samples.length < 8) {
@@ -297,19 +313,21 @@ async function main() {
         lat:              geo.latitude,
         lng:              geo.longitude,
         confidence:       geo.confidence,
+        approximate:      geo.approximate,
         formattedAddress: geo.formattedAddress,
       });
     }
 
     // Write to Firebase
     const update = {
-      latitude:          geo.latitude,
-      longitude:         geo.longitude,
-      hasCoords:         true,
-      geocodedAt:        new Date().toISOString(),
-      geocodeProvider:   'google',
-      geocodeQuery:      geo.query,
-      geocodeConfidence: geo.confidence,
+      latitude:            geo.latitude,
+      longitude:           geo.longitude,
+      hasCoords:           true,
+      approximateLocation: geo.approximate === true,   // true for APPROXIMATE, false otherwise
+      geocodedAt:          new Date().toISOString(),
+      geocodeProvider:     'google',
+      geocodeQuery:        geo.query,
+      geocodeConfidence:   geo.confidence,             // ROOFTOP / GEOMETRIC_CENTER / APPROXIMATE etc.
     };
 
     try {

@@ -824,6 +824,10 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 .nnr-btn:active{transform:scale(.97);opacity:.85}
 .nnr-btn.primary{background:var(--accent);color:#111}
 .nnr-btn.ghost{background:var(--card2);color:var(--text);border:1.5px solid var(--border)}
+/* Approximate location badge */
+.approx-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;
+  color:#f59e0b;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);
+  border-radius:5px;padding:1px 5px;margin-right:3px}
 /* nearby rows inside product modal */
 .nb-row{display:flex;align-items:center;gap:10px;background:var(--card2);
   border-radius:10px;padding:9px 11px;margin-bottom:4px}
@@ -2159,7 +2163,8 @@ function _renderNearbyNoResults(q, data) {
   }
 
   // Geocoded stores exist, but none within this radius carry the product
-  const maxBefore = Math.max(...(data.results || []).map(r => r.totalPricesBeforeRadius || 0));
+  const maxBefore   = Math.max(...(data.results || []).map(r => r.totalPricesBeforeRadius || 0));
+  const approxCount = data.approximateNearbyCount || 0;
   return `<div class="nearby-no-results">
     <div class="nnr-icon">📍</div>
     <div class="nnr-title">מצאתי מוצרים — אבל לא בחנויות קרובות</div>
@@ -2170,6 +2175,7 @@ function _renderNearbyNoResults(q, data) {
     </div>
     <div class="nnr-actions">
       <button class="nnr-btn primary" onclick="increaseRadius()">🔭 הגדל רדיוס ל-${_nextRadius()} ק"מ</button>
+      ${approxCount > 0 ? `<button class="nnr-btn ghost" onclick="searchPricesWithApproximate(${JSON.stringify(q)})">📍 הצג גם מיקומים משוערים (${approxCount})</button>` : ''}
       <button class="nnr-btn ghost" onclick="searchEverywhere(${JSON.stringify(q)})">🌍 חפש בכל הארץ</button>
       <button class="nnr-btn ghost" onclick="openManualAddressModal()">📌 בחר מיקום אחר</button>
     </div>
@@ -2210,6 +2216,36 @@ window.searchEverywhere = async function(q) {
       const banner = document.createElement('div');
       banner.style.cssText = 'text-align:center;font-size:11px;color:var(--muted);padding:6px 0 2px;';
       banner.textContent = '🌍 מציג מחירים מכל הארץ';
+      content.insertBefore(banner, content.firstChild);
+    }
+  } catch(e) {
+    wrap.innerHTML = renderManualFallback(q, null);
+  }
+};
+
+// Re-run last search including APPROXIMATE location stores (one-shot, user-initiated)
+window.searchPricesWithApproximate = async function(q) {
+  const wrap = document.getElementById('price-content');
+  if (!q) q = lastSearchQuery;
+  if (!q) return;
+  wrap.innerHTML = `<div class="price-loading"><div class="spin"></div><p>מחפש "${esc(q)}" כולל מיקומים משוערים...</p></div>`;
+  try {
+    let url = `/api/prices?q=${encodeURIComponent(q)}&includeApproximate=true`;
+    if (_hasLoc()) url += `&lat=${_locLat()}&lng=${_locLng()}&radiusKm=${_nearbyRadius}`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (!data.results?.length) {
+      wrap.innerHTML = `<div class="search-hint"><div class="sh-icon">🔍</div>
+        <p>לא נמצאו תוצאות עבור "${esc(q)}"</p><small>נסה שם שונה</small></div>`;
+      return;
+    }
+    searchResults = data.results;
+    renderSearchResults(data.results, q);
+    const content = document.getElementById('price-content');
+    if (content) {
+      const banner = document.createElement('div');
+      banner.style.cssText = 'text-align:center;font-size:11px;color:#f59e0b;padding:6px 0 2px;';
+      banner.textContent = '📍 כולל חנויות במיקום משוער';
       content.insertBefore(banner, content.firstChild);
     }
   } catch(e) {
@@ -2736,15 +2772,16 @@ function _normalizeResults(results) {
     const rawPrices = Array.isArray(r.prices) ? r.prices : [];
     const stores = rawPrices
       .map(p => ({
-        store:      p.chainName || p.storeName || p.chain || '',
-        storeName:  p.storeName || '',
-        storeId:    p.storeId   || '',
-        city:       p.city      || '',
-        distanceKm: p.distanceKm != null ? p.distanceKm : null,
-        price:      parseFloat(p.displayPrice ?? p.price) || 0,
-        unit:       p.unit || '',
-        source:     p.source || '',
-        isStale:    p.isStale || false,
+        store:               p.chainName || p.storeName || p.chain || '',
+        storeName:           p.storeName || '',
+        storeId:             p.storeId   || '',
+        city:                p.city      || '',
+        distanceKm:          p.distanceKm != null ? p.distanceKm : null,
+        price:               parseFloat(p.displayPrice ?? p.price) || 0,
+        unit:                p.unit || '',
+        source:              p.source || '',
+        isStale:             p.isStale || false,
+        approximateLocation: p.approximateLocation === true,
       }))
       .filter(sp => sp.price > 0 && sp.store);
     return {
@@ -3028,13 +3065,14 @@ function _renderProductModal() {
         const metaParts = [];
         if (s.city) metaParts.push(esc(s.city));
         if (s.distanceKm != null) metaParts.push(`📍 ${s.distanceKm} ק"מ`);
-        const staleBadge = s.isStale ? `<span style="font-size:9px;color:var(--red);margin-right:3px">⚠ ישן</span>` : '';
+        const staleBadge   = s.isStale           ? `<span style="font-size:9px;color:var(--red);margin-right:3px">⚠ ישן</span>` : '';
+        const approxBadge  = s.approximateLocation ? `<span class="approx-badge">📍 מיקום משוער</span>` : '';
         return `<div class="spr${isBest ? ' best' : ''}">
           <div style="flex:1;min-width:0">
             <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
               <span class="spr-name" style="color:${m2.color}">${label}</span>
               ${isBest ? `<span class="best-badge">הכי זול 🏆</span>` : ''}
-              ${staleBadge}
+              ${staleBadge}${approxBadge}
             </div>
             ${metaParts.length ? `<div style="font-size:10px;color:var(--muted);margin-top:1px">${metaParts.join(' · ')}</div>` : ''}
           </div>

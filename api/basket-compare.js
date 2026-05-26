@@ -14,14 +14,15 @@ export default async function handler(req, res) {
   try { body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body; }
   catch (_) { return res.status(400).json({ error: 'Invalid JSON' }); }
 
-  const { items, lat, lng, radiusKm, groupId } = body || {};
+  const { items, lat, lng, radiusKm, groupId, includeApproximate } = body || {};
   if (!Array.isArray(items) || !items.length)
     return res.status(400).json({ error: 'items array required' });
 
-  const userLat = parseFloat(lat || '');
-  const userLng = parseFloat(lng || '');
-  const radius  = parseFloat(radiusKm || '10');
-  const hasLoc  = !isNaN(userLat) && !isNaN(userLng);
+  const userLat        = parseFloat(lat || '');
+  const userLng        = parseFloat(lng || '');
+  const radius         = parseFloat(radiusKm || '10');
+  const hasLoc         = !isNaN(userLat) && !isNaN(userLng);
+  const wantApproximate = includeApproximate === true || includeApproximate === 'true';
 
   const validItems = items
     .map(i => ({ barcode: String(i.barcode || '').replace(/\D/g, ''), qty: Math.max(1, parseInt(i.quantity || 1)) }))
@@ -39,15 +40,16 @@ export default async function handler(req, res) {
     if (snap.exists()) storeIndex = snap.val();
   } catch (_) {}
 
-  // Filter nearby stores
+  // Filter nearby stores — APPROXIMATE locations excluded by default
   const allStoreKeys = Object.keys(storeIndex);
   const nearbyKeys = hasLoc
     ? allStoreKeys.filter(k => {
         const s = storeIndex[k];
         if (!s?.hasCoords) return false;
+        if (!wantApproximate && s.approximateLocation === true) return false;
         return haversine(userLat, userLng, s.latitude, s.longitude) <= radius;
       })
-    : allStoreKeys;
+    : allStoreKeys.filter(k => wantApproximate || storeIndex[k]?.approximateLocation !== true);
 
   // Fetch all prices for all barcodes in parallel
   const priceMap = {}; // barcode → { storeKey → priceEntry }

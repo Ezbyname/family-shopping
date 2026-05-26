@@ -43,8 +43,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
 
-  const { barcode, q, lat, lng, radiusKm, groupId, userId, includeStale } = req.query || {};
-  const wantStale = includeStale === 'true';
+  const { barcode, q, lat, lng, radiusKm, groupId, userId, includeStale, includeApproximate } = req.query || {};
+  const wantStale          = includeStale      === 'true';
+  const wantApproximate    = includeApproximate === 'true';
 
   const userLat  = parseFloat(lat  || '');
   const userLng  = parseFloat(lng  || '');
@@ -209,9 +210,12 @@ async function buildLayeredPrices(db, barcode, userId, groupId, hasLoc, lat, lng
         displayPrice: overrides[key]?.overridePrice ?? p.price,
         override:     overrides[key] ?? null,
       }));
+    let officialApproxNearby = 0;
     if (hasLoc) {
       officialTotalBeforeRadius = official.length; // count before strict radius filter
-      official = filterByRadius(official, lat, lng, radius, storeIndex);
+      const filtered = filterByRadius(official, lat, lng, radius, storeIndex, wantApproximate);
+      official              = filtered.results;
+      officialApproxNearby  = filtered.approximateNearbyCount;
     }
     official.sort((a, b) => a.displayPrice - b.displayPrice);
   }
@@ -258,8 +262,10 @@ async function buildLayeredPrices(db, barcode, userId, groupId, hasLoc, lat, lng
       communityWarning: warning,
       // Location-filter metadata (only present when hasLoc=true)
       ...(hasLoc && {
-        totalPricesBeforeRadius: officialTotalBeforeRadius,
-        nearbyPricesCount:       prices.length,
+        totalPricesBeforeRadius:      officialTotalBeforeRadius,
+        nearbyPricesCount:            prices.length,
+        approximateNearbyCount:       officialApproxNearby,
+        hasApproximateNearbyMatches:  officialApproxNearby > 0 && prices.length === 0,
       }),
     };
   }
@@ -270,7 +276,7 @@ async function buildLayeredPrices(db, barcode, userId, groupId, hasLoc, lat, lng
     proxy = Object.values(snaps.proxy.val())
       .filter(p => p?.price > 0 && (now - (p.fetchedAt || 0)) < 3_600_000)
       .map(p => ({ ...p, source: 'proxy', displayPrice: p.price }));
-    if (hasLoc) proxy = filterByRadius(proxy, lat, lng, radius, storeIndex);
+    if (hasLoc) proxy = filterByRadius(proxy, lat, lng, radius, storeIndex, wantApproximate).results;
     proxy.sort((a, b) => a.displayPrice - b.displayPrice);
   }
 
@@ -305,18 +311,29 @@ async function buildLayeredPrices(db, barcode, userId, groupId, hasLoc, lat, lng
 // Filter prices to stores within radius and annotate each entry with distanceKm.
 // Strict: stores without hasCoords=true are EXCLUDED when a radius is active.
 // They still appear in non-location searches (hasLoc=false bypasses this function).
-// Rationale: a store whose location is unknown cannot be said to satisfy a radius constraint.
-function filterByRadius(prices, lat, lng, radius, storeIndex) {
-  const results = [];
+// Returns { results, approximateNearbyCount }
+//   results              — high/medium confidence stores (ROOFTOP/RANGE_INTERPOLATED/GEOMETRIC_CENTER)
+//                          + APPROXIMATE stores appended when includeApproximate=true
+//   approximateNearbyCount — count of APPROXIMATE stores within radius (always computed)
+function filterByRadius(prices, lat, lng, radius, storeIndex, includeApproximate = false) {
+  const strict = [];
+  const approx  = [];
   for (const p of prices) {
-    const key = `${p.chainId || ''}_${p.storeId || ''}`;
+    const key   = `${p.chainId || ''}_${p.storeId || ''}`;
     const store = storeIndex[key];
-    // No geocoded coords → unknown location → exclude from radius results
     if (!store?.hasCoords || !store.latitude || !store.longitude) continue;
     const dist = Math.round(haversine(lat, lng, store.latitude, store.longitude) * 10) / 10;
-    if (dist <= radius) results.push({ ...p, distanceKm: dist });
+    if (dist > radius) continue;
+    if (store.approximateLocation === true) {
+      approx.push({ ...p, distanceKm: dist, approximateLocation: true });
+    } else {
+      strict.push({ ...p, distanceKm: dist });
+    }
   }
-  return results;
+  return {
+    results:                includeApproximate ? [...strict, ...approx] : strict,
+    approximateNearbyCount: approx.length,
+  };
 }
 
 // Build community warning from reports
