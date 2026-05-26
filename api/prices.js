@@ -274,20 +274,21 @@ async function buildLayeredPrices(db, barcode, userId, groupId, hasLoc, lat, lng
   return { prices: [], source: 'none', communityWarning: null };
 }
 
-// Filter prices to stores within radius and annotate each entry with distanceKm
+// Filter prices to stores within radius and annotate each entry with distanceKm.
+// Strict: stores without hasCoords=true are EXCLUDED when a radius is active.
+// They still appear in non-location searches (hasLoc=false bypasses this function).
+// Rationale: a store whose location is unknown cannot be said to satisfy a radius constraint.
 function filterByRadius(prices, lat, lng, radius, storeIndex) {
-  return prices
-    .map(p => {
-      const key = `${p.chainId || ''}_${p.storeId || ''}`;
-      const store = storeIndex[key];
-      if (!store?.hasCoords) return p; // no coords — keep without distance
-      const dist = Math.round(haversine(lat, lng, store.latitude, store.longitude) * 10) / 10;
-      return { ...p, distanceKm: dist };
-    })
-    .filter(p => {
-      if (p.distanceKm == null) return true; // include when no coords available
-      return p.distanceKm <= radius;
-    });
+  const results = [];
+  for (const p of prices) {
+    const key = `${p.chainId || ''}_${p.storeId || ''}`;
+    const store = storeIndex[key];
+    // No geocoded coords → unknown location → exclude from radius results
+    if (!store?.hasCoords || !store.latitude || !store.longitude) continue;
+    const dist = Math.round(haversine(lat, lng, store.latitude, store.longitude) * 10) / 10;
+    if (dist <= radius) results.push({ ...p, distanceKm: dist });
+  }
+  return results;
 }
 
 // Build community warning from reports
