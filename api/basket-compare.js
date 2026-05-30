@@ -148,12 +148,70 @@ export default async function handler(req, res) {
   const partial = storeResults.filter(s => s.missingItems > 0 && s.availableItems > 0)
     .sort((a, b) => b.completeness - a.completeness || a.total - b.total);
 
+  const sorted = [...full, ...partial];
+
+  // ── Travel Cost Awareness ─────────────────────────────────────────────────
+  // Cost model: ₪0.80/km × 2 (round trip) — Israeli average fuel + running cost
+  const COST_PER_KM = 0.80;
+  if (hasLoc) {
+    sorted.forEach(r => {
+      if (r.distanceKm !== null) {
+        r.travelCostILS = Math.round(r.distanceKm * 2 * COST_PER_KM * 100) / 100;
+      }
+    });
+  }
+
+  // ── Summary object ────────────────────────────────────────────────────────
+  let summary = null;
+  if (sorted.length >= 1) {
+    const cheapest = sorted[0];
+    const priciest = sorted[sorted.length - 1];
+    const maxSavings = Math.round((priciest.total - cheapest.total) * 100) / 100;
+    const maxSavingsPct = priciest.total > 0
+      ? Math.round((maxSavings / priciest.total) * 100)
+      : 0;
+
+    // Closest store (by distanceKm — may differ from cheapest)
+    const withDist = sorted.filter(r => r.distanceKm !== null);
+    const closest  = withDist.length
+      ? withDist.reduce((a, b) => a.distanceKm < b.distanceKm ? a : b)
+      : null;
+
+    // Best *full* basket — first complete store
+    const bestFull = full[0] || null;
+
+    // Net savings after travel for cheapest full store vs. closest full store
+    let netSavingsVsClosest = null;
+    if (bestFull && closest && bestFull !== closest && closest.travelCostILS !== undefined) {
+      const grossSaving = closest.total - bestFull.total;
+      const extraTravel = (bestFull.travelCostILS ?? 0) - (closest.travelCostILS ?? 0);
+      netSavingsVsClosest = Math.round((grossSaving - extraTravel) * 100) / 100;
+    }
+
+    summary = {
+      cheapestTotal:       cheapest.total,
+      priciestTotal:       priciest.total,
+      maxSavings,
+      maxSavingsPct,
+      cheapestChain:       cheapest.chainName,
+      priciestChain:       priciest.chainName,
+      bestFullChain:       bestFull?.chainName ?? null,
+      bestFullTotal:       bestFull?.total     ?? null,
+      closestChain:        closest?.chainName  ?? null,
+      closestKm:           closest?.distanceKm ?? null,
+      netSavingsVsClosest,
+      costPerKm:           COST_PER_KM,
+      storesFound:         sorted.length,
+    };
+  }
+
   return res.status(200).json({
-    version:        '2.0.0',
+    version:        '2.1.0',
     radiusKm:       radius,
     itemsRequested: validItems.length,
     bestFullBasket: full[0] || null,
-    results:        [...full, ...partial].slice(0, 20),
+    summary,
+    results:        sorted.slice(0, 20),
     note: 'Items marked isFallback:true use proxy/manual prices — official XML sync pending',
   });
 }

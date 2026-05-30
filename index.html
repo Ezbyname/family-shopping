@@ -763,6 +763,14 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 .brc-rank.third{color:var(--muted)}
 .brc-completeness{height:5px;border-radius:3px;background:var(--card2);margin-top:5px;overflow:hidden}
 .brc-completeness-bar{height:100%;border-radius:3px;transition:width .4s ease}
+.basket-travel-note{font-size:11px;color:var(--muted);margin-top:5px;padding:6px 9px;
+  border-radius:8px;background:rgba(0,0,0,.03);border:1px solid var(--border)}
+.basket-travel-note.warn{color:var(--red);background:rgba(248,113,113,.06);border-color:rgba(248,113,113,.2)}
+.basket-travel-note.ok{color:var(--green);background:rgba(34,197,94,.06);border-color:rgba(34,197,94,.2)}
+.basket-nav-btn{display:block;margin-top:10px;padding:11px;border-radius:12px;
+  background:var(--green);color:#fff;font-family:'Heebo',sans-serif;font-size:13px;
+  font-weight:700;text-align:center;text-decoration:none;cursor:pointer}
+.basket-nav-btn:active{opacity:.85}
 .brc-missing-list{font-size:11px;color:var(--red);margin-top:6px;padding:7px 9px;
   background:rgba(248,113,113,.07);border-radius:8px;border:1px solid rgba(248,113,113,.15)}
 .brc-alt{font-size:10px;color:var(--muted);margin-top:3px;padding:3px 7px;
@@ -1873,18 +1881,19 @@ window.runBasketCompare = async function() {
 
 function renderBasketResults(data, totalItems, barcodeToName) {
   const wrap = document.getElementById('basket-results-wrap');
-  const { results } = data;
+  const { results, summary } = data;
 
   if (!results?.length) {
     wrap.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">לא נמצאו חנויות בטווח</div>';
     return;
   }
 
-  // Sort by total ascending (cheapest first)
-  const sorted = [...results].sort((a,b) => a.total - b.total);
-  const cheapest = sorted[0].total;
+  // Results already sorted by API (full→cheapest first, then partial→completeness)
+  const sorted    = results;
+  const cheapest  = sorted[0].total;
   const priciest  = sorted[sorted.length-1].total;
-  const maxSavings = priciest - cheapest;
+  const maxSavings = summary?.maxSavings ?? (priciest - cheapest);
+  const maxSavingsPct = summary?.maxSavingsPct ?? Math.round((maxSavings / priciest) * 100);
 
   // Build a lookup: for each missing barcode, find alternatives from other stores
   const barcodeInStore = {};
@@ -1895,15 +1904,27 @@ function renderBasketResults(data, totalItems, barcodeToName) {
     });
   });
 
-  // Savings hero
+  // ── Savings hero ──
   let heroHtml = '';
   if (maxSavings >= 1) {
-    const savePct = Math.round((maxSavings / priciest) * 100);
+    const cheapestChain = summary?.cheapestChain || sorted[0].chainName;
+    const priciestChain = summary?.priciestChain || sorted[sorted.length-1].chainName;
+
+    // Travel context line (only if server provided net savings vs. closest)
+    let travelNote = '';
+    if (summary?.netSavingsVsClosest !== null && summary?.netSavingsVsClosest !== undefined) {
+      const net = summary.netSavingsVsClosest;
+      travelNote = net > 0
+        ? `<div style="font-size:11px;color:var(--green);margin-top:4px">🚗 שווה נסיעה — חיסכון נטו ₪${net.toFixed(2)} לאחר עלות נסיעה</div>`
+        : `<div style="font-size:11px;color:var(--muted);margin-top:4px">🏪 ${esc(summary.closestChain||'')} קרוב יותר — חיסכון לא מצדיק נסיעה</div>`;
+    }
+
     heroHtml = `<div class="savings-hero" style="margin-bottom:12px">
       <div class="savings-hero-amount">₪${maxSavings.toFixed(2)}</div>
-      <div>
-        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px">💰 חסכת אם תקנה בזול</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:3px">${savePct}% פחות לעומת <strong style="color:var(--text)">${esc(sorted[sorted.length-1].chainName)}</strong></div>
+      <div style="flex:1">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px">💰 חיסכון פוטנציאלי</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">${maxSavingsPct}% פחות ב<strong style="color:var(--text)">${esc(cheapestChain)}</strong> לעומת ${esc(priciestChain)}</div>
+        ${travelNote}
       </div>
     </div>`;
   }
@@ -1912,14 +1933,41 @@ function renderBasketResults(data, totalItems, barcodeToName) {
   let html = heroHtml;
 
   sorted.forEach((r, idx) => {
-    const rankLabel    = idx < 3 ? rankEmoji[idx] : `#${idx+1}`;
-    const completePct  = r.completeness ?? Math.round((r.availableItems / totalItems) * 100);
-    const diff         = r.total - cheapest;
-    const diffStr      = diff > 0.01 ? `<span style="color:var(--muted);font-size:12px">+₪${diff.toFixed(2)}</span>` : `<span style="color:var(--green);font-size:12px">הכי זול ✅</span>`;
-    const barPct       = Math.min(completePct, 100);
-    const barColor     = completePct >= 90 ? 'var(--green)' : completePct >= 60 ? 'var(--accent)' : 'var(--red)';
+    const rankLabel   = idx < 3 ? rankEmoji[idx] : `#${idx+1}`;
+    const completePct = r.completeness ?? Math.round((r.availableItems / totalItems) * 100);
+    const diff        = r.total - cheapest;
+    const diffStr     = diff > 0.01
+      ? `<span style="color:var(--muted);font-size:12px">+₪${diff.toFixed(2)}</span>`
+      : `<span style="color:var(--green);font-size:12px">הכי זול ✅</span>`;
+    const barPct  = Math.min(completePct, 100);
+    const barColor = completePct >= 90 ? 'var(--green)' : completePct >= 60 ? 'var(--accent)' : 'var(--red)';
 
-    // Missing items with alternatives
+    // ── Travel Cost Awareness ──
+    let travelHtml = '';
+    if (r.travelCostILS !== undefined && r.distanceKm !== null) {
+      const travel  = r.travelCostILS;
+      const netSave = diff > 0 ? diff - travel : -travel; // savings vs cheapest minus trip cost delta
+      if (idx === 0 && r.distanceKm > 0) {
+        // Cheapest store — show cost of the trip
+        travelHtml = `<div class="basket-travel-note">
+          🚗 ${r.distanceKm} ק"מ — עלות נסיעה ~₪${travel.toFixed(2)} הלוך-חזור
+        </div>`;
+      } else if (idx > 0 && r.distanceKm !== null) {
+        // Other stores — is the extra distance worth vs. price diff?
+        const extraSavingVsTrip = diff - travel; // positive = trip cost MORE than savings
+        if (extraSavingVsTrip > 2) {
+          travelHtml = `<div class="basket-travel-note warn">
+            ⚠️ יקר יותר — לאחר נסיעה: +₪${extraSavingVsTrip.toFixed(2)} ביחס לזול
+          </div>`;
+        } else if (diff > 0.5 && travel > 0 && (travel - diff) > 2) {
+          travelHtml = `<div class="basket-travel-note ok">
+            🚗 עדיין שווה — חיסכון ₪${diff.toFixed(2)} גדול מעלות נסיעה ₪${travel.toFixed(2)}
+          </div>`;
+        }
+      }
+    }
+
+    // ── Missing items with alternatives ──
     let missingHtml = '';
     if ((r.missingBarcodes||[]).length) {
       const missingLines = r.missingBarcodes.map(bc => {
@@ -1932,19 +1980,30 @@ function renderBasketResults(data, totalItems, barcodeToName) {
       missingHtml = `<div style="margin-top:6px">${missingLines}</div>`;
     }
 
-    // Item breakdown (collapsed, first 3)
+    // ── Item breakdown (first 3) ──
     const itemsHtml = (r.items||[]).slice(0,3).map(it =>
       `<div class="basket-item-row"><span>${esc(it.name||it.barcode)}</span><span>₪${it.totalPrice.toFixed(2)}</span></div>`
     ).join('') + (r.items?.length > 3
       ? `<div class="basket-item-row" style="color:var(--muted);text-align:center">ועוד ${r.items.length-3}...</div>` : '');
 
+    // ── Navigate CTA (rank #1 only, with coords) ──
+    const lat = r.latitude ?? (r.items?.[0]?.latitude ?? null);
+    const lng = r.longitude ?? (r.items?.[0]?.longitude ?? null);
+    const navQuery = encodeURIComponent([r.chainName, r.storeName, r.address, r.city].filter(Boolean).join(' '));
+    const navUrl = lat ? `https://waze.com/ul?ll=${lat},${lng}&navigate=yes` : `https://waze.com/ul?q=${navQuery}`;
+    const navCta = (idx === 0)
+      ? `<a href="${navUrl}" target="_blank" rel="noopener" class="basket-nav-btn">🚗 נווט לחנות</a>` : '';
+
     html += `<div class="basket-result-card${idx===0?' best':''}">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div style="display:flex;align-items:center;gap:6px">
           <span class="brc-rank ${idx===0?'first':idx===1?'second':''}" style="font-size:20px">${rankLabel}</span>
-          <div class="basket-chain">${esc(r.chainName)}</div>
+          <div>
+            <div class="basket-chain">${esc(r.chainName)}</div>
+            ${r.storeName && r.storeName !== r.chainName ? `<div style="font-size:10px;color:var(--muted)">${esc(r.storeName)}</div>` : ''}
+          </div>
         </div>
-        ${r.distanceKm ? `<span class="distance-label">📍 ${r.distanceKm} ק"מ</span>` : ''}
+        ${r.distanceKm !== null ? `<span class="distance-label">📍 ${r.distanceKm} ק"מ</span>` : ''}
       </div>
       <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">
         <div class="basket-total">₪${r.total.toFixed(2)}</div>
@@ -1957,8 +2016,10 @@ function renderBasketResults(data, totalItems, barcodeToName) {
         </div>
         <div class="brc-completeness"><div class="brc-completeness-bar" style="width:${barPct}%;background:${barColor}"></div></div>
       </div>
+      ${travelHtml}
       ${missingHtml}
       <div class="basket-items-mini">${itemsHtml}</div>
+      ${navCta}
     </div>`;
   });
 
