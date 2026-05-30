@@ -1,4 +1,4 @@
-// api/_firebase.js — v2.0 — lazy Firebase init, no top-level imports
+// api/_firebase.js — v2.1 — lazy Firebase init, shared validators and CORS helpers
 let _db = null;
 
 export async function getDB() {
@@ -27,8 +27,33 @@ export function haversine(lat1, lng1, lat2, lng2) {
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
+/** Set permissive CORS headers on a Vercel response object. */
 export const cors = (res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 };
+
+/** Alias used by newer API modules (same behaviour as cors()). */
+export const setCors = cors;
+
+/**
+ * Accept barcodes with 8, 12, 13, or 14 digits (EAN-8, UPC-A, EAN-13, ITF-14).
+ * Rejects empty strings, all-zeros, and anything with non-digit characters.
+ */
+export function isValidBarcode(code) {
+  if (!code || typeof code !== 'string') return false;
+  const s = code.replace(/\D/g, '');
+  if (!/^(8|12|13|14)$/.test(String(s.length))) return false;
+  if (/^0+$/.test(s)) return false;
+  return true;
+}
+
+/**
+ * Accept prices in the range 0.01 – 10 000 ILS.
+ * Handles both number and string inputs.
+ */
+export function isValidPrice(p) {
+  const n = parseFloat(p);
+  return isFinite(n) && n >= 0.01 && n <= 10_000;
+}
