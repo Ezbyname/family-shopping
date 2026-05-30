@@ -1089,6 +1089,9 @@ function connectToGroup(){
   // Load header avatar
   setTimeout(updateHeaderAvatar, 300);
 
+  // Check sync health — warn users if prices are stale (>36h since last sync)
+  setTimeout(checkSyncHealth, 4000);
+
   toast('👋 שלום '+myName+'!');
 }
 
@@ -1957,25 +1960,30 @@ function renderBasketResults(data, totalItems, barcodeToName) {
     const barColor = completePct >= 90 ? 'var(--green)' : completePct >= 60 ? 'var(--accent)' : 'var(--red)';
 
     // ── Travel Cost Awareness ──
+    // Correct model: for each non-cheapest store X, compare the NET BENEFIT of
+    // driving to cheapest store C instead:
+    //   netBenefit = (X.total − C.total) − max(0, C.travelCost − X.travelCost)
+    //   positive → worth driving to C   |   negative → X is cheaper after travel
     let travelHtml = '';
     if (r.travelCostILS !== undefined && r.distanceKm !== null) {
-      const travel  = r.travelCostILS;
-      const netSave = diff > 0 ? diff - travel : -travel; // savings vs cheapest minus trip cost delta
+      const myTravel = r.travelCostILS;
       if (idx === 0 && r.distanceKm > 0) {
-        // Cheapest store — show cost of the trip
+        // Cheapest store — just show the round-trip cost of reaching it
         travelHtml = `<div class="basket-travel-note">
-          🚗 ${r.distanceKm} ק"מ — עלות נסיעה ~₪${travel.toFixed(2)} הלוך-חזור
+          🚗 ${r.distanceKm} ק"מ — עלות נסיעה ~₪${myTravel.toFixed(2)} הלוך-חזור
         </div>`;
-      } else if (idx > 0 && r.distanceKm !== null) {
-        // Other stores — is the extra distance worth vs. price diff?
-        const extraSavingVsTrip = diff - travel; // positive = trip cost MORE than savings
-        if (extraSavingVsTrip > 2) {
+      } else if (idx > 0) {
+        // Extra cost of driving to cheapest store instead of this one:
+        const extraTravelToCheatpest = Math.max(0, (sorted[0].travelCostILS || 0) - myTravel);
+        // Net benefit of choosing cheapest: price saving minus extra trip cost
+        const netBenefit = diff - extraTravelToCheatpest;
+        if (netBenefit > 5) {
           travelHtml = `<div class="basket-travel-note warn">
-            ⚠️ יקר יותר — לאחר נסיעה: +₪${extraSavingVsTrip.toFixed(2)} ביחס לזול
+            ⚠️ שווה לנסוע לזול — חיסכון נטו ~₪${netBenefit.toFixed(2)} לאחר נסיעה
           </div>`;
-        } else if (diff > 0.5 && travel > 0 && (travel - diff) > 2) {
+        } else if (netBenefit < -2) {
           travelHtml = `<div class="basket-travel-note ok">
-            🚗 עדיין שווה — חיסכון ₪${diff.toFixed(2)} גדול מעלות נסיעה ₪${travel.toFixed(2)}
+            🏪 קרוב יותר — לאחר נסיעה, חנות זו עדיפה כלכלית
           </div>`;
         }
       }
@@ -2065,9 +2073,11 @@ function renderBasketResults(data, totalItems, barcodeToName) {
 
 const _analyticsQueue = [];
 let _analyticsFlushPending = false;
+const _ANALYTICS_MAX_QUEUE = 50; // drop events if queue grows unexpectedly large
 
 function trackEvent(eventName, props = {}) {
   if (!db || !groupId) return; // only track when connected to a group
+  if (_analyticsQueue.length >= _ANALYTICS_MAX_QUEUE) return; // abuse/runaway guard
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const entry = {
     event:    eventName,
@@ -2089,6 +2099,49 @@ function trackEvent(eventName, props = {}) {
       } catch (_) {}
     });
   }, 2000);
+}
+
+// ── SYNC HEALTH MONITOR ──────────────────────────────────────────────────────
+// Reads syncSummary once on app connect to detect stale price data (>36 h since
+// last sync or majority of chains failed).  Shows a dismissible banner so users
+// know prices may be outdated without having to look at individual timestamps.
+const STALE_HOURS = 36;
+
+async function checkSyncHealth() {
+  if (!db) return;
+  try {
+    const snap = await withClientTimeout(get(ref(db, 'syncSummary')), 5_000, 'syncSummary');
+    if (!snap?.exists()) return;
+    const { lastSync, chainsFailed, chainsSucceeded } = snap.val() || {};
+    const ageHours = lastSync ? (Date.now() - lastSync) / 3_600_000 : Infinity;
+    const majorityFailed = (chainsFailed || 0) > (chainsSucceeded || 0);
+    if (ageHours > STALE_HOURS || majorityFailed) {
+      const hoursLabel = isFinite(ageHours) ? `${Math.round(ageHours)} שעות` : 'זמן רב';
+      showSyncStaleBanner(hoursLabel);
+      trackEvent('sync_stale_banner_shown', {
+        ageHours: Math.round(ageHours),
+        chainsFailed: chainsFailed || 0,
+      });
+    }
+  } catch (_) {} // non-blocking — ignore failures silently
+}
+
+function showSyncStaleBanner(ageLabel) {
+  // Only show once per session
+  if (document.getElementById('sync-stale-banner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'sync-stale-banner';
+  banner.style.cssText = [
+    'position:fixed;top:0;left:0;right:0;z-index:9999',
+    'background:rgba(248,113,113,.92);backdrop-filter:blur(6px)',
+    'padding:10px 14px;display:flex;align-items:center;gap:8px',
+    'font-family:Heebo,sans-serif;font-size:13px;font-weight:600;color:#111',
+    'direction:rtl;box-shadow:0 2px 12px rgba(0,0,0,.3)',
+  ].join(';');
+  banner.innerHTML = `
+    <span style="flex:1">⚠️ המחירים עשויים להיות לא מעודכנים — הסנכרון האחרון היה לפני ${esc(ageLabel)}</span>
+    <button onclick="this.parentElement.remove()" style="background:transparent;border:none;font-size:18px;cursor:pointer;color:#111;line-height:1">✕</button>`;
+  document.body.prepend(banner);
 }
 
 // ══════════════════════════════════════════════════
@@ -2264,8 +2317,24 @@ let _currentWarnings = null; // warnings for current product view
 let _locationMode    = false;
 let _userLat         = null;
 let _userLng         = null;
+// Default search radius in km.  Shared with basket compare (fsl_radius localStorage key).
+let _radiusKm        = parseInt(localStorage.getItem('fsl_radius') || '15', 10);
 let _storeSheetData  = null; // currently open store sheet data
 const _storeDetailsCache = {};  // session cache: storeKey → enriched API response
+
+// ── CLIENT-SIDE FIREBASE TIMEOUT WRAPPER ─────────────────────────────────────
+// Mirrors the server-side withTimeout in api/_firebase.js.
+// Prevents Firebase reads from hanging indefinitely in the browser SDK.
+function withClientTimeout(promise, ms, label = '') {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(
+      () => reject(Object.assign(new Error(`timeout:${label}`), { isTimeout: true })),
+      ms
+    );
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
 
 // ── SOURCE BADGE HELPER ──
 
@@ -2340,8 +2409,8 @@ window.saveSinglePrice = async function(storeName, inputId, barcode, productName
       source: 'manual',
     });
     toast(`💰 מחיר נשמר: ₪${val.toFixed(2)} ב${storeName}`);
-    // Refresh display
-    if (selectedProduct) window.showProductPricesEnhanced(selectedProduct);
+    // Refresh display — this is a post-save refresh, not a new user search
+    if (selectedProduct) window.showProductPricesEnhanced(selectedProduct, { analyticsSource: 'refresh' });
   } catch(e) { toast('❌ ' + e.message); }
 };
 
@@ -2392,8 +2461,30 @@ async function tryProxyFetch(query, storeName) {
 // STORE_LIST_ALL defined above
 
 // ── Validation ──
-function isValidBarcode(b) { const s=String(b||'').replace(/\D/g,''); return s.length>=4&&s.length<=20; }
+/**
+ * Strict barcode validator — matches the API (_firebase.js) exactly.
+ * Accepts EAN-8 (8), UPC-A (12), EAN-13 (13), ITF-14 (14) digits only.
+ * Rejects all-zero barcodes and non-digit characters.
+ */
+function isValidBarcode(b) {
+  const s = String(b || '').replace(/\D/g, '');
+  if (!/^(?:8|12|13|14)$/.test(String(s.length))) return false;
+  if (/^0+$/.test(s)) return false;
+  return true;
+}
 function isValidPrice(p)   { const n=parseFloat(p); return !isNaN(n)&&n>0&&n<10000; }
+/**
+ * Phone number sanitizer — allowlist: digits, +, -, spaces, parentheses.
+ * Returns null for anything that fails E.164 digit-count rules (7–15 digits).
+ * Prevents tel: URI injection if Firebase phone field contains crafted values.
+ */
+function sanitizePhone(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const stripped = raw.replace(/[^\d+\-\s()]/g, '').trim();
+  const digits   = stripped.replace(/\D/g, '');
+  if (digits.length < 7 || digits.length > 15) return null;
+  return stripped;
+}
 function sanitize(s,max=200) { return String(s||'').trim().replace(/[<>]/g,'').substring(0,max); }
 
 // ── SOURCE BADGE ──
@@ -2406,16 +2497,20 @@ function sourceBadge(source, submittedBy) {
 }
 
 // ── FETCH ALL PRICE LAYERS ──
+// Each read is guarded by withClientTimeout so a slow Firebase node cannot
+// block the UI indefinitely.
+const _CLIENT_READ_MS = 5_000; // 5 s per Firebase get() call
+
 async function fetchAllPriceLayers(barcode) {
   if (!db || !isValidBarcode(barcode)) return { official:[], proxy:[], manual:[], overrides:{}, reports:{} };
   console.log(`[prices] fetching layers for ${barcode}`);
 
   const tasks = {
-    official: get(ref(db, `prices/${barcode}`)),
-    proxy:    get(ref(db, `proxyCache/${barcode}`)),
-    reports:  get(ref(db, `priceReports/${barcode}`)),
-    overrides: myId ? get(ref(db, `userPriceOverrides/${myId}/${barcode}`)) : Promise.resolve(null),
-    manual:    groupId ? get(ref(db, `manualPrices/${groupId}/${barcode}`)) : Promise.resolve(null),
+    official:  withClientTimeout(get(ref(db, `prices/${barcode}`)),                              _CLIENT_READ_MS, 'official'),
+    proxy:     withClientTimeout(get(ref(db, `proxyCache/${barcode}`)),                          _CLIENT_READ_MS, 'proxy'),
+    reports:   withClientTimeout(get(ref(db, `priceReports/${barcode}`)),                        _CLIENT_READ_MS, 'reports'),
+    overrides: myId    ? withClientTimeout(get(ref(db, `userPriceOverrides/${myId}/${barcode}`)), _CLIENT_READ_MS, 'overrides') : Promise.resolve(null),
+    manual:    groupId ? withClientTimeout(get(ref(db, `manualPrices/${groupId}/${barcode}`)),   _CLIENT_READ_MS, 'manual')    : Promise.resolve(null),
   };
 
   const snaps = {};
@@ -2593,17 +2688,56 @@ function renderPriceRow(p, isFirst, total, warnings) {
   </div>`;
 }
 
-// ── showProductPricesEnhanced (v2 — pagination + store sheet) ──
-window.showProductPricesEnhanced = async function(product) {
+// ── showProductPricesEnhanced (v3 — API routing in location mode + analyticsSource) ──
+//
+// analyticsSource controls whether a price_search analytics event is emitted:
+//   'search'  (default) — real user-initiated search → emit event
+//   'refresh' — post-save refresh after override/report/manual price → skip event
+//
+// When _locationMode is true and coordinates are available the function routes
+// through /api/prices?barcode=&lat=&lng=&radiusKm= (server-side Haversine filter)
+// instead of reading all Firebase price nodes directly.  This is the correct fix
+// for the location-filter bug: the "📍 מסנן לפי מיקום" badge now accurately reflects
+// that only stores within radius are included.
+window.showProductPricesEnhanced = async function(product, { analyticsSource = 'search' } = {}) {
   if (!product) return;
   const wrap = document.getElementById('price-content');
   wrap.innerHTML = `<div class="price-loading"><div class="spin"></div><p>טוען מחירים...</p></div>`;
   const barcode = product.barcode || '';
 
-  let layers = { official:[], proxy:[], manual:[], overrides:{}, reports:{} };
-  if (isValidBarcode(barcode)) layers = await fetchAllPriceLayers(barcode);
+  let prices = [], warnings = [];
 
-  const { prices, warnings } = buildDisplayPrices(layers);
+  if (isValidBarcode(barcode)) {
+    if (_locationMode && _userLat !== null) {
+      // ── SERVER PATH: API handles radius filtering ───────────────────────────
+      // The API applies Haversine server-side so only stores within radius are
+      // returned.  This is the only correct path when location mode is active.
+      try {
+        const params = new URLSearchParams({ barcode, lat: _userLat, lng: _userLng, radiusKm: _radiusKm });
+        if (groupId) params.set('groupId', groupId);
+        if (myId)    params.set('userId',  myId);
+        const resp = await fetch(`/api/prices?${params}`, { signal: AbortSignal.timeout(10_000) });
+        if (resp.ok) {
+          const data = await resp.json();
+          // Normalise API response fields to the shape renderPriceRow expects
+          prices = (data.prices || []).map(p => ({
+            ...p,
+            displayPrice: p.displayPrice ?? p.price,
+            sourceDisplay: p.source,
+          }));
+          warnings = Array.isArray(data.communityWarning) ? data.communityWarning : [];
+        }
+      } catch (e) {
+        console.warn('[prices] API fetch error (location mode):', e.message);
+      }
+    } else {
+      // ── DIRECT FIREBASE PATH (no location filter) ───────────────────────────
+      const layers = await fetchAllPriceLayers(barcode);
+      const result = buildDisplayPrices(layers);
+      prices   = result.prices;
+      warnings = result.warnings;
+    }
+  }
 
   // Reset pagination state
   _priceAllRows    = prices;
@@ -2611,11 +2745,16 @@ window.showProductPricesEnhanced = async function(product) {
   _pricePage       = 0;
   _currentWarnings = warnings;
 
-  trackEvent('price_search', {
-    mode: 'barcode',
-    hasLocation: _locationMode,
-    resultCount: prices.length,
-  });
+  // Only emit price_search for genuine user-initiated searches.
+  // Post-save refreshes (override/report/manual price) pass analyticsSource:'refresh'
+  // so they do NOT inflate the price_search metric.
+  if (analyticsSource === 'search') {
+    trackEvent('price_search', {
+      mode:        _locationMode ? 'location' : 'barcode',
+      hasLocation: _locationMode,
+      resultCount: prices.length,
+    });
+  }
 
   const coveredChains = new Set(prices.map(p=>p.chainName||p.storeName||p.store||''));
   const missing = STORE_LIST_ALL.filter(s=>!coveredChains.has(s));
@@ -2729,7 +2868,9 @@ window.loadMorePrices = function() {
 // Helper: re-run whatever price view is currently showing after location state changes
 async function _refreshPricesAfterLocationChange() {
   if (selectedProduct) {
-    await window.showProductPricesEnhanced(selectedProduct);
+    // This is a re-run triggered by the location toggle, not a new user search.
+    // Pass analyticsSource:'refresh' to avoid inflating the price_search metric.
+    await window.showProductPricesEnhanced(selectedProduct, { analyticsSource: 'refresh' });
   } else {
     const q = document.getElementById('price-search-input')?.value?.trim();
     if (q && q.length >= 2) await window.searchPrices();
@@ -2805,13 +2946,52 @@ function _formatHours(hours) {
     .join('\n');
 }
 
-/** Fetch enriched store data from /api/store-details (session-cached). */
-async function _fetchStoreDetails(storeKey) {
-  if (_storeDetailsCache[storeKey]) return _storeDetailsCache[storeKey];
+// ── Store details cache — two-tier (in-memory + localStorage) ────────────────
+// Store details (phone, hours, address, sync metadata) change at most twice a day.
+// A 30-minute localStorage TTL eliminates network round-trips for repeat opens
+// of the same store sheet within a session and across sessions.
+const _STORE_DETAIL_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+function _getCachedStoreDetails(key) {
   try {
-    const res = await fetch(`/api/store-details?storeKey=${encodeURIComponent(storeKey)}`);
+    const raw = localStorage.getItem(`sd:${key}`);
+    if (!raw) return null;
+    const { data, ts } = JSON.parse(raw);
+    if (Date.now() - ts > _STORE_DETAIL_TTL_MS) {
+      localStorage.removeItem(`sd:${key}`);
+      return null;
+    }
+    return data;
+  } catch (_) { return null; }
+}
+
+function _persistStoreDetails(key, data) {
+  try {
+    localStorage.setItem(`sd:${key}`, JSON.stringify({ data, ts: Date.now() }));
+  } catch (_) {} // Storage quota exceeded — silent fail, in-memory cache still works
+}
+
+/** Fetch enriched store data from /api/store-details (2-tier cache: memory + localStorage). */
+async function _fetchStoreDetails(storeKey) {
+  // 1. In-memory cache (fastest — same session)
+  if (_storeDetailsCache[storeKey]) return _storeDetailsCache[storeKey];
+  // 2. localStorage cache with 30-min TTL (survives page reload)
+  const persisted = _getCachedStoreDetails(storeKey);
+  if (persisted) {
+    _storeDetailsCache[storeKey] = persisted;
+    return persisted;
+  }
+  // 3. Network fetch with 8s timeout
+  try {
+    const res = await fetch(
+      `/api/store-details?storeKey=${encodeURIComponent(storeKey)}`,
+      { signal: AbortSignal.timeout(8_000) }
+    );
     const data = await res.json();
-    if (res.ok) _storeDetailsCache[storeKey] = data;
+    if (res.ok) {
+      _storeDetailsCache[storeKey] = data;
+      _persistStoreDetails(storeKey, data);
+    }
     return data;
   } catch (e) {
     console.warn('[store-details] fetch error:', e.message);
@@ -2823,11 +3003,14 @@ async function _fetchStoreDetails(storeKey) {
 function _applyEnrichment(el, enriched) {
   if (!enriched) return;
 
-  // Phone — update call button + skeleton cell
-  const phoneEl = el.querySelector('#sk-phone');
+  // Phone — update call button + skeleton cell.
+  // sanitizePhone() strips non-allowlist characters and validates digit count,
+  // preventing tel: URI injection if enriched.phone contains a crafted value.
+  const phoneEl  = el.querySelector('#sk-phone');
+  const safePhone = sanitizePhone(enriched.phone);
   if (phoneEl) {
-    if (enriched.phone) {
-      phoneEl.textContent = enriched.phone;
+    if (safePhone) {
+      phoneEl.textContent = safePhone;
       phoneEl.classList.remove('store-sheet-skeleton');
     } else {
       phoneEl.textContent = 'לא ידוע';
@@ -2837,8 +3020,8 @@ function _applyEnrichment(el, enriched) {
   }
   const callBtn = el.querySelector('.store-sheet-btn.call');
   if (callBtn) {
-    callBtn.style.display = enriched.phone ? 'flex' : 'none';
-    if (enriched.phone) callBtn.onclick = () => { window.open(`tel:${enriched.phone}`); };
+    callBtn.style.display = safePhone ? 'flex' : 'none';
+    if (safePhone) callBtn.onclick = () => { window.open(`tel:${safePhone}`); };
   }
 
   // Hours
@@ -2994,7 +3177,7 @@ window.saveSingleManualPrice = async function(storeName, inputId, barcode, produ
     });
     trackEvent('manual_price', { source: 'manual' });
     toast(`💰 ₪${val.toFixed(2)} ב${storeName} נשמר`);
-    if (selectedProduct) window.showProductPricesEnhanced(selectedProduct);
+    if (selectedProduct) window.showProductPricesEnhanced(selectedProduct, { analyticsSource: 'refresh' });
   } catch(e) { console.error('[manual] error:', e.message); toast('❌ ' + e.message); }
 };
 
@@ -3028,7 +3211,7 @@ window.saveOverride = async function() {
     });
     closeOL2('override-overlay');
     toast(`✏️ תיקון אישי נשמר ב${storeName}`);
-    if (selectedProduct) window.showProductPricesEnhanced(selectedProduct);
+    if (selectedProduct) window.showProductPricesEnhanced(selectedProduct, { analyticsSource: 'refresh' });
   } catch(e) { console.error('[override]', e.message); toast('❌ '+e.message); }
 };
 
@@ -3038,7 +3221,7 @@ window.removeOverride = async function(chainKey, storeName) {
   try {
     await remove(ref(db, `userPriceOverrides/${myId}/${barcode}/${chainKey}`));
     toast(`↩️ חזרת למחיר הרשמי ב${storeName}`);
-    if (selectedProduct) window.showProductPricesEnhanced(selectedProduct);
+    if (selectedProduct) window.showProductPricesEnhanced(selectedProduct, { analyticsSource: 'refresh' });
   } catch(e) { toast('❌ '+e.message); }
 };
 
@@ -3075,7 +3258,7 @@ window.submitReport = async function() {
     });
     closeOL2('report-overlay');
     toast('📢 תודה! הדיווח נשמר');
-    if (selectedProduct) window.showProductPricesEnhanced(selectedProduct);
+    if (selectedProduct) window.showProductPricesEnhanced(selectedProduct, { analyticsSource: 'refresh' });
   } catch(e) { console.error('[report]', e.message); toast('❌ '+e.message); }
 };
 

@@ -18,7 +18,7 @@
 //   - The sheet opens immediately with basic data; this endpoint is called
 //     lazily after the sheet is visible (skeleton → real data)
 
-import { getDB, setCors } from './_firebase.js';
+import { getDB, setCors, sanitizePhone, logError } from './_firebase.js';
 
 const READ_TIMEOUT_MS = 5_000;
 
@@ -70,9 +70,9 @@ export default async function handler(req, res) {
     ]);
   } catch (e) {
     if (e.isTimeout) {
-      return res.status(504).json({ error: 'Firebase read timed out', storeKey: key });
+      return res.status(504).json({ error: 'Firebase read timed out', storeKey: key, retryAfter: 30 });
     }
-    console.error('[store-details] read error:', e.message);
+    logError('store-details', e, { storeKey: key });
     return res.status(500).json({ error: 'Unexpected read error', storeKey: key });
   }
 
@@ -104,7 +104,8 @@ export default async function handler(req, res) {
     hasCoords:   store.hasCoords ?? false,
 
     // Enrichment fields (null until store-enrichment worker populates)
-    phone:           enriched.phone          ?? null,
+    // sanitizePhone prevents tel: injection if the phone field contains crafted values.
+    phone:           sanitizePhone(enriched.phone ?? null),
     hours:           enriched.hours          ?? null,  // { mon: '08:00-22:00', … }
     hoursSource:     enriched.hoursSource    ?? null,  // 'google_places' | 'waze' | 'manual'
     hoursConfidence: enriched.hoursConfidence ?? 'none', // 'high'|'medium'|'low'|'none'
