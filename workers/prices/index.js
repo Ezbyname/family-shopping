@@ -86,7 +86,18 @@ async function syncChain(chain, writer, config) {
           config.worker.downloadTimeout, config.worker.downloadRetries
         );
         await parseXMLStream(storeStream, null, async (store) => {
-          await writer.queue(`stores/${safeKey(`${chain.id}_${store.storeId}`)}`, store);
+          const storeKey = safeKey(`${chain.id}_${store.storeId}`);
+          await writer.queue(`stores/${storeKey}`, store);
+          // Also write lightweight coordinate index consumed by basket-compare + prices API.
+          // storeCoords/{storeKey} = { lat, lng, city } — ~50 bytes/store vs ~500 for full record.
+          // Only written when the store has geocoded coordinates.
+          if (store.hasCoords) {
+            await writer.queue(`storeCoords/${storeKey}`, {
+              lat:  store.latitude,
+              lng:  store.longitude,
+              city: store.city || '',
+            });
+          }
           result.storeCount++;
         }, chainMeta);
         await writer.flush();

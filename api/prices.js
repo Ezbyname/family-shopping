@@ -165,13 +165,27 @@ export default async function handler(req, res) {
     ]);
     timings.initMs = Date.now() - tInit;
 
-    // Load store index once for radius filtering (search mode only)
+    // Load coordinate index for radius filtering (search mode only).
+    // Prefer lightweight storeCoords/{key}={lat,lng,city} written by the price sync worker.
+    // Falls back to the full stores node if storeCoords doesn't exist yet.
     let storeIndex = {};
     if (hasLoc && db) {
       try {
         const tStore = Date.now();
-        const snap = await withTimeout(db.ref('stores').get(), READ_TIMEOUT_MS, 'stores');
-        if (snap?.exists()) storeIndex = snap.val();
+        const cSnap = await withTimeout(db.ref('storeCoords').get(), READ_TIMEOUT_MS, 'storeCoords');
+        if (cSnap?.exists()) {
+          // Normalise storeCoords schema to the shape filterByRadius expects
+          const raw = cSnap.val();
+          storeIndex = Object.fromEntries(
+            Object.entries(raw).map(([k, v]) => [k, {
+              hasCoords: true, latitude: v.lat, longitude: v.lng, city: v.city || '',
+            }])
+          );
+        } else {
+          // Fallback: full stores node (pre-storeCoords deploy)
+          const snap = await withTimeout(db.ref('stores').get(), READ_TIMEOUT_MS, 'stores');
+          if (snap?.exists()) storeIndex = snap.val();
+        }
         timings.storeReadMs = Date.now() - tStore;
       } catch (_) {}
     }
@@ -261,18 +275,31 @@ async function buildLayeredPrices(
         override:     overrides[key] ?? null,
       }));
 
-    // Radius filter — lazy-load stores in barcode mode
+    // Radius filter — lazy-load coord index in barcode mode.
+    // Prefers storeCoords (lightweight, ~50 bytes/store) over full stores node (~500 bytes).
     if (hasLoc && official.length > 0) {
       let idx = storeIndex;
       if (idx === undefined) {
-        // Barcode mode: load stores on demand
+        // Barcode mode: load coord index on demand
         idx = {};
         const tStore = Date.now();
         try {
-          const snap = await withTimeout(db.ref('stores').get(), READ_TIMEOUT_MS, 'stores');
-          if (snap?.exists()) idx = snap.val();
+          const cSnap = await withTimeout(db.ref('storeCoords').get(), READ_TIMEOUT_MS, 'storeCoords');
+          if (cSnap?.exists()) {
+            const raw = cSnap.val();
+            idx = Object.fromEntries(
+              Object.entries(raw).map(([k, v]) => [k, {
+                hasCoords: true, latitude: v.lat, longitude: v.lng, city: v.city || '',
+              }])
+            );
+            timings.coordsMs = Date.now() - tStore;
+          } else {
+            // Fallback: full stores node (pre-storeCoords deploy)
+            const snap = await withTimeout(db.ref('stores').get(), READ_TIMEOUT_MS, 'stores');
+            if (snap?.exists()) idx = snap.val();
+            timings.storeReadMs = Date.now() - tStore;
+          }
         } catch (_) {}
-        timings.storeReadMs = Date.now() - tStore;
       }
       official = filterByRadius(official, lat, lng, radius, idx);
     }
