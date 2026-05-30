@@ -1,4 +1,4 @@
-// api/prices.js — v6.2.0
+// api/prices.js — v6.3.0
 // GET /api/prices?barcode=&q=&lat=&lng=&radiusKm=&groupId=&userId=&debug=1
 //
 // Price priority (deterministic):
@@ -8,13 +8,8 @@
 //   D. manualPrices/{groupId}/{barcode}/{entryId}    — family scoped, only if no official/proxy
 //   E. priceReports — warning signal only, never shown as real price
 //
-// v6.2.0 changes (over v6.1.0):
-//   - ALL Firebase reads now use fetch() REST API — eliminates Admin SDK WebSocket hang
-//   - OAuth2 admin token generated from service-account credentials (cached 50 min)
-//   - Store index cached 5 min in module scope (reduces redundant stores/ fetches)
-//   - buildLayeredPrices takes dbUrl (string) instead of db (Admin SDK handle)
-//   - initMs now measures admin token acquisition (was: SDK init + auth token)
-//   - Target: barcode lookup < 2 s (was: 5 s+ timeout)
+// v6.2.0: ALL Firebase reads via fetch() REST API — eliminates Admin SDK WebSocket hang
+// v6.3.0: storeCoords index support — lightweight {lat,lng,city} read instead of full stores node
 
 import { restGet, getDbUrl, getAdminToken, haversine, setCors, isValidBarcode, isValidPrice } from './_firebase.js';
 
@@ -40,12 +35,34 @@ function withTimeout(promise, ms, label = '') {
 }
 
 // ── Store index cache (module-level, reused across requests) ─────────────────
+// Prefers lightweight storeCoords/{key}={lat,lng,city} (~28 KB) over full
+// stores node (~141 KB). Falls back to stores/ if storeCoords doesn't exist yet.
 let _storeCache    = null;
 let _storeCacheExp = 0;
 
 async function getStoreIndex(dbUrl) {
   const now = Date.now();
   if (_storeCache && _storeCacheExp > now) return _storeCache;
+
+  // Try storeCoords first (lightweight index written by price sync worker)
+  try {
+    const coordsData = await restGet(dbUrl, 'storeCoords', READ_TIMEOUT_MS);
+    if (coordsData && typeof coordsData === 'object' && Object.keys(coordsData).length > 0) {
+      // Normalize storeCoords {lat,lng,city} → stores-compatible shape
+      _storeCache = Object.fromEntries(
+        Object.entries(coordsData).map(([k, v]) => [k, {
+          hasCoords: true,
+          latitude:  v.lat ?? v.latitude ?? null,
+          longitude: v.lng ?? v.longitude ?? null,
+          city:      v.city || '',
+        }])
+      );
+      _storeCacheExp = now + STORE_CACHE_MS;
+      return _storeCache;
+    }
+  } catch (_) {}
+
+  // Fallback: full stores node (pre-storeCoords deploy)
   const data = await restGet(dbUrl, 'stores', READ_TIMEOUT_MS);
   _storeCache    = (data && typeof data === 'object') ? data : {};
   _storeCacheExp = now + STORE_CACHE_MS;
@@ -125,7 +142,7 @@ export default async function handler(req, res) {
       );
       timings.totalMs = Date.now() - t0;
 
-      const response = { version: '6.2.0', barcode: clean, ...result };
+      const response = { version: '6.3.0', barcode: clean, ...result };
       if (isDebug) response.timings = timings;
       return res.status(200).json(response);
 
@@ -159,7 +176,7 @@ export default async function handler(req, res) {
   const query  = String(q).trim();
   const hebrew = isHebrew(query);
   const en     = hebrew ? (translate(query) || query) : query;
-  console.log(`[prices v6.2] search: "${query}" → "${en}"`);
+  console.log(`[prices v6.3] search: "${query}" → "${en}"`);
 
   const dbUrl = getDbUrl();
 
@@ -209,7 +226,7 @@ export default async function handler(req, res) {
 
     timings.totalMs = Date.now() - t0;
     const response = {
-      version: '6.2.0', query, englishQuery: en,
+      version: '6.3.0', query, englishQuery: en,
       results: enriched.slice(0, 20), total: enriched.length,
       syncStatus,
     };
@@ -220,7 +237,7 @@ export default async function handler(req, res) {
     console.error('[prices] search error:', e.message);
     timings.totalMs = Date.now() - t0;
     return res.status(200).json({
-      version: '6.2.0', query, results: [], error: e.message,
+      version: '6.3.0', query, results: [], error: e.message,
       ...(isDebug ? { timings } : {}),
     });
   }
@@ -270,7 +287,7 @@ async function buildLayeredPrices(
         override:     overrides[key] ?? null,
       }));
 
-    // Radius filter — use cached store index in barcode mode
+    // Radius filter — use cached store index (prefers storeCoords, falls back to stores/)
     if (hasLoc && official.length > 0) {
       let idx = storeIndex;
       if (idx === undefined) {
@@ -426,7 +443,7 @@ async function searchOFF(hebrewQuery, englishQuery) {
   for (const url of urls) {
     try {
       const r = await fetch(url, {
-        headers: { 'User-Agent': 'FamilyShoppingIL/6.2' },
+        headers: { 'User-Agent': 'FamilyShoppingIL/6.3' },
         signal: AbortSignal.timeout(10_000),
       });
       if (!r.ok) continue;

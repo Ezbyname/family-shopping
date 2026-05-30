@@ -2306,6 +2306,78 @@ window.joinGroup=async function(){
   saveLocal(); connectToGroup();
 };
 
+// ── ANALYTICS ────────────────────────────────────────────────────────────────
+// Batched event queue — writes to analytics/events/{YYYY-MM-DD} via Firebase push().
+// Requires auth (auth !== null rule) — events sent only when connected to a group.
+const _analyticsQueue      = [];
+let   _analyticsFlushPending = false;
+const _ANALYTICS_MAX_QUEUE   = 50; // drop events if queue grows unexpectedly large (abuse guard)
+
+function trackEvent(eventName, props = {}) {
+  if (!db || !groupId) return;
+  if (_analyticsQueue.length >= _ANALYTICS_MAX_QUEUE) return;
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const entry = {
+    event:    eventName,
+    ts:       Date.now(),
+    group:    groupId.slice(0, 6), // anonymized group prefix only
+    platform: 'pwa',
+    props,
+  };
+  _analyticsQueue.push({ today, entry });
+  if (_analyticsFlushPending) return;
+  _analyticsFlushPending = true;
+  // Batch flush after 2 s to avoid spamming writes on rapid interactions
+  setTimeout(() => {
+    _analyticsFlushPending = false;
+    const batch = _analyticsQueue.splice(0);
+    batch.forEach(({ today: d, entry: e }) => {
+      try { push(ref(db, `analytics/events/${d}`), e).catch(() => {}); } catch (_) {}
+    });
+  }, 2000);
+}
+
+// ── SYNC HEALTH MONITOR ──────────────────────────────────────────────────────
+// Reads syncSummary once on app connect. Shows a dismissible banner if prices
+// are stale (>36 h) or majority of chains failed the last sync run.
+const _STALE_HOURS = 36;
+
+async function checkSyncHealth() {
+  if (!db) return;
+  try {
+    const snap = await withClientTimeout(get(ref(db, 'syncSummary')), 5_000, 'syncSummary');
+    if (!snap?.exists()) return;
+    const { lastSync, chainsFailed, chainsSucceeded } = snap.val() || {};
+    const ageHours    = lastSync ? (Date.now() - lastSync) / 3_600_000 : Infinity;
+    const majorFailed = (chainsFailed || 0) > (chainsSucceeded || 0);
+    if (ageHours > _STALE_HOURS || majorFailed) {
+      const label = isFinite(ageHours) ? `${Math.round(ageHours)} שעות` : 'זמן רב';
+      showSyncStaleBanner(label);
+      trackEvent('sync_stale_banner_shown', {
+        ageHours:    Math.round(isFinite(ageHours) ? ageHours : 999),
+        chainsFailed: chainsFailed || 0,
+      });
+    }
+  } catch (_) {} // non-blocking — ignore all failures silently
+}
+
+function showSyncStaleBanner(ageLabel) {
+  if (document.getElementById('sync-stale-banner')) return; // show once per session
+  const banner = document.createElement('div');
+  banner.id = 'sync-stale-banner';
+  banner.style.cssText = [
+    'position:fixed;top:0;left:0;right:0;z-index:9999',
+    'background:rgba(248,113,113,.92);backdrop-filter:blur(6px)',
+    'padding:10px 14px;display:flex;align-items:center;gap:8px',
+    'font-family:Heebo,sans-serif;font-size:13px;font-weight:600;color:#111',
+    'direction:rtl;box-shadow:0 2px 12px rgba(0,0,0,.3)',
+  ].join(';');
+  banner.innerHTML = `
+    <span style="flex:1">⚠️ המחירים עשויים להיות לא מעודכנים — הסנכרון האחרון היה לפני ${esc(ageLabel)}</span>
+    <button onclick="this.parentElement.remove()" style="background:transparent;border:none;font-size:18px;cursor:pointer;color:#111;line-height:1">✕</button>`;
+  document.body.prepend(banner);
+}
+
 function connectToGroup(){
   showScreen('main-screen');
   // Cleanup old notifications silently (>30 days)
@@ -2333,6 +2405,8 @@ function connectToGroup(){
   setTimeout(updateHeaderAvatar, 300);
   // Attach hidden admin long-press gesture (silently no-ops for non-admins)
   setTimeout(initAdminGesture, 600);
+  // Check sync health — warn users if prices are stale (>36 h since last sync)
+  setTimeout(checkSyncHealth, 4000);
 
   toast('👋 שלום '+myName+'!');
 }
@@ -4810,9 +4884,38 @@ async function tryProxyFetch(query, storeName) {
 // STORE_LIST_ALL defined above
 
 // ── Validation ──
-function isValidBarcode(b) { const s=String(b||'').replace(/\D/g,''); return s.length>=4&&s.length<=20; }
+// Strict EAN-8 / UPC-A / EAN-13 / ITF-14 barcode validation (matches api/_firebase.js)
+function isValidBarcode(b) {
+  const s = String(b || '').replace(/\D/g, '');
+  if (!/^(?:8|12|13|14)$/.test(String(s.length))) return false;
+  if (/^0+$/.test(s)) return false;
+  return true;
+}
 function isValidPrice(p)   { const n=parseFloat(p); return !isNaN(n)&&n>0&&n<10000; }
 function sanitize(s,max=200) { return String(s||'').trim().replace(/[<>]/g,'').substring(0,max); }
+/**
+ * Phone number sanitizer — allowlist: digits, +, -, spaces, parentheses.
+ * Returns null for anything that fails E.164 digit-count rules (7–15 digits).
+ * Prevents tel: URI injection if Firebase phone field contains crafted values.
+ */
+function sanitizePhone(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const stripped = raw.replace(/[^\d+\-\s()]/g, '').trim();
+  const digits   = stripped.replace(/\D/g, '');
+  if (digits.length < 7 || digits.length > 15) return null;
+  return stripped;
+}
+/** Race a Firebase promise against a timeout. Returns { isTimeout: true } on expiry. */
+function withClientTimeout(promise, ms, label = '') {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(
+      () => reject(Object.assign(new Error(`timeout:${label}`), { isTimeout: true })),
+      ms
+    );
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
 
 // ── SOURCE BADGE ──
 function sourceBadge(source, submittedBy) {
