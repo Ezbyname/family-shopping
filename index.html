@@ -19,6 +19,7 @@
   --green:#34d399;--green-dim:rgba(52,211,153,.12);
   --red:#f87171;--text:#e6edf3;--muted:#7d8590;--border:#30363d;
   --radius:16px;--safe-b:env(safe-area-inset-bottom,0px);
+  --blue:#60a5fa;--blue-dim:rgba(96,165,250,.15);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden}
@@ -687,6 +688,92 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   font-weight:700;color:#fff;cursor:pointer;transition:all .12s}
 .confirm-btn-delete:active{opacity:.8;transform:scale(.97)}
 
+/* ══ STORE DETAILS SHEET ══ */
+.store-sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);
+  z-index:800;display:none;align-items:flex-end;justify-content:center}
+.store-sheet-overlay.show{display:flex}
+.store-sheet{background:var(--surface);border-radius:22px 22px 0 0;
+  padding:0 0 calc(16px + var(--safe-b));width:100%;max-width:480px;
+  animation:slideUp .23s ease;max-height:86vh;overflow-y:auto}
+.store-sheet-inner{padding:20px 18px 0}
+.store-sheet-handle{width:40px;height:4px;background:var(--border);
+  border-radius:2px;margin:14px auto 16px}
+.store-sheet-chain{font-size:10px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px}
+.store-sheet-name{font-size:19px;font-weight:900;margin-bottom:1px;line-height:1.2}
+.store-sheet-city{font-size:13px;color:var(--muted);margin-bottom:10px}
+.store-sheet-price-row{display:flex;align-items:baseline;gap:8px;
+  margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+.store-sheet-price{font-size:34px;font-weight:900;color:var(--accent)}
+.store-sheet-price-label{font-size:11px;color:var(--muted)}
+.store-sheet-row{display:flex;align-items:flex-start;gap:10px;padding:9px 0;
+  border-bottom:1px solid var(--border);font-size:13px}
+.store-sheet-icon{font-size:17px;width:24px;text-align:center;flex-shrink:0;margin-top:1px}
+.store-sheet-label{font-size:10px;color:var(--muted);margin-bottom:1px;font-weight:600;letter-spacing:.3px}
+.store-sheet-val{font-size:13px;font-weight:600}
+.store-sheet-na{font-size:12px;color:var(--muted);font-style:italic}
+.store-sheet-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;
+  padding:16px 18px calc(4px + var(--safe-b))}
+.store-sheet-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:5px;padding:15px 8px;border-radius:14px;border:none;cursor:pointer;
+  font-family:'Heebo',sans-serif;font-size:12px;font-weight:700;
+  transition:opacity .15s,transform .1s;min-height:70px;line-height:1.2}
+.store-sheet-btn:active{opacity:.8;transform:scale(.95)}
+.store-sheet-btn .sb-icon{font-size:24px}
+.store-sheet-btn.call{background:rgba(52,211,153,.15);color:var(--green)}
+.store-sheet-btn.maps{background:rgba(96,165,250,.15);color:var(--blue)}
+.store-sheet-btn.waze{background:rgba(240,180,41,.15);color:var(--accent)}
+.store-sheet-btn.basket{background:var(--card2);color:var(--text)}
+.store-sheet-btn[disabled]{opacity:.35;cursor:default}
+
+/* ══ PAGINATION ══ */
+.load-more-btn{width:100%;background:var(--card);border:1.5px solid var(--border);
+  border-radius:13px;padding:14px;font-family:'Heebo',sans-serif;font-size:14px;
+  font-weight:700;color:var(--accent);cursor:pointer;margin-top:8px;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:all .15s;}
+.load-more-btn:active{background:var(--accent-dim);border-color:var(--accent)}
+
+/* ══ SAVINGS HERO ══ */
+.savings-hero{background:linear-gradient(135deg,rgba(52,211,153,.12),rgba(240,180,41,.08));
+  border:1px solid rgba(52,211,153,.25);border-radius:16px;padding:13px 15px;
+  margin-bottom:10px;display:flex;align-items:center;gap:12px}
+.savings-hero-amount{font-size:30px;font-weight:900;color:var(--green);flex-shrink:0;line-height:1}
+.savings-hero-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.savings-hero-pct{font-size:12px;font-weight:700;color:var(--green)}
+
+/* ══ LOCATION TOGGLE ══ */
+.loc-toggle{display:flex;align-items:center;justify-content:center;
+  width:40px;height:40px;border-radius:11px;
+  background:var(--card);border:1.5px solid var(--border);
+  cursor:pointer;font-size:16px;flex-shrink:0;transition:all .15s}
+.loc-toggle.on{background:rgba(52,211,153,.12);border-color:var(--green)}
+.loc-toggle:active{opacity:.8}
+
+/* ══ BASKET COMPARE v2 ══ */
+.brc-rank{font-size:11px;font-weight:700;letter-spacing:.4px;
+  margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.brc-rank.first{color:var(--green)}
+.brc-rank.second{color:var(--accent)}
+.brc-rank.third{color:var(--muted)}
+.brc-completeness{height:5px;border-radius:3px;background:var(--card2);margin-top:5px;overflow:hidden}
+.brc-completeness-bar{height:100%;border-radius:3px;transition:width .4s ease}
+.brc-missing-list{font-size:11px;color:var(--red);margin-top:6px;padding:7px 9px;
+  background:rgba(248,113,113,.07);border-radius:8px;border:1px solid rgba(248,113,113,.15)}
+.brc-alt{font-size:10px;color:var(--muted);margin-top:3px;padding:3px 7px;
+  background:var(--card2);border-radius:5px;display:flex;
+  align-items:center;justify-content:space-between}
+.brc-alt-score{font-size:9px;font-weight:700;background:var(--green-dim);
+  color:var(--green);border-radius:4px;padding:1px 5px}
+.savings-banner-main{background:var(--green-dim);border:1px solid rgba(52,211,153,.3);
+  border-radius:14px;padding:12px 14px;margin-bottom:10px;display:flex;
+  align-items:center;gap:10px}
+
+/* ══ PRICE ROWS — MOBILE TOUCH ══ */
+.spr{min-height:52px;cursor:pointer;transition:background .12s}
+.spr:active{background:var(--card) !important}
+.store-prices .spr{position:relative}
+
 /* ══ NOTIFICATION BELL ══ */
 .notif-btn{position:relative;width:34px;height:34px;border-radius:50%;
   border:none;background:var(--card);cursor:pointer;
@@ -852,6 +939,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
     <div class="price-search-bar">
       <input class="price-search-input" id="price-search-input" placeholder="חפש מוצר... (קורנפלקס, חלב...)"
         maxlength="60" onkeydown="if(event.key==='Enter')searchPrices()">
+      <button class="loc-toggle" id="loc-toggle-btn" onclick="toggleLocationMode()" title="סינון לפי מיקום">📍</button>
       <button class="price-search-btn" onclick="searchPrices()">🔍</button>
     </div>
     <div class="quick-items" id="quick-items"></div>
@@ -1115,7 +1203,9 @@ window.searchPrices = async function(){
     const wrap = document.getElementById('price-content');
     wrap.innerHTML = `<div class="price-loading"><div class="spin"></div><p>מחפש "${esc(q)}" בכל הסופרמרקטים...</p></div>`;
     try {
-      const res = await fetch(`/api/prices?q=${encodeURIComponent(resolvedQuery)}`);
+      const locParams = (_locationMode && _userLat !== null)
+        ? `&lat=${_userLat}&lng=${_userLng}&radiusKm=${priceRadius}` : '';
+      const res = await fetch(`/api/prices?q=${encodeURIComponent(resolvedQuery)}${locParams}`);
     const data = await res.json();
 
     if(!data.results || !data.results.length){
@@ -1741,20 +1831,23 @@ window.runBasketCompare = async function() {
   const wrap = document.getElementById('basket-results-wrap');
   wrap.innerHTML = `<div class="price-loading"><div class="spin"></div><p>משווה מחירים...</p></div>`;
 
-  // Get user location
-  let lat = null, lng = null;
-  try {
-    const pos = await new Promise((res,rej) => navigator.geolocation.getCurrentPosition(res,rej,{timeout:5000}));
-    lat = pos.coords.latitude; lng = pos.coords.longitude;
-  } catch (_) { toast('⚠️ לא ניתן לקבל מיקום — מציג ללא סינון מרחק'); }
+  // Get user location (reuse if already available)
+  let lat = _userLat, lng = _userLng;
+  if (!lat) {
+    try {
+      const pos = await new Promise((res,rej) => navigator.geolocation.getCurrentPosition(res,rej,{timeout:5000}));
+      lat = pos.coords.latitude; lng = pos.coords.longitude;
+    } catch (_) { /* no location — compare without radius filter */ }
+  }
 
-  // Build items array (use barcode if available, else name)
-  const basketItems = pending
-    .filter(([,v]) => v.barcode)
-    .map(([,v]) => ({ barcode: v.barcode, quantity: v.qty || 1 }));
+  // Build items array with barcode + name map
+  const pendingWithBarcode = pending.filter(([,v]) => v.barcode);
+  const basketItems = pendingWithBarcode.map(([,v]) => ({ barcode: v.barcode, quantity: v.qty || 1 }));
+  const barcodeToName = {};
+  pendingWithBarcode.forEach(([,v]) => { if (v.barcode) barcodeToName[v.barcode] = v.name || v.barcode; });
 
   if (!basketItems.length) {
-    wrap.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">אין פריטים עם ברקוד לשוואה</div>';
+    wrap.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">אין פריטים עם ברקוד להשוואה — הוסף ברקוד לפריטים</div>';
     return;
   }
 
@@ -1767,51 +1860,100 @@ window.runBasketCompare = async function() {
       body: JSON.stringify(body),
     });
     const data = await res.json();
-    renderBasketResults(data, basketItems.length);
+    renderBasketResults(data, basketItems.length, barcodeToName);
   } catch (e) {
     wrap.innerHTML = `<div style="text-align:center;padding:20px;color:var(--red)">${esc(e.message)}</div>`;
   }
 };
 
-function renderBasketResults(data, totalItems) {
+function renderBasketResults(data, totalItems, barcodeToName) {
   const wrap = document.getElementById('basket-results-wrap');
-  const { results, bestFullBasket } = data;
+  const { results } = data;
 
   if (!results?.length) {
     wrap.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">לא נמצאו חנויות בטווח</div>';
     return;
   }
 
-  let html = '';
-  if (bestFullBasket) {
-    html += `<div style="font-size:10px;font-weight:700;color:var(--green);letter-spacing:.7px;text-transform:uppercase;margin-bottom:6px">🏆 הכי זול לסל המלא</div>`;
+  // Sort by total ascending (cheapest first)
+  const sorted = [...results].sort((a,b) => a.total - b.total);
+  const cheapest = sorted[0].total;
+  const priciest  = sorted[sorted.length-1].total;
+  const maxSavings = priciest - cheapest;
+
+  // Build a lookup: for each missing barcode, find alternatives from other stores
+  const barcodeInStore = {};
+  sorted.forEach(r => {
+    (r.items||[]).forEach(it => {
+      if (!barcodeInStore[it.barcode]) barcodeInStore[it.barcode] = [];
+      barcodeInStore[it.barcode].push({ chainName: r.chainName, price: it.unitPrice });
+    });
+  });
+
+  // Savings hero
+  let heroHtml = '';
+  if (maxSavings >= 1) {
+    const savePct = Math.round((maxSavings / priciest) * 100);
+    heroHtml = `<div class="savings-hero" style="margin-bottom:12px">
+      <div class="savings-hero-amount">₪${maxSavings.toFixed(2)}</div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px">💰 חסכת אם תקנה בזול</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px">${savePct}% פחות לעומת <strong style="color:var(--text)">${esc(sorted[sorted.length-1].chainName)}</strong></div>
+      </div>
+    </div>`;
   }
 
-  results.forEach(r => {
-    const isBest = bestFullBasket && r.storeId === bestFullBasket.storeId && r.chainId === bestFullBasket.chainId;
-    const completePct = Math.round((r.availableItems / totalItems) * 100);
-    html += `<div class="basket-result-card${isBest?' best':''}">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-        <div class="basket-chain">${esc(r.chainName)}</div>
-        ${isBest?'<span class="best-badge-full">הכי זול ✅</span>':''}
-      </div>
-      <div style="display:flex;align-items:baseline;gap:6px">
-        <div class="basket-total">₪${r.total.toFixed(2)}</div>
+  const rankEmoji = ['🥇','🥈','🥉'];
+  let html = heroHtml;
+
+  sorted.forEach((r, idx) => {
+    const rankLabel    = idx < 3 ? rankEmoji[idx] : `#${idx+1}`;
+    const completePct  = r.completeness ?? Math.round((r.availableItems / totalItems) * 100);
+    const diff         = r.total - cheapest;
+    const diffStr      = diff > 0.01 ? `<span style="color:var(--muted);font-size:12px">+₪${diff.toFixed(2)}</span>` : `<span style="color:var(--green);font-size:12px">הכי זול ✅</span>`;
+    const barPct       = Math.min(completePct, 100);
+    const barColor     = completePct >= 90 ? 'var(--green)' : completePct >= 60 ? 'var(--accent)' : 'var(--red)';
+
+    // Missing items with alternatives
+    let missingHtml = '';
+    if ((r.missingBarcodes||[]).length) {
+      const missingLines = r.missingBarcodes.map(bc => {
+        const name = barcodeToName?.[bc] || bc;
+        const alts = (barcodeInStore[bc]||[]).filter(a => a.chainName !== r.chainName);
+        const altStr = alts.length
+          ? `<span style="color:var(--blue);font-size:10px"> ← קיים ב-${esc(alts[0].chainName)}: ₪${alts[0].price.toFixed(2)}</span>` : '';
+        return `<div class="brc-missing-list">✗ ${esc(name)}${altStr}</div>`;
+      }).join('');
+      missingHtml = `<div style="margin-top:6px">${missingLines}</div>`;
+    }
+
+    // Item breakdown (collapsed, first 3)
+    const itemsHtml = (r.items||[]).slice(0,3).map(it =>
+      `<div class="basket-item-row"><span>${esc(it.name||it.barcode)}</span><span>₪${it.totalPrice.toFixed(2)}</span></div>`
+    ).join('') + (r.items?.length > 3
+      ? `<div class="basket-item-row" style="color:var(--muted);text-align:center">ועוד ${r.items.length-3}...</div>` : '');
+
+    html += `<div class="basket-result-card${idx===0?' best':''}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="brc-rank ${idx===0?'first':idx===1?'second':''}" style="font-size:20px">${rankLabel}</span>
+          <div class="basket-chain">${esc(r.chainName)}</div>
+        </div>
         ${r.distanceKm ? `<span class="distance-label">📍 ${r.distanceKm} ק"מ</span>` : ''}
       </div>
-      <div class="basket-meta">
-        <span>✅ ${r.availableItems}/${totalItems} פריטים (${completePct}%)</span>
-        ${r.city ? `<span>🏙 ${esc(r.city)}</span>` : ''}
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">
+        <div class="basket-total">₪${r.total.toFixed(2)}</div>
+        ${diffStr}
       </div>
-      ${r.missingItems > 0 ? `<div class="basket-missing">חסרים ${r.missingItems} פריטים</div>` : ''}
-      <div class="basket-items-mini">
-        ${(r.items||[]).slice(0,4).map(i => `
-          <div class="basket-item-row">
-            <span>${esc(i.name||i.barcode)}</span>
-            <span>₪${i.totalPrice.toFixed(2)}</span>
-          </div>`).join('')}
-        ${r.items?.length > 4 ? `<div class="basket-item-row" style="color:var(--muted);text-align:center">ועוד ${r.items.length-4}...</div>` : ''}
+      <div style="margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:3px">
+          <span>שלמות: ${r.availableItems}/${totalItems} פריטים (${completePct}%)</span>
+          ${r.city ? `<span>🏙 ${esc(r.city)}</span>` : ''}
+        </div>
+        <div class="brc-completeness"><div class="brc-completeness-bar" style="width:${barPct}%;background:${barColor}"></div></div>
       </div>
+      ${missingHtml}
+      <div class="basket-items-mini">${itemsHtml}</div>
     </div>`;
   });
 
@@ -1981,6 +2123,18 @@ let _scanTimer = null;
 
 let _overrideContext = null;
 let _reportContext = null;
+
+// ── PAGINATION & STORE SHEET STATE ──
+const PRICE_PAGE_SIZE = 10;
+let _priceAllRows    = [];   // all sorted price objects (after filter+sort)
+let _priceRows       = [];   // store data indexed by rowIdx for sheet access
+let _pricePage       = 0;    // how many pages already rendered
+let _currentWarnings = null; // warnings for current product view
+let _locationMode    = false;
+let _userLat         = null;
+let _userLng         = null;
+let _storeSheetData  = null; // currently open store sheet data
+
 // ── SOURCE BADGE HELPER ──
 
 // ── GET ALL PRICES FOR BARCODE (layered) ──
@@ -2227,12 +2381,28 @@ function buildCommunityWarnings(reports, official) {
   return warnings;
 }
 
-// ── RENDER PRICE ROW ──
+// ── RENDER PRICE ROW (v2 — clickable, store sheet enabled) ──
 function renderPriceRow(p, isFirst, total, warnings) {
-  const store = p.chainName||p.storeName||p.store||'';
+  const store    = p.chainName||p.storeName||p.store||'';
   const chainKey = `${p.chainId||store.replace(/\s/g,'_')}_${p.storeId||'0'}`;
-  const isBest = isFirst && total > 1;
-  const badge = sourceBadge(p.sourceDisplay||p.source, p.submittedByDisplayName);
+  const isBest   = isFirst && total > 1;
+  const badge    = sourceBadge(p.sourceDisplay||p.source, p.submittedByDisplayName);
+
+  // Register store data for sheet access
+  const rowIdx = _priceRows.length;
+  _priceRows.push({
+    chainName:    store,
+    chainId:      p.chainId    || '',
+    storeId:      p.storeId    || '',
+    address:      p.address    || '',
+    city:         p.city       || '',
+    latitude:     p.latitude   ?? null,
+    longitude:    p.longitude  ?? null,
+    phone:        p.phone      ?? null,
+    distanceKm:   p.distanceKm ?? null,
+    displayPrice: p.displayPrice,
+    source:       p.sourceDisplay || p.source,
+  });
 
   let submittedLine = '';
   if ((p.source==='manual'||p.sourceDisplay==='manual') && p.submittedByDisplayName) {
@@ -2245,12 +2415,11 @@ function renderPriceRow(p, isFirst, total, warnings) {
     overrideLine = `<div style="font-size:10px;color:var(--muted);margin-top:1px">
       <span class="spr-official-struck">₪${p.price.toFixed(2)}</span>
       <span style="color:var(--blue)"> → ₪${p.displayPrice.toFixed(2)} (תיקון אישי)</span>
-      <button onclick="removeOverride('${chainKey}','${esc(store)}')"
+      <button onclick="event.stopPropagation();removeOverride('${chainKey}','${esc(store)}')"
         style="background:transparent;border:none;color:var(--red);cursor:pointer;font-size:10px;margin-right:6px">✕ בטל</button>
     </div>`;
   }
 
-  // Community warning (reports signal)
   const warn = warnings?.find(w => w.chainKey===chainKey);
   let warnLine = '';
   if (warn) {
@@ -2259,29 +2428,35 @@ function renderPriceRow(p, isFirst, total, warnings) {
     </div>`;
   }
 
-  // Action buttons — only for official/override
   let actions = '';
   if (p.source==='official'||p.source==='user_override') {
     const pname = sanitize(_currentScanProduct?.name||selectedProduct?.name||'');
     actions = `<div class="override-actions">
-      <button class="override-btn primary" onclick="openOverrideModal('${chainKey}','${esc(store)}','${p.price}','${esc(pname)}')">✏️ תקן אישי</button>
-      <button class="override-btn" onclick="openReportModal('${chainKey}','${esc(store)}','${p.price}','${esc(pname)}')">🚨 דווח שגיאה</button>
+      <button class="override-btn primary" onclick="event.stopPropagation();openOverrideModal('${chainKey}','${esc(store)}','${p.price}','${esc(pname)}')">✏️ תקן אישי</button>
+      <button class="override-btn" onclick="event.stopPropagation();openReportModal('${chainKey}','${esc(store)}','${p.price}','${esc(pname)}')">🚨 דווח שגיאה</button>
     </div>`;
   }
 
-  return `<div class="spr${isBest?' best':''}">
+  const distLabel = (p.distanceKm !== null && p.distanceKm !== undefined)
+    ? `<span style="font-size:10px;color:var(--muted);margin-top:2px;display:block">📍 ${p.distanceKm} ק"מ · ${esc(p.city||'')}</span>` : '';
+
+  return `<div class="spr${isBest?' best':''}" onclick="openStoreSheet(${rowIdx})">
     <div style="flex:1;min-width:0">
       <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
         <span class="spr-name">${esc(store)}</span> ${badge}
         ${isBest&&total>1?'<span class="best-badge">הכי זול 🏆</span>':''}
       </div>
+      ${distLabel}
       ${submittedLine}${overrideLine}${warnLine}${actions}
     </div>
-    <span class="spr-price" style="flex-shrink:0;margin-right:8px">₪${p.displayPrice.toFixed(2)}</span>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;margin-right:8px;gap:3px">
+      <span class="spr-price">₪${p.displayPrice.toFixed(2)}</span>
+      <span style="font-size:9px;color:var(--muted)">לפרטים ›</span>
+    </div>
   </div>`;
 }
 
-// ── showProductPricesEnhanced ──
+// ── showProductPricesEnhanced (v2 — pagination + store sheet) ──
 window.showProductPricesEnhanced = async function(product) {
   if (!product) return;
   const wrap = document.getElementById('price-content');
@@ -2292,12 +2467,33 @@ window.showProductPricesEnhanced = async function(product) {
   if (isValidBarcode(barcode)) layers = await fetchAllPriceLayers(barcode);
 
   const { prices, warnings } = buildDisplayPrices(layers);
+
+  // Reset pagination state
+  _priceAllRows    = prices;
+  _priceRows       = [];
+  _pricePage       = 0;
+  _currentWarnings = warnings;
+
   const coveredChains = new Set(prices.map(p=>p.chainName||p.storeName||p.store||''));
   const missing = STORE_LIST_ALL.filter(s=>!coveredChains.has(s));
 
-  const pricesHTML = prices.length
-    ? prices.map((p,i)=>renderPriceRow(p,i===0,prices.length,warnings)).join('')
-    : `<div style="text-align:center;padding:16px;color:var(--muted);font-size:13px">אין מחירים עדיין</div>`;
+  // Savings hero
+  let savingsHero = '';
+  if (prices.length > 1) {
+    const cheapest   = prices[0].displayPrice;
+    const priciest   = prices[prices.length-1].displayPrice;
+    const savings    = priciest - cheapest;
+    const savingsPct = Math.round((savings / priciest) * 100);
+    if (savings >= 0.5) {
+      savingsHero = `<div class="savings-hero">
+        <div class="savings-hero-amount">₪${savings.toFixed(2)}</div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px">💰 חיסכון פוטנציאלי</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px">${savingsPct}% פחות ב<strong style="color:var(--text)">${esc(prices[0].chainName||prices[0].storeName||'')}</strong> לעומת היקרה</div>
+        </div>
+      </div>`;
+    }
+  }
 
   const missingHTML = missing.length ? `
     <div style="margin-top:10px">
@@ -2313,8 +2509,8 @@ window.showProductPricesEnhanced = async function(product) {
       </div>`).join('')}
     </div>` : '';
 
-  const savings = prices.length > 1
-    ? (prices[prices.length-1].displayPrice - prices[0].displayPrice).toFixed(2) : null;
+  const locBadge = _locationMode && _userLat !== null
+    ? `<span style="font-size:11px;color:var(--green);font-weight:700">📍 מסנן לפי מיקום</span>` : '';
 
   wrap.innerHTML = `
     <button onclick="backToResults()" style="background:transparent;border:none;color:var(--muted);font-family:'Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;padding:4px 0 10px;display:flex;align-items:center;gap:4px">← חזרה לתוצאות</button>
@@ -2329,20 +2525,147 @@ window.showProductPricesEnhanced = async function(product) {
           ${barcode?`<div style="font-size:10px;color:var(--muted)">🔖 ${esc(barcode)}</div>`:''}
         </div>
       </div>
+      ${locBadge ? `<div style="margin-bottom:8px">${locBadge}</div>` : ''}
       <div style="font-size:10px;color:var(--muted);margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">
         <span class="badge-official">✅ רשמי</span> XML ממשלתי &nbsp;
         <span class="badge-proxy">⚡ חי</span> Proxy &nbsp;
         <span class="badge-manual">📝</span> משפחה &nbsp;
         <span class="badge-override">✏️</span> תיקון אישי שלך
       </div>
-      <div class="store-prices">${pricesHTML}</div>
+      ${savingsHero}
+      <div id="prc-rows" class="store-prices"></div>
+      <button id="prc-load-more" class="load-more-btn" onclick="loadMorePrices()" style="display:none">הצג עוד מחירים ▼</button>
       ${missingHTML}
-      ${savings&&parseFloat(savings)>0?`<div class="savings-bar">💰 חיסכון פוטנציאלי: ₪${savings}</div>`:''}
       ${barcode?`<button onclick="openScanner()" class="clear-btn" style="margin-top:10px">📷 סרוק בסופר ועדכן מחיר</button>`:''}
     </div>
     <div style="font-size:10px;color:var(--muted);text-align:center;padding:8px 0">
       ✏️ תיקון אישי גלוי רק לך · 🚨 דיווח מוצג לאחרי 2+ דיווחים · 📝 מחיר משפחה גלוי לקבוצה בלבד
     </div>`;
+
+  // Render first page
+  const rowsEl   = document.getElementById('prc-rows');
+  const moreBtn  = document.getElementById('prc-load-more');
+  renderPricePage(rowsEl, moreBtn, product);
+};
+
+// ── RENDER ONE PAGE OF PRICE ROWS ──
+function renderPricePage(rowsEl, moreBtn, product) {
+  const start = _pricePage * PRICE_PAGE_SIZE;
+  const slice = _priceAllRows.slice(start, start + PRICE_PAGE_SIZE);
+  if (!slice.length) {
+    if (!_pricePage) rowsEl.innerHTML = `<div style="text-align:center;padding:16px;color:var(--muted);font-size:13px">אין מחירים עדיין</div>`;
+    if (moreBtn) moreBtn.style.display = 'none';
+    return;
+  }
+  const isFirst = _pricePage === 0;
+  const total   = _priceAllRows.length;
+  const frag = slice.map((p, i) => renderPriceRow(p, isFirst && i === 0, total, _currentWarnings)).join('');
+  rowsEl.insertAdjacentHTML('beforeend', frag);
+  _pricePage++;
+  const loaded = _pricePage * PRICE_PAGE_SIZE;
+  if (moreBtn) {
+    if (loaded < total) {
+      moreBtn.style.display = 'block';
+      const remaining = total - loaded;
+      moreBtn.textContent = `הצג עוד (${remaining} נוספים) ▼`;
+    } else {
+      moreBtn.style.display = 'none';
+    }
+  }
+}
+
+window.loadMorePrices = function() {
+  const rowsEl  = document.getElementById('prc-rows');
+  const moreBtn = document.getElementById('prc-load-more');
+  if (!rowsEl) return;
+  renderPricePage(rowsEl, moreBtn, selectedProduct);
+};
+
+// ── LOCATION TOGGLE ──
+window.toggleLocationMode = async function() {
+  const btn = document.getElementById('loc-toggle-btn');
+  if (_locationMode) {
+    _locationMode = false;
+    _userLat = null; _userLng = null;
+    if (btn) { btn.classList.remove('on'); btn.title = 'סינון לפי מיקום'; }
+    toast('📍 סינון מיקום כובה');
+    return;
+  }
+  if (!navigator.geolocation) { toast('⚠️ גישה למיקום לא נתמכת'); return; }
+  toast('📍 מאתר מיקום...');
+  try {
+    const pos = await new Promise((res,rej) => navigator.geolocation.getCurrentPosition(res,rej,{timeout:8000,maximumAge:60000}));
+    _userLat = pos.coords.latitude;
+    _userLng = pos.coords.longitude;
+    _locationMode = true;
+    if (btn) { btn.classList.add('on'); btn.title = 'סינון מיקום פעיל'; }
+    toast('📍 מיקום נמצא — מחירים יסוננו לפי מרחק');
+  } catch (e) {
+    toast('⚠️ לא ניתן לקבל מיקום: ' + (e.code === 1 ? 'נדחה על ידי המשתמש' : 'שגיאת GPS'));
+  }
+};
+
+// ── STORE DETAILS SHEET ──
+window.openStoreSheet = function(idx) {
+  const d = _priceRows[idx];
+  if (!d) return;
+  _storeSheetData = d;
+  const el = document.getElementById('store-sheet-overlay');
+  if (!el) return;
+
+  const chainDisplay = d.chainName || '—';
+  const cityDisplay  = d.city      || '';
+  const addrDisplay  = d.address   || '';
+  const distDisplay  = d.distanceKm !== null ? `${d.distanceKm} ק"מ` : null;
+
+  // Map links
+  const query = encodeURIComponent([chainDisplay, addrDisplay, cityDisplay].filter(Boolean).join(' '));
+  const lat = d.latitude, lng = d.longitude;
+  const mapsUrl  = lat ? `https://maps.google.com/?q=${lat},${lng}` : `https://maps.google.com/?q=${query}`;
+  const wazeUrl  = lat ? `https://waze.com/ul?ll=${lat},${lng}&navigate=yes` : `https://waze.com/ul?q=${query}`;
+  const gpsConf  = lat ? `<span style="font-size:10px;color:var(--green)">✅ GPS מדויק</span>` : `<span style="font-size:10px;color:var(--muted)">📍 ניחוש לפי כתובת</span>`;
+
+  el.querySelector('.store-sheet-chain').textContent = chainDisplay;
+  el.querySelector('.store-sheet-name').textContent  = cityDisplay ? `${cityDisplay}${addrDisplay ? ' — ' + addrDisplay : ''}` : addrDisplay || '—';
+  el.querySelector('.store-sheet-city').innerHTML    = distDisplay
+    ? `<span class="store-sheet-icon">📍</span><span>${distDisplay} ממך</span>${gpsConf}` : gpsConf;
+
+  // Price row
+  el.querySelector('.store-sheet-price').textContent = `₪${d.displayPrice.toFixed(2)}`;
+
+  // Detail rows
+  const rows = el.querySelector('.store-sheet-rows');
+  const row = (icon, label, val) => `<div class="store-sheet-row">
+    <span class="store-sheet-icon">${icon}</span>
+    <div style="flex:1;min-width:0">
+      <div class="store-sheet-label">${label}</div>
+      ${val ? `<div class="store-sheet-val">${esc(String(val))}</div>` : `<div class="store-sheet-na">לא ידוע</div>`}
+    </div>
+  </div>`;
+
+  rows.innerHTML = [
+    row('🏪','רשת',chainDisplay),
+    row('🏙','עיר',cityDisplay||null),
+    row('🗺','כתובת',addrDisplay||null),
+    row('📞','טלפון',d.phone||null),
+    distDisplay ? row('📏','מרחק',distDisplay) : row('📏','מרחק',null),
+    row('🏷','מקור',d.source||null),
+  ].join('');
+
+  // Action buttons
+  el.querySelector('.store-sheet-btn.call').style.display  = d.phone ? 'flex' : 'none';
+  el.querySelector('.store-sheet-btn.call').onclick = () => { window.open(`tel:${d.phone}`); };
+  el.querySelector('.store-sheet-btn.maps').onclick = () => { window.open(mapsUrl,'_blank'); };
+  el.querySelector('.store-sheet-btn.waze').onclick = () => { window.open(wazeUrl,'_blank'); };
+  el.querySelector('.store-sheet-btn.basket').onclick = () => { closeStoreSheet(); openBasketCompare(); };
+
+  el.classList.add('show');
+};
+
+window.closeStoreSheet = function() {
+  const el = document.getElementById('store-sheet-overlay');
+  if (el) el.classList.remove('show');
+  _storeSheetData = null;
 };
 
 window.selectProduct = function(idx) {
@@ -4123,6 +4446,54 @@ onAuthStateChanged(auth, async (user) => {
       <button class="confirm-btn-delete" id="confirm-delete-btn" onclick="confirmDeleteItem()">
         🗑 מחק
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ STORE DETAILS SHEET ═══ -->
+<div class="store-sheet-overlay" id="store-sheet-overlay" onclick="if(event.target===this)closeStoreSheet()">
+  <div class="store-sheet">
+    <div class="store-sheet-inner">
+      <div class="store-sheet-handle"></div>
+      <div class="store-sheet-chain"></div>
+      <div class="store-sheet-name"></div>
+      <div class="store-sheet-city" style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);margin-top:4px"></div>
+      <div class="store-sheet-price-row">
+        <span style="font-size:13px;color:var(--muted)">מחיר:</span>
+        <span class="store-sheet-price"></span>
+      </div>
+      <div class="store-sheet-rows"></div>
+      <div class="store-sheet-actions">
+        <button class="store-sheet-btn call">
+          <span>📞</span><span>התקשר</span>
+        </button>
+        <button class="store-sheet-btn maps">
+          <span>🗺</span><span>מפות</span>
+        </button>
+        <button class="store-sheet-btn waze">
+          <span>🚗</span><span>Waze</span>
+        </button>
+        <button class="store-sheet-btn basket">
+          <span>🛒</span><span>השווה סל</span>
+        </button>
+      </div>
+      <button onclick="closeStoreSheet()" style="width:100%;background:var(--card);border:none;border-radius:12px;padding:13px;font-family:'Heebo',sans-serif;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer;margin-top:8px">סגור</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TRANSLATION RESOLVER OVERLAY ═══ -->
+<div class="resolver-overlay" id="resolver-overlay" onclick="if(event.target===this)document.getElementById('resolver-overlay').classList.remove('show')">
+  <div class="resolver-modal">
+    <div class="resolver-handle"></div>
+    <div id="resolver-title" class="resolver-title">בחר שם אנגלי לחיפוש</div>
+    <div id="resolver-subtitle" class="resolver-subtitle">תרגום עברית → אנגלית</div>
+    <div id="resolver-suggestions"></div>
+    <button id="resolver-none-btn" class="resolver-none" onclick="showManualEntry()">✍️ הכנס ידנית</button>
+    <div class="resolver-manual" id="resolver-manual">
+      <input id="resolver-manual-input" class="resolver-manual-input" placeholder="e.g. cornflakes" type="text"
+        onkeydown="if(event.key==='Enter')confirmManualEntry()">
+      <button onclick="confirmManualEntry()" class="resolver-manual-btn">חפש</button>
     </div>
   </div>
 </div>

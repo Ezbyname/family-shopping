@@ -120,6 +120,21 @@ cd workers/prices
 npm test                   # Run test suite (smoke tests)
 npm run test:curl          # Verify Shufersal and Rami Levy are reachable (HTTP 200)
 
+# Sanity checks — split into parser + live verification
+cd scripts
+
+# A. Parser fixture test (GitHub Actions, no Israeli IP needed)
+npm run sanity:prices:fixture    # Test parser correctness with local XML fixtures
+                                 # Runs on every PR + push to main
+                                 # Tests: XML parsing, gzip, entity decoding, validation
+
+# B. Live chain test (Israeli VM, requires Israeli IP + Firebase creds)
+npm run sanity:prices:live       # Test real supermarket sources
+                                 # Requires: Israeli IP + Firebase credentials
+                                 # Writes status to Firebase latestPriceSanityStatus
+                                 # Requirement: ALL enabled chains must pass
+                                 # Run via cron on price-worker VM
+
 # Frontend: no automated tests; manual QA via browser
 # Test offline mode: DevTools → Network → Offline, reload, app should still load
 ```
