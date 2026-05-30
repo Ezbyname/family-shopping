@@ -1227,6 +1227,11 @@ window.searchPrices = async function(){
     }
 
     searchResults = data.results;
+    trackEvent('price_search', {
+      mode: 'name',
+      hasLocation: _locationMode,
+      resultCount: data.results.length,
+    });
     // Auto-select if only one result with no prices → show manual fallback with image
     if (data.results.length === 1 && !data.results[0].storePrices?.length) {
       wrap.innerHTML = renderManualFallback(q, data.results[0]);
@@ -1873,6 +1878,15 @@ window.runBasketCompare = async function() {
       body: JSON.stringify(body),
     });
     const data = await res.json();
+    if (data.summary) {
+      trackEvent('basket_compare', {
+        itemCount:           basketItems.length,
+        storeCount:          data.results?.length ?? 0,
+        hasLocation:         !!lat,
+        maxSavingsPct:       data.summary.maxSavingsPct ?? 0,
+        cheapestHasFullBasket: data.summary.bestFullChain === data.summary.cheapestChain,
+      });
+    }
     renderBasketResults(data, basketItems.length, barcodeToName);
   } catch (e) {
     wrap.innerHTML = `<div style="text-align:center;padding:20px;color:var(--red)">${esc(e.message)}</div>`;
@@ -2024,6 +2038,57 @@ function renderBasketResults(data, totalItems, barcodeToName) {
   });
 
   wrap.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════
+// ANALYTICS — privacy-safe event tracking (Phase D)
+// ══════════════════════════════════════════════════
+//
+// Events write to: analytics/events/{YYYY-MM-DD}/{pushKey}
+// Rules: no PII, no barcodes, no lat/lng, group anonymized to prefix
+//
+// Schema per event:
+//   event   : string (event name)
+//   ts      : number (unix ms)
+//   group   : string (first 6 chars of groupId — de-duplication, not identity)
+//   platform: 'pwa'
+//   props   : object (event-specific, see below)
+//
+// Events:
+//   price_search   { mode:'barcode'|'name', hasLocation:bool, resultCount:int }
+//   store_sheet_open { source:'official'|'proxy'|'manual', hasCoords:bool }
+//   basket_compare { itemCount:int, storeCount:int, hasLocation:bool,
+//                    maxSavingsPct:int, cheapestHasFullBasket:bool }
+//   location_toggle { action:'on'|'off' }
+//   load_more      { page:int }
+//   manual_price   { source:'manual' }
+
+const _analyticsQueue = [];
+let _analyticsFlushPending = false;
+
+function trackEvent(eventName, props = {}) {
+  if (!db || !groupId) return; // only track when connected to a group
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const entry = {
+    event:    eventName,
+    ts:       Date.now(),
+    group:    groupId.slice(0, 6),  // anonymized group prefix
+    platform: 'pwa',
+    props,
+  };
+  _analyticsQueue.push({ today, entry });
+  if (_analyticsFlushPending) return;
+  _analyticsFlushPending = true;
+  // Batch flush after 2s to avoid spamming writes on rapid interactions
+  setTimeout(() => {
+    _analyticsFlushPending = false;
+    const batch = _analyticsQueue.splice(0);
+    batch.forEach(({ today, entry }) => {
+      try {
+        push(ref(db, `analytics/events/${today}`), entry).catch(() => {});
+      } catch (_) {}
+    });
+  }, 2000);
 }
 
 // ══════════════════════════════════════════════════
@@ -2546,6 +2611,12 @@ window.showProductPricesEnhanced = async function(product) {
   _pricePage       = 0;
   _currentWarnings = warnings;
 
+  trackEvent('price_search', {
+    mode: 'barcode',
+    hasLocation: _locationMode,
+    resultCount: prices.length,
+  });
+
   const coveredChains = new Set(prices.map(p=>p.chainName||p.storeName||p.store||''));
   const missing = STORE_LIST_ALL.filter(s=>!coveredChains.has(s));
 
@@ -2650,6 +2721,7 @@ window.loadMorePrices = function() {
   const rowsEl  = document.getElementById('prc-rows');
   const moreBtn = document.getElementById('prc-load-more');
   if (!rowsEl) return;
+  trackEvent('load_more', { page: _pricePage + 1 });
   renderPricePage(rowsEl, moreBtn, selectedProduct);
 };
 
@@ -2671,6 +2743,7 @@ window.toggleLocationMode = async function() {
     _userLat = null; _userLng = null;
     if (btn) { btn.classList.remove('on'); btn.title = 'סינון לפי מיקום'; }
     toast('📍 סינון מיקום כובה');
+    trackEvent('location_toggle', { action: 'off' });
     await _refreshPricesAfterLocationChange();
     return;
   }
@@ -2683,6 +2756,7 @@ window.toggleLocationMode = async function() {
     _locationMode = true;
     if (btn) { btn.classList.add('on'); btn.title = 'סינון מיקום פעיל'; }
     toast('📍 מיקום נמצא — מסנן תוצאות לפי מרחק...');
+    trackEvent('location_toggle', { action: 'on' });
     await _refreshPricesAfterLocationChange();
   } catch (e) {
     toast('⚠️ לא ניתן לקבל מיקום: ' + (e.code === 1 ? 'נדחה על ידי המשתמש' : 'שגיאת GPS'));
@@ -2855,6 +2929,10 @@ window.openStoreSheet = function(idx) {
 
   // ── Open sheet immediately ──
   el.classList.add('show');
+  trackEvent('store_sheet_open', {
+    source:   d.source || 'unknown',
+    hasCoords: !!(d.latitude && d.longitude),
+  });
 
   // ── Lazy-load enrichment (non-blocking) ──
   const storeKey = d.storeKey || `${d.chainId || ''}_${d.storeId || ''}`;
@@ -2914,6 +2992,7 @@ window.saveSingleManualPrice = async function(storeName, inputId, barcode, produ
       submittedAt: new Date().toISOString(),
       source: 'manual',
     });
+    trackEvent('manual_price', { source: 'manual' });
     toast(`💰 ₪${val.toFixed(2)} ב${storeName} נשמר`);
     if (selectedProduct) window.showProductPricesEnhanced(selectedProduct);
   } catch(e) { console.error('[manual] error:', e.message); toast('❌ ' + e.message); }
