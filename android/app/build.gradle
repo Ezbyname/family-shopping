@@ -1,0 +1,60 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.familyshopping.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.familyshopping.app"
+        minSdk 24              // Android 7.0+ — covers 99%+ of active devices
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+
+        // Ensures Hebrew RTL is handled correctly
+        resourceConfigurations += ["he", "iw", "en"]
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+        }
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
+    }
+
+    // Signing config — fill in before first release build
+    // signingConfigs {
+    //     release {
+    //         storeFile file(KEYSTORE_PATH)
+    //         storePassword KEYSTORE_PASSWORD
+    //         keyAlias KEY_ALIAS
+    //         keyPassword KEY_PASSWORD
+    //     }
+    // }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    // Android Browser Helper — the official TWA library from Google Chrome team
+    // https://github.com/GoogleChrome/android-browser-helper
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+
+    // Core AndroidX (for access to activity and lifecycle)
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+}

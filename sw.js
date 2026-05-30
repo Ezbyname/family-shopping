@@ -1,21 +1,83 @@
-const CACHE = 'fsl-v1';
-const ASSETS = ['/', '/index.html', '/manifest.json'];
+// sw.js — Family Shopping PWA Service Worker v2
+// Strategy: Network-first for API/Firebase, Cache-first for app shell
 
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
-  self.skipWaiting();
+const CACHE_VERSION = 'fsl-v2';
+const APP_SHELL = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
+];
+
+// Patterns that should NEVER be served from cache
+const NETWORK_ONLY_PATTERNS = [
+  /firebase\.googleapis\.com/,
+  /firebaseio\.com/,
+  /googleapis\.com/,
+  /\/api\//,
+  /openfoodfacts\.org/,
+];
+
+// ── Install: pre-cache app shell ──────────────────────────────────────────────
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_VERSION)
+      .then(cache => cache.addAll(APP_SHELL))
+      .then(() => self.skipWaiting())
+  );
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-  ));
-  self.clients.claim();
+// ── Activate: clean up old caches ─────────────────────────────────────────────
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(
+        keys
+          .filter(key => key !== CACHE_VERSION)
+          .map(key => caches.delete(key))
+      ))
+      .then(() => self.clients.claim())
+  );
 });
 
-self.addEventListener('fetch', e => {
-  if (e.request.url.includes('firebase') || e.request.url.includes('googleapis')) return;
-  e.respondWith(
-    fetch(e.request).catch(() => caches.match(e.request))
+// ── Fetch: tiered strategy ────────────────────────────────────────────────────
+self.addEventListener('fetch', event => {
+  const { request } = event;
+  const url = request.url;
+
+  // Skip non-GET and network-only patterns
+  if (request.method !== 'GET') return;
+  if (NETWORK_ONLY_PATTERNS.some(p => p.test(url))) return;
+
+  // Navigation requests (HTML): network-first, fall back to cached /index.html
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then(res => {
+          // Cache a fresh copy of the app shell on successful navigation
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE_VERSION).then(c => c.put(request, clone));
+          }
+          return res;
+        })
+        .catch(() => caches.match('/index.html'))
+    );
+    return;
+  }
+
+  // Static assets: cache-first
+  event.respondWith(
+    caches.match(request).then(cached => {
+      if (cached) return cached;
+      return fetch(request).then(res => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE_VERSION).then(c => c.put(request, clone));
+        }
+        return res;
+      }).catch(() => cached); // if fetch fails and not cached, let it fail naturally
+    })
   );
 });

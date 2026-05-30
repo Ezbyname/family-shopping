@@ -4294,6 +4294,16 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 
+// ── TWA / LAUNCH SOURCE DETECTION ──
+const _launchSource = new URLSearchParams(location.search).get('source') || 'web';
+const _isTWA = _launchSource === 'twa';
+// When launched from TWA, tag analytics and suppress any browser-specific prompts
+if (_isTWA) {
+  document.body.dataset.platform = 'twa';
+  // Track TWA launch (fires once per session)
+  setTimeout(() => trackEvent('app_launch', { source: 'twa' }), 3000);
+}
+
 // ── TRANSLATION RESOLVER INTEGRATION ──
 // Dynamically import resolver modules
 let resolverReady = false;

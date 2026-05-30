@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Internet access for the web app -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Location — requested by JavaScript Geolocation API at runtime -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.FamilyShopping">
+
+        <!--
+            TWA Activity — launches the web app in a full-screen Chrome Custom Tab.
+            No browser UI visible to the user.
+        -->
+        <activity
+            android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:exported="true">
+
+            <!-- Main launcher intent -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+                Deep-link intent filter — handles all URLs on your domain.
+                Domain verification via /.well-known/assetlinks.json.
+                Replace YOUR_DOMAIN with the actual Vercel/custom domain.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="family-shopping.vercel.app" />
+            </intent-filter>
+
+            <!-- TWA configuration — points to your PWA -->
+            <meta-data
+                android:name="android.support.customtabs.trusted.DEFAULT_URL"
+                android:value="https://family-shopping.vercel.app/?source=twa" />
+
+            <!-- Status bar color — matches PWA theme_color -->
+            <meta-data
+                android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
+                android:value="#ff0d1117" />
+            <meta-data
+                android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR_DARK"
+                android:value="#ff0d1117" />
+
+            <!-- Navigation bar color -->
+            <meta-data
+                android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR"
+                android:value="#ff0d1117" />
+
+            <!-- Splash screen — matches background_color until web app loads -->
+            <meta-data
+                android:name="android.support.customtabs.trusted.SPLASH_IMAGE_DRAWABLE"
+                android:resource="@drawable/splash" />
+            <meta-data
+                android:name="android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR"
+                android:value="#ff0d1117" />
+            <meta-data
+                android:name="android.support.customtabs.trusted.SPLASH_SCREEN_FADE_OUT_DURATION"
+                android:value="300" />
+
+            <!-- File picker (for future camera/upload features) -->
+            <meta-data
+                android:name="android.support.customtabs.trusted.FILE_PROVIDER_AUTHORITY"
+                android:value="com.familyshopping.app.fileprovider" />
+        </activity>
+
+        <!-- Required for Custom Tabs communication -->
+        <service
+            android:name="com.google.androidbrowserhelper.trusted.DelegationService"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
+        </service>
+
+    </application>
+</manifest>
