@@ -4464,46 +4464,138 @@ function _bpTranslate(q) {
   return null;
 }
 
+// ── Language detection & relevance scoring ──────────────────────────────────
+const _RE_HEB  = /[א-ת]/;   // Hebrew alphabet
+const _RE_ARAB = /[؀-ۿ]/;   // Arabic alphabet
+
+function _bpDetectLang(t) {
+  return _RE_HEB.test(t) ? 'he' : _RE_ARAB.test(t) ? 'ar' : 'latin';
+}
+
+// Known Israeli/Israel-common brand tokens (lowercase) — scoring bonus
+const _IL_BRANDS_SET = new Set([
+  'תנובה','שטראוס','עלית','אסם','אוסם','טרה','ויסוצקי','תלמה','אנג\'לה',
+  'tnuva','strauss','elite','osem','tara','wissotzky','telma','angel','yotvata',
+]);
+
+// Pick the most appropriate name field based on the query's language
+function _bpSelectName(p, queryLang) {
+  const he = (p.product_name_he || '').trim();
+  const ar = (p.product_name_ar || '').trim();
+  const en = (p.product_name    || '').trim();
+  if (queryLang === 'he') return he || en || ar;
+  if (queryLang === 'ar') return ar || he || en;
+  return en || he || ar;
+}
+
+// Score a candidate product for a given query.
+// Higher = more relevant. Negative = should be filtered out.
+function _bpScore(p, query, queryLang, enQuery) {
+  let score = 0;
+  const nameLang = _bpDetectLang(p.name);
+  const nLow     = p.name.toLowerCase();
+  const qLow     = query.toLowerCase();
+  const eLow     = (enQuery || '').toLowerCase();
+  const bLow     = (p.brand || '').toLowerCase();
+
+  // ── 1. Language alignment (most important) ──────────────────────────────
+  // Big bonus when the product name is in the same language as the query
+  if (queryLang === 'he' && nameLang === 'he') score += 50;
+  if (queryLang === 'ar' && nameLang === 'ar') score += 50;
+  // Heavily penalise non-Israeli Latin results when query is Hebrew/Arabic —
+  // this is what filters out Kinder/Jaouda/Carrefour junk
+  if (queryLang !== 'latin' && nameLang === 'latin' && !p.isIsraeli) score -= 25;
+
+  // ── 2. Israeli origin ───────────────────────────────────────────────────
+  if (p.isIsraeli) score += 25;
+  if (bLow.split(/[\s,/]+/).some(w => w && _IL_BRANDS_SET.has(w))) score += 15;
+
+  // ── 3. Name contains the query words ────────────────────────────────────
+  const qWords = qLow.split(/\s+/).filter(w => w.length > 1);
+  if (qWords.length) {
+    score += (qWords.filter(w => nLow.includes(w)).length / qWords.length) * 25;
+  }
+  if (nLow.includes(qLow))   score += 20; // exact phrase in name
+  if (nLow.startsWith(qLow)) score += 10; // name starts with query
+
+  // ── 4. English translation match ─────────────────────────────────────────
+  if (eLow && eLow !== qLow) {
+    const eWords = eLow.split(/\s+/).filter(w => w.length > 2);
+    if (eWords.length) {
+      score += (eWords.filter(w => nLow.includes(w)).length / eWords.length) * 15;
+    }
+    if (nLow.includes(eLow)) score += 10;
+  }
+
+  return score;
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 async function _bpRunSearch(query, signal) {
   const resultsEl = document.getElementById('bp-results');
   const queryEl   = document.getElementById('bp-query-text');
   if (queryEl)   queryEl.textContent = `מחפש "${query}"...`;
   if (resultsEl) resultsEl.innerHTML = '<div class="bp-loading">🔍 מחפש מוצרים...</div>';
   try {
-    const isHeb = /[֐-׿]/.test(query);
-    const enQuery = isHeb ? (_bpTranslate(query) || query) : query;
-    const enc    = encodeURIComponent(enQuery);
-    const encHe  = encodeURIComponent(query);
+    const queryLang = _bpDetectLang(query);
+    const enQuery   = queryLang === 'he' ? (_bpTranslate(query) || query) : query;
+    const enc       = encodeURIComponent(enQuery);
+    const encOrig   = encodeURIComponent(query);
+
     const BASE   = 'https://world.openfoodfacts.org/cgi/search.pl';
-    const FIELDS = 'product_name,product_name_he,brands,quantity,image_small_url,code,countries_tags';
-    const urls   = [
-      `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=15&fields=${FIELDS}&tagtype_0=countries&tag_contains_0=contains&tag_0=israel`,
-      isHeb && enQuery !== query ? `${BASE}?search_terms=${encHe}&search_simple=1&action=process&json=1&page_size=8&fields=${FIELDS}` : null,
+    // Added product_name_ar so Arabic product names are available for ranking
+    const FIELDS = 'product_name,product_name_he,product_name_ar,brands,quantity,image_small_url,code,countries_tags';
+    const IL     = '&tagtype_0=countries&tag_contains_0=contains&tag_0=israel';
+
+    const urls = [
+      // 1. Israel-filtered + original query (finds Hebrew/Arabic named products in Israel)
+      `${BASE}?search_terms=${encOrig}&search_simple=1&action=process&json=1&page_size=20&fields=${FIELDS}${IL}`,
+      // 2. Israel-filtered + translated query (finds Latin-named products sold in Israel)
+      enQuery !== query
+        ? `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=15&fields=${FIELDS}${IL}`
+        : null,
+      // 3. Broad fallback — no country filter; low-scored items get filtered by _bpScore
       `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=20&fields=${FIELDS}`,
     ].filter(Boolean);
+
     const seen = new Set();
-    _bpProducts = [];
+    const raw  = [];
+
     for (const url of urls) {
-      if (_bpProducts.length >= 15) break;
+      if (raw.length >= 35) break;
       if (signal.aborted) return;
       try {
-        const r = await fetch(url, { headers:{'User-Agent':'FamilyShoppingIL/6.0'}, signal });
+        const r = await fetch(url, { headers: { 'User-Agent': 'FamilyShoppingIL/6.3' }, signal });
         if (!r.ok) continue;
         const data = await r.json();
         for (const p of data?.products || []) {
           const code = p.code || '';
           if (code && seen.has(code)) continue;
           if (code) seen.add(code);
-          const name = p.product_name_he || p.product_name || '';
-          if (!name) continue;
           const isIsraeli = (p.countries_tags || []).some(c => c.includes('israel'));
-          _bpProducts.push({ name, brand: p.brands || '', size: p.quantity || '',
-            image: p.image_small_url || '', barcode: code, isIsraeli });
+          // Use language-aware name selection
+          const name = _bpSelectName(
+            { product_name_he: p.product_name_he, product_name_ar: p.product_name_ar, product_name: p.product_name },
+            queryLang
+          ) || '';
+          if (!name) continue;
+          raw.push({ name, brand: p.brands || '', size: p.quantity || '',
+                     image: p.image_small_url || '', barcode: code, isIsraeli });
         }
       } catch(e) { if (e.name === 'AbortError') return; }
     }
+
     if (signal.aborted) return;
-    _bpProducts.sort((a,b) => (b.isIsraeli?1:0)-(a.isIsraeli?1:0));
+
+    // Score every candidate, filter irrelevant ones, sort by relevance
+    const MIN_SCORE = queryLang !== 'latin' ? -10 : -20;
+    _bpProducts = raw
+      .map(p => ({ ...p, _s: _bpScore(p, query, queryLang, enQuery) }))
+      .filter(p => p._s > MIN_SCORE)
+      .sort((a, b) => b._s - a._s)
+      .map(({ _s, ...p }) => p)
+      .slice(0, 20);
+
     if (queryEl) queryEl.textContent = _bpProducts.length
       ? `${_bpProducts.length} תוצאות עבור "${query}"`
       : `לא נמצאו תוצאות עבור "${query}"`;
