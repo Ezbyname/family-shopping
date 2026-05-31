@@ -2018,15 +2018,15 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
   <div class="gs-sep"></div>
   <!-- Actions -->
   <div class="gs-actions-wrap">
-    <button class="gs-action" onclick="copyCode(); toast('📋 קוד הוזמנה הועתק!')">
+    <button class="gs-action" onclick="copyCode()">
       <span class="gs-action-ic">🔗</span>
       <span class="gs-action-lbl">הזמן חבר קבוצה</span>
     </button>
-    <button class="gs-action" onclick="openJoinGroupPanel(); closeGroupSheet()">
+    <button class="gs-action" onclick="openJoinGroupPanel()">
       <span class="gs-action-ic">➕</span>
       <span class="gs-action-lbl">הצטרף לקבוצה נוספת</span>
     </button>
-    <button class="gs-action" onclick="openCreateGroupPanel(); closeGroupSheet()">
+    <button class="gs-action" onclick="openCreateGroupPanel()">
       <span class="gs-action-ic">✨</span>
       <span class="gs-action-lbl">צור קבוצה חדשה</span>
     </button>
@@ -2111,13 +2111,16 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
       ✏️ ערוך את הפרופיל שלי
     </button>
     <div class="invite-box">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:5px">קוד הצטרפות</div>
-      <div class="invite-code" id="modal-code">------</div>
-      <div class="invite-hint">שתף קוד זה עם בני משפחה</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:6px">קישור הצטרפות לקבוצה</div>
+      <div class="invite-code" id="modal-code" style="font-size:22px;letter-spacing:4px">------</div>
+      <div class="invite-hint" style="margin-bottom:10px">שלח את הקישור לבני משפחה — הם יצטרפו בלחיצה אחת</div>
+      <button class="mbtn primary" style="width:100%;font-size:13px" onclick="copyCode()">
+        🔗 שתף קישור הצטרפות
+      </button>
     </div>
     <div class="members-list" id="members-list"></div>
     <div class="modal-row">
-      <button class="mbtn primary" onclick="copyCode()">📋 העתק קוד</button>
+      <button class="mbtn primary" onclick="copyCode()">🔗 שתף קישור הזמנה</button>
       <button class="mbtn ghost" onclick="closeOL2('members-overlay')">סגור</button>
     </div>
   </div>
@@ -2409,6 +2412,26 @@ function connectToGroup(){
   setTimeout(checkSyncHealth, 4000);
 
   toast('👋 שלום '+myName+'!');
+
+  // If the user arrived via an invite link — offer to join that group too
+  if (window._pendingInviteCode) {
+    const inviteCode = window._pendingInviteCode;
+    window._pendingInviteCode = null;
+
+    if (inviteCode === groupId) {
+      // Already a member of this group — nothing to do
+      setTimeout(() => toast('✅ כבר חבר בקבוצה זו'), 1200);
+    } else {
+      // Different group — open the join overlay pre-filled
+      setTimeout(() => {
+        const codeInput = document.getElementById('ag-join-code');
+        if (codeInput) codeInput.value = inviteCode;
+        if (typeof switchAddGroupTab === 'function') switchAddGroupTab('join');
+        document.getElementById('add-group-overlay')?.classList.add('show');
+        toast('🔗 הוזמנת להצטרף לקבוצה — הזן את שמך');
+      }, 1000);
+    }
+  }
 }
 
 
@@ -3881,11 +3904,50 @@ window.openMembers=function(){
   document.getElementById('members-overlay').classList.add('show');
 };
 
-window.copyCode=function(){
-  navigator.clipboard.writeText(
-    `הצטרף לרשימת הקניות שלנו 🛒\nקוד הצטרפות: ${groupId}`
-  ).then(()=>toast('📋 קוד הועתק!'));
+window.copyCode = function() {
+  const inviteUrl  = `${location.origin}/?join=${groupId}`;
+  const shareTitle = `הצטרף לקבוצה "${groupName}" 🛒`;
+  const shareText  = 'לחץ על הקישור כדי להצטרף לרשימת הקניות המשותפת';
+
+  if (navigator.share) {
+    navigator.share({ title: shareTitle, text: shareText, url: inviteUrl })
+      .catch(err => {
+        // AbortError = user dismissed the native share sheet — no action needed
+        if (err.name !== 'AbortError') {
+          navigator.clipboard.writeText(inviteUrl)
+            .then(() => toast('🔗 קישור הועתק!'))
+            .catch(() => _copyFallback(inviteUrl));
+        }
+      });
+  } else {
+    navigator.clipboard.writeText(inviteUrl)
+      .then(() => toast('🔗 קישור הוזמנה הועתק!'))
+      .catch(() => _copyFallback(inviteUrl));
+  }
 };
+
+function _copyFallback(text) {
+  const el = document.createElement('input');
+  el.value = text;
+  el.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+  document.body.appendChild(el);
+  el.select();
+  try { document.execCommand('copy'); toast('🔗 קישור הוזמנה הועתק!'); }
+  catch (_) { toast('העתק ידנית: ' + text); }
+  document.body.removeChild(el);
+}
+
+// Detect ?join=XXXXXX in the URL at page load and store for later use.
+// Must run before onAuthStateChanged so the code is ready when the app decides which screen to show.
+(function _handleInviteParam() {
+  try {
+    const code = new URLSearchParams(location.search).get('join');
+    if (code && /^\d{6}$/.test(code)) {
+      window._pendingInviteCode = code;
+      history.replaceState({}, '', location.pathname); // clean URL, no page reload
+    }
+  } catch (_) {}
+})();
 
 window.openShare=function(){
   const pending=Object.values(items).filter(i=>!i.bought);
@@ -4457,9 +4519,7 @@ async function _bpRunSearch(query, signal) {
         ? `<img class="bp-item-img" src="${esc(p.image)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
         : '';
       const phStyle = p.image ? 'style="display:none"' : '';
-      const btnClick = isAttach
-        ? `selectBrandProduct(${i})`
-        : `selectBrandProduct(${JSON.stringify(p.name)},${JSON.stringify(p.barcode||'')})`;
+      const btnClick = `selectBrandProduct(${i})`;
       const btnLabel = isAttach ? 'בחר' : 'הוסף';
       return `<div class="bp-item">
         ${imgTag}<div class="bp-img-ph" ${phStyle}>🛒</div>
@@ -4539,10 +4599,12 @@ window.selectBrandProduct = function(nameOrIdx, barcode) {
     closeBrandPicker();
     return;
   }
-  // 'new' mode — nameOrIdx is the product name string
-  window._pendingBarcode = barcode || null;
+  // 'new' mode — nameOrIdx is the product index into _bpProducts
+  const p = _bpProducts[nameOrIdx];
+  if (!p) return;
+  window._pendingBarcode = p.barcode || null;
   const input = document.getElementById('new-item-input');
-  if (input) input.value = nameOrIdx;
+  if (input) input.value = p.name;
   closeBrandPicker();
   window.addItem();
 };
@@ -6962,6 +7024,19 @@ onAuthStateChanged(auth, async (user) => {
     } else {
       console.log('[auth] ✓ signed in | uid:', firebaseUid, '| no saved session → setup screen');
       showScreen('setup-screen');
+
+      // Pre-fill join form if user arrived via an invite link
+      if (window._pendingInviteCode) {
+        const code = window._pendingInviteCode;
+        window._pendingInviteCode = null;
+        setTimeout(() => {
+          if (typeof switchSetupTab === 'function') switchSetupTab('join');
+          const codeInput = document.getElementById('jn-code');
+          if (codeInput) codeInput.value = code;
+          document.getElementById('jn-name')?.focus();
+          toast('🔗 הוזמנת להצטרף — הזן את שמך');
+        }, 400);
+      }
     }
   } else {
     // Not signed in — sign in anonymously (onAuthStateChanged fires again with user)
