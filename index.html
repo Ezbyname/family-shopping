@@ -241,19 +241,29 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);
   justify-content:center;font-weight:700;transition:background .1s,transform .1s;line-height:1;}
 .qty-btn:active{transform:scale(.78);background:var(--accent);color:#111}
 .qty-num{font-size:13px;font-weight:800;min-width:18px;text-align:center;color:var(--accent)}
-.bought-tag{background:var(--green);color:#0a1f15;
-  border:1.5px solid var(--green);border-radius:8px;padding:4px 11px;
-  font-size:12px;font-weight:800;cursor:pointer;
-  box-shadow:0 2px 6px rgba(52,211,153,.25);
-  transition:transform .1s,box-shadow .15s;}
-.bought-tag:active{transform:scale(.95);box-shadow:0 1px 3px rgba(52,211,153,.2)}
-.pending-tag{background:var(--green-dim);color:var(--green);
-  border:1.5px solid rgba(52,211,153,.55);border-radius:8px;padding:4px 11px;
-  font-size:12px;font-weight:800;cursor:pointer;
-  box-shadow:0 1px 4px rgba(52,211,153,.15);
-  transition:transform .1s,background .15s,color .15s;}
-.pending-tag::before{content:'🛒 ';font-size:11px}
-.pending-tag:active{transform:scale(.95);background:var(--green);color:#0a1f15}
+/* ── "קניתי" PRIMARY CTA (tap to mark purchased) ── */
+.pending-tag{display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  min-height:40px;min-width:104px;padding:9px 18px;
+  background:var(--accent);color:#000;
+  border:none;border-radius:14px;font-family:'Heebo',sans-serif;
+  font-size:14px;font-weight:900;cursor:pointer;
+  box-shadow:0 3px 12px rgba(240,180,41,.4);
+  transition:transform .12s,box-shadow .15s,filter .15s;}
+.pending-tag::before{content:'🛒';font-size:15px;line-height:1}
+.pending-tag:hover{filter:brightness(1.06);transform:translateY(-1px);
+  box-shadow:0 5px 16px rgba(240,180,41,.5)}
+.pending-tag:active{transform:scale(.93);box-shadow:0 2px 6px rgba(240,180,41,.35)}
+.pending-tag:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+
+/* ── "✅ קניתי" DONE STATE (already purchased) ── */
+.bought-tag{display:inline-flex;align-items:center;justify-content:center;gap:4px;
+  min-height:40px;min-width:104px;padding:9px 16px;
+  background:var(--green-dim);color:var(--green);
+  border:1.5px solid rgba(52,211,153,.5);border-radius:14px;
+  font-family:'Heebo',sans-serif;font-size:13px;font-weight:800;cursor:pointer;
+  transition:transform .12s,background .15s;}
+.bought-tag:active{transform:scale(.93)}
+.bought-tag:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 .item-acts{display:flex;flex-direction:column;gap:4px;flex-shrink:0}
 .act-btn{width:27px;height:27px;border-radius:50%;border:none;cursor:pointer;
   display:flex;align-items:center;justify-content:center;font-size:13px;
@@ -986,18 +996,16 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   color:var(--muted);transition:all .15s}
 .fav-remove-btn:active{background:rgba(248,113,113,.1);border-color:var(--red);color:var(--red)}
 
-.fav-star-btn{background:var(--card2);border:1.5px solid var(--border);
-  border-radius:50%;width:30px;height:30px;font-size:16px;color:var(--muted);
-  cursor:pointer;display:flex;align-items:center;justify-content:center;
-  transition:transform .15s,background .15s,border-color .15s,color .15s;line-height:1}
-.fav-star-btn:active{transform:scale(1.2)}
-.fav-star-btn:hover{border-color:var(--accent);color:var(--accent)}
-.fav-star-btn.starred{background:var(--accent-dim);border-color:var(--accent);
-  color:var(--accent);font-size:18px;
-  filter:drop-shadow(0 0 4px rgba(240,180,41,.6));
-  animation:starPulse 1.8s ease-in-out infinite}
-@keyframes starPulse{0%,100%{box-shadow:0 0 0 0 rgba(240,180,41,.4)}
-  50%{box-shadow:0 0 0 4px rgba(240,180,41,0)}}
+.fav-star-btn{display:inline-flex;align-items:center;justify-content:center;
+  width:44px;height:44px;border-radius:50%;
+  background:transparent;border:none;cursor:pointer;
+  font-size:24px;color:var(--muted);line-height:1;
+  transition:transform .15s,color .15s,filter .2s,background .15s}
+.fav-star-btn:hover{color:var(--accent);background:var(--accent-dim)}
+.fav-star-btn:active{transform:scale(1.28)}
+.fav-star-btn:focus-visible{outline:3px solid var(--blue);outline-offset:1px}
+.fav-star-btn.starred{color:var(--accent);font-size:27px;
+  filter:drop-shadow(0 0 6px rgba(240,180,41,.75))}
 
 .fav-empty{text-align:center;padding:40px 20px;color:var(--muted)}
 .fav-empty .fav-em{font-size:40px;margin-bottom:10px}
@@ -2452,6 +2460,8 @@ function connectToGroup(){
 
 
 function _warnPermission(){ toast('⚠️ אין הרשאה — רענן את האפליקציה'); }
+// Light haptic tap on supported mobile devices (no-op elsewhere)
+function _haptic(ms){ try{ navigator.vibrate && navigator.vibrate(ms||15); }catch(_){} }
 window.toggleFav=function(id){const i=items[id];update(ref(db,`groups/${groupId}/items/${id}`),{fav:!i.fav}).then(()=>toast(i.fav?'הוסר מהמועדפים':'⭐ נוסף למועדפים')).catch(e=>{if((e.message||'').includes('PERMISSION_DENIED'))_warnPermission();else toast('❌ '+e.message);});};
 window.changeQty=function(id,d){const i=items[id];update(ref(db,`groups/${groupId}/items/${id}`),{qty:Math.max(1,(i.qty||1)+d)}).catch(e=>{if((e.message||'').includes('PERMISSION_DENIED'))_warnPermission();});};
 window.clearBought=function(){Object.entries(items).forEach(([id,i])=>{if(i.bought)remove(ref(db,`groups/${groupId}/items/${id}`))});toast('🗑 נקנים נמחקו')};
@@ -4223,7 +4233,7 @@ function itemHTML(item) {
   const avatarValue = addedMember?.avatarValue || item.addedByAvatarValue || '👤';
   const avatarEmoji = addedMember?.avatarEmoji || item.addedByAvatarEmoji || null;
 
-  const boughtBtn = isFavTab ? '' : `<span class="${item.bought?'bought-tag':'pending-tag'}" onclick="toggleBought('${item.id}')">${item.bought?'✅ קניתי':'קניתי'}</span>`;
+  const boughtBtn = isFavTab ? '' : `<button class="${item.bought?'bought-tag':'pending-tag'}" onclick="toggleBought('${item.id}')" aria-pressed="${item.bought?'true':'false'}" aria-label="${item.bought?'בטל סימון — נקנה':'סמן כמוצר שנקנה'}">${item.bought?'✅ קניתי':'קניתי'}</button>`;
 
   // ── Product attachment tile (replaces check-btn) ──
   const at = item.attached;
@@ -4277,6 +4287,8 @@ function itemHTML(item) {
     <div class="item-acts">
       <button class="fav-star-btn${isFavSaved?' starred':''}"
         onclick="toggleSavedFavorite('${item.id}','${esc(item.name)}','${item.barcode||''}')"
+        aria-pressed="${isFavSaved?'true':'false'}"
+        aria-label="${isFavSaved?'הסר ממועדפים':'הוסף למועדפים'}"
         title="${isFavSaved?'הסר ממועדפים':'שמור במועדפים'}"
       >${isFavSaved?'⭐':'☆'}</button>
       <button class="act-btn del" onclick="deleteItem('${item.id}')">✕</button>
@@ -4803,6 +4815,7 @@ window.toggleBought = async function(id) {
   const item = items[id];
   if (!item) return;
   const nowBought = !item.bought;
+  _haptic(nowBought ? 18 : 12);
 
   await update(ref(db, `groups/${groupId}/items/${id}`), {
     bought:          nowBought,
@@ -5910,6 +5923,7 @@ function findExistingListItem(name, barcode) {
 window.toggleSavedFavorite = async function(itemId, name, barcode) {
   if (!groupId) return;
   const alreadySaved = isItemInFavorites(name, barcode);
+  _haptic(alreadySaved ? 12 : 18);
 
   if (alreadySaved) {
     // Remove from favorites — find its key
