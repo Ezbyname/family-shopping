@@ -2628,7 +2628,10 @@ window.searchPrices = async function(){
       }
 
       searchResults = data.results;
-      if (data.results.length === 1 && !data.results[0].storePrices?.length) {
+      // Only fall back to manual entry when the single result genuinely has NO prices.
+      // (API exposes prices under `prices`, not `storePrices` — the old field name
+      //  was always undefined, forcing manual fallback even when prices existed.)
+      if (data.results.length === 1 && !data.results[0].prices?.length) {
         wrap.innerHTML = renderManualFallback(q, data.results[0]);
       } else {
         renderSearchResults(data.results, q);
