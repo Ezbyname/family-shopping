@@ -2568,6 +2568,10 @@ function renderAvatars(){
 let lastSearchQuery = '';
 let searchResults = [];
 let selectedProduct = null;
+// Request-identity guards — only the LATEST request may render. Prevents a slow
+// first response (cold Vercel / cold Firebase) from overwriting a newer, valid one.
+let _searchSeq = 0;   // increments per price search
+let _pdSeq     = 0;   // increments per product price-detail view
 
 window.setRadius=function(v){
   priceRadius=+v;
@@ -2601,6 +2605,7 @@ window.searchPrices = async function(){
 
   // Run through translation resolver pipeline
   await resolveAndSearch(q, async (resolvedQuery) => {
+    const mySeq = ++_searchSeq;          // claim latest — older responses self-cancel
     lastSearchQuery = resolvedQuery;
     selectedProduct = null;
     const wrap = document.getElementById('price-content');
@@ -2613,8 +2618,22 @@ window.searchPrices = async function(){
       if (_hasLoc()) {
         _apiUrl += `&lat=${_locLat()}&lng=${_locLng()}&radiusKm=${_nearbyRadius}`;
       }
-      const res  = await fetch(_apiUrl);
-      const data = await res.json();
+      // 15s client timeout so a hung first request can't strand the UI on "loading"
+      const ctrl = new AbortController();
+      const tmo  = setTimeout(() => ctrl.abort(), 15000);
+      let res, data;
+      try {
+        res  = await fetch(_apiUrl, { signal: ctrl.signal });
+        data = await res.json();
+      } finally { clearTimeout(tmo); }
+
+      if (mySeq !== _searchSeq) return;  // a newer search superseded this one
+
+      // Server timeout / error (504/503) → offer RETRY, never a false "no results"
+      if (!res.ok || data.error) {
+        wrap.innerHTML = _renderSearchRetry(q);
+        return;
+      }
 
       if (!data.results || !data.results.length) {
         wrap.innerHTML = `<div class="search-hint"><div class="sh-icon">🔍</div><p>לא נמצאו תוצאות עבור "${esc(q)}"</p><small>נסה שם שונה</small></div>`;
@@ -2637,10 +2656,21 @@ window.searchPrices = async function(){
         renderSearchResults(data.results, q);
       }
     } catch(e) {
-      wrap.innerHTML = renderManualFallback(q, null);
+      if (mySeq !== _searchSeq) return;  // superseded — stay silent
+      // Network failure / abort → RETRY affordance, not a fake empty/manual state
+      wrap.innerHTML = _renderSearchRetry(q);
     }
   });
 };
+
+// Retry card shown on network error / timeout (never a false "no prices")
+function _renderSearchRetry(q) {
+  return `<div class="search-hint"><div class="sh-icon">⏳</div>
+    <p>החיפוש לקח יותר מדי זמן</p>
+    <small>בדוק את החיבור ונסה שוב</small>
+    <button class="nnr-btn primary" style="margin-top:12px"
+      onclick="searchPrices()">🔄 נסה שוב</button></div>`;
+}
 
 // ── NO-NEARBY-RESULTS: context-aware feedback with action buttons ─────────────
 function _renderNearbyNoResults(q, data) {
@@ -5309,12 +5339,41 @@ function renderPriceRow(p, isFirst, total, warnings) {
 // ── showProductPricesEnhanced ──
 window.showProductPricesEnhanced = async function(product) {
   if (!product) return;
+  const mySeq = ++_pdSeq;                         // request-identity guard
   const wrap = document.getElementById('price-content');
-  wrap.innerHTML = `<div class="price-loading"><div class="spin"></div><p>טוען מחירים...</p></div>`;
   const barcode = product.barcode || '';
 
+  // No barcode → this product was never linked to the catalog. Do NOT claim
+  // "no prices" — say so honestly and offer to link a product / add manually.
+  if (!isValidBarcode(barcode)) {
+    wrap.innerHTML = `
+      <button onclick="backToResults()" style="background:transparent;border:none;color:var(--muted);font-family:'Heebo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;padding:4px 0 10px">← חזרה</button>
+      <div class="compare-card" style="text-align:center;padding:24px 16px">
+        <div style="font-size:34px;margin-bottom:8px">🔗</div>
+        <div style="font-size:15px;font-weight:800;margin-bottom:6px">${esc(product.name||'המוצר')} לא מקושר לברקוד עדיין</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:16px">
+          כדי להשוות מחירים צריך לקשר מוצר ספציפי מהקטלוג (עם ברקוד).
+        </div>
+        <button class="mbtn primary" style="width:100%"
+          onclick="openBrandPicker('new')">🔍 בחר מוצר</button>
+      </div>`;
+    return;
+  }
+
+  wrap.innerHTML = `<div class="price-loading"><div class="spin"></div><p>בודק מחירים...</p></div>`;
+
   let layers = { official:[], proxy:[], manual:[], overrides:{}, reports:{} };
-  if (isValidBarcode(barcode)) layers = await fetchAllPriceLayers(barcode);
+  try {
+    layers = await fetchAllPriceLayers(barcode);
+  } catch (e) {
+    if (mySeq !== _pdSeq) return;
+    wrap.innerHTML = `<div class="search-hint"><div class="sh-icon">⏳</div>
+      <p>טעינת המחירים נכשלה</p><small>בדוק חיבור ונסה שוב</small>
+      <button class="nnr-btn primary" style="margin-top:12px"
+        onclick="showProductPricesEnhanced(selectedProduct)">🔄 נסה שוב</button></div>`;
+    return;
+  }
+  if (mySeq !== _pdSeq) return;                   // a newer view superseded this one
 
   const { prices, warnings } = buildDisplayPrices(layers);
   const coveredChains = new Set(prices.map(p=>p.chainName||p.storeName||p.store||''));
