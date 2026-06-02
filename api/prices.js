@@ -97,6 +97,79 @@ const translate = q => {
   return null;
 };
 
+// ── Relevance scoring (Hebrew-aware) ─────────────────────────────────────────
+// Normalizes Hebrew/English product text so that "חלב 3%", "חלב 3 אחוז" and
+// "תנובה חלב 3%" collapse to comparable token sets. Pure + deterministic so it
+// can be unit-tested in isolation.
+export function normalizeProductText(s) {
+  if (!s) return '';
+  let t = String(s).toLowerCase();
+  // Hebrew final letters → standard forms
+  t = t.replace(/ך/g, 'כ').replace(/ם/g, 'מ').replace(/ן/g, 'נ').replace(/ף/g, 'פ').replace(/ץ/g, 'צ');
+  // Percent: "3 אחוז" / "3%" → "3"
+  t = t.replace(/אחוז/g, '%').replace(/%/g, ' ');
+  // Unit normalization → canonical tokens
+  t = t.replace(/מ["'׳]?ל|ml|מיליליטר/g, ' ml ');
+  t = t.replace(/ק["'׳]?ג|קילו(?:גרם)?|kg/g, ' kg ');
+  t = t.replace(/ליטר|ל["'׳]/g, ' l ');
+  t = t.replace(/גרם|ג["'׳]|gr?\b/g, ' g ');
+  // Strip punctuation / quotes / apostrophes
+  t = t.replace(/["'`׳״.,()\[\]/\\\-_+]/g, ' ');
+  // Collapse whitespace
+  return t.replace(/\s+/g, ' ').trim();
+}
+
+function _tokens(s) { return normalizeProductText(s).split(' ').filter(Boolean); }
+
+// Score one product name against one query string (both pre-normalized inside).
+// Returns 0–100. Head-noun (first token) match is weighted so that the product
+// TYPE wins: "חלב תנובה" outranks "שוקולד חלב" for query "חלב".
+function _scoreOne(query, name) {
+  const qn = normalizeProductText(query);
+  const nn = normalizeProductText(name);
+  if (!qn || !nn) return 0;
+  if (nn === qn) return 100;
+  if (nn.startsWith(qn + ' ') || nn === qn) return 94;
+
+  const qTok = qn.split(' ').filter(Boolean);
+  const nTok = nn.split(' ').filter(Boolean);
+  const nSet = new Set(nTok);
+  const matched = qTok.filter(t => nSet.has(t)).length;
+  const coverage = qTok.length ? matched / qTok.length : 0;
+
+  let base;
+  if (coverage >= 1)        base = 80;            // all query tokens present
+  else if (coverage >= 0.5) base = 50 + coverage * 25;
+  else if (nn.includes(qn)) base = 50;            // loose substring
+  else                      base = coverage * 40; // weak
+
+  // Head-noun bonus: query's first token IS the product's first token → it's
+  // the main product type, not an incidental mention.
+  if (qTok[0] && nTok[0] === qTok[0]) base += 10;
+  // Starts-with the full query → strong
+  if (nn.startsWith(qn)) base += 6;
+
+  return Math.min(100, Math.round(base));
+}
+
+// Best score across Hebrew query, English query, and the product brand line.
+export function scoreProductMatch(heQuery, enQuery, product) {
+  const name  = product.name || '';
+  const brand = product.brand || '';
+  const nameScore = Math.max(
+    _scoreOne(heQuery, name),
+    enQuery && enQuery !== heQuery ? _scoreOne(enQuery, name) : 0
+  );
+  // Brand-only match (query is a brand like "תנובה") gives a moderate score.
+  const brandScore = Math.max(
+    _scoreOne(heQuery, brand),
+    enQuery && enQuery !== heQuery ? _scoreOne(enQuery, brand) : 0
+  );
+  let score = Math.max(nameScore, brandScore * 0.6);
+  if (product.isIsraeli) score += 6;   // modest tiebreaker, never dominant
+  return Math.round(Math.min(100, score));
+}
+
 // ── Main handler ─────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   const t0 = Date.now();
@@ -210,11 +283,22 @@ export default async function handler(req, res) {
       return { ...p, ...layered };
     }));
 
+    // Relevance score per product (deterministic, Hebrew-aware)
+    for (const p of enriched) p._score = scoreProductMatch(query, en, p);
+
+    // Rank: relevance first, then availability (has prices), then source quality.
+    // This ensures "חלב תנובה" beats "שוקולד חלב"/"Kinder Chocolate" for query "חלב".
     const ORDER = { official: 0, override: 0, proxy: 1, manual: 2, none: 3 };
     enriched.sort((a, b) =>
-      (ORDER[a.source] ?? 3) - (ORDER[b.source] ?? 3) ||
-      (b.prices?.length || 0) - (a.prices?.length || 0)
+      (b._score - a._score) ||
+      ((b.prices?.length ? 1 : 0) - (a.prices?.length ? 1 : 0)) ||
+      ((ORDER[a.source] ?? 3) - (ORDER[b.source] ?? 3)) ||
+      ((b.prices?.length || 0) - (a.prices?.length || 0))
     );
+
+    // Drop weak matches (score < 50) UNLESS that would leave too few results.
+    const strong = enriched.filter(p => p._score >= 50);
+    const ranked = strong.length >= 3 ? strong : enriched;
 
     let syncStatus = null;
     if (dbUrl) {
@@ -227,7 +311,7 @@ export default async function handler(req, res) {
     timings.totalMs = Date.now() - t0;
     const response = {
       version: '6.3.0', query, englishQuery: en,
-      results: enriched.slice(0, 20), total: enriched.length,
+      results: ranked.slice(0, 20), total: ranked.length,
       syncStatus,
     };
     if (isDebug) response.timings = timings;
