@@ -5332,7 +5332,14 @@ window.showProductPricesEnhanced = async function(product) {
 
   const pricesHTML = prices.length
     ? spreadHTML + prices.map((p,i)=>renderPriceRow(p,i===0,prices.length,warnings)).join('')
-    : `<div style="text-align:center;padding:16px;color:var(--muted);font-size:13px">אין מחירים עדיין</div>`;
+    : `<div style="text-align:center;padding:18px 14px;background:var(--accent-dim);
+         border:1.5px dashed rgba(240,180,41,.4);border-radius:13px">
+         <div style="font-size:30px;margin-bottom:8px">🏷️</div>
+         <div style="font-size:14px;font-weight:800;margin-bottom:5px">עדיין אין מחיר למוצר הזה</div>
+         <div style="font-size:12px;color:var(--muted);line-height:1.6">
+           ראית את המחיר בסופר?<br>הוסף אותו למטה ועזור למשפחה לחסוך 👇
+         </div>
+       </div>`;
 
   const missingHTML = missing.length ? `
     <div style="margin-top:10px">
