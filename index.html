@@ -2572,6 +2572,12 @@ let selectedProduct = null;
 // first response (cold Vercel / cold Firebase) from overwriting a newer, valid one.
 let _searchSeq = 0;   // increments per price search
 let _pdSeq     = 0;   // increments per product price-detail view
+// Search-product store-list pagination (10 at a time, reset on every new product view)
+let _spdPrices    = [];
+let _spdWarnings  = null;
+let _spdSpreadHTML = '';
+let _spdPage      = 1;
+const SPD_PAGE    = 10;
 
 window.setRadius=function(v){
   priceRadius=+v;
@@ -5392,8 +5398,15 @@ window.showProductPricesEnhanced = async function(product) {
       </span>
     </div>` : '';
 
+  // Store full sorted set for pagination; reset to page 1 on every product view.
+  _spdPrices     = prices;
+  _spdWarnings   = warnings;
+  _spdSpreadHTML = spreadHTML;
+  _spdPage       = 1;
+
+  const firstPage = prices.slice(0, SPD_PAGE);
   const pricesHTML = prices.length
-    ? spreadHTML + prices.map((p,i)=>renderPriceRow(p,i===0,prices.length,warnings)).join('')
+    ? spreadHTML + firstPage.map((p,i)=>renderPriceRow(p,i===0,prices.length,warnings)).join('')
     : `<div style="text-align:center;padding:18px 14px;background:var(--accent-dim);
          border:1.5px dashed rgba(240,180,41,.4);border-radius:13px">
          <div style="font-size:30px;margin-bottom:8px">🏷️</div>
@@ -5439,12 +5452,44 @@ window.showProductPricesEnhanced = async function(product) {
         <span class="badge-override">✏️</span> תיקון אישי שלך
       </div>
       <div class="store-prices">${pricesHTML}</div>
+      <div id="spd-more"></div>
       ${missingHTML}
       ${barcode?`<button onclick="openScanner()" class="clear-btn" style="margin-top:10px">📷 סרוק בסופר ועדכן מחיר</button>`:''}
     </div>
     <div style="font-size:10px;color:var(--muted);text-align:center;padding:8px 0">
       ✏️ תיקון אישי גלוי רק לך · 🚨 דיווח מוצג לאחרי 2+ דיווחים · 📝 מחיר משפחה גלוי לקבוצה בלבד
     </div>`;
+
+  _renderSpdMore();   // populate "show more 10" button + "showing X of N"
+};
+
+// ── Search-product store-list pagination helpers ──
+function _renderSpdStoreRows() {
+  const cont = document.querySelector('.store-prices');
+  if (!cont) return;
+  const shown = _spdPrices.slice(0, SPD_PAGE * _spdPage);
+  cont.innerHTML = _spdSpreadHTML +
+    shown.map((p,i) => renderPriceRow(p, i === 0, _spdPrices.length, _spdWarnings)).join('');
+  _renderSpdMore();
+}
+
+function _renderSpdMore() {
+  const el = document.getElementById('spd-more');
+  if (!el) return;
+  const total = _spdPrices.length;
+  const shown = Math.min(SPD_PAGE * _spdPage, total);
+  if (total <= SPD_PAGE || shown >= total) { el.innerHTML = ''; return; }
+  const next = Math.min(SPD_PAGE, total - shown);
+  el.innerHTML = `
+    <div style="text-align:center;font-size:11px;color:var(--muted);margin:8px 0 6px">
+      מציג ${shown} מתוך ${total}
+    </div>
+    <button class="clear-btn" style="margin-top:0" onclick="_spdShowMore()">⬇️ הצג עוד ${next}</button>`;
+}
+
+window._spdShowMore = function() {
+  _spdPage++;
+  _renderSpdStoreRows();   // re-renders the store-prices container in place (scroll preserved)
 };
 
 window.selectProduct = function(idx) {
