@@ -1,4 +1,4 @@
-// api/prices.js — v6.2.0
+// api/prices.js — v6.3.0
 // GET /api/prices?barcode=&q=&lat=&lng=&radiusKm=&groupId=&userId=&debug=1
 //
 // Price priority (deterministic):
@@ -8,13 +8,8 @@
 //   D. manualPrices/{groupId}/{barcode}/{entryId}    — family scoped, only if no official/proxy
 //   E. priceReports — warning signal only, never shown as real price
 //
-// v6.2.0 changes (over v6.1.0):
-//   - ALL Firebase reads now use fetch() REST API — eliminates Admin SDK WebSocket hang
-//   - OAuth2 admin token generated from service-account credentials (cached 50 min)
-//   - Store index cached 5 min in module scope (reduces redundant stores/ fetches)
-//   - buildLayeredPrices takes dbUrl (string) instead of db (Admin SDK handle)
-//   - initMs now measures admin token acquisition (was: SDK init + auth token)
-//   - Target: barcode lookup < 2 s (was: 5 s+ timeout)
+// v6.2.0: ALL Firebase reads via fetch() REST API — eliminates Admin SDK WebSocket hang
+// v6.3.0: storeCoords index support — lightweight {lat,lng,city} read instead of full stores node
 
 import { restGet, getDbUrl, getAdminToken, haversine, setCors, isValidBarcode, isValidPrice } from './_firebase.js';
 
@@ -40,12 +35,34 @@ function withTimeout(promise, ms, label = '') {
 }
 
 // ── Store index cache (module-level, reused across requests) ─────────────────
+// Prefers lightweight storeCoords/{key}={lat,lng,city} (~28 KB) over full
+// stores node (~141 KB). Falls back to stores/ if storeCoords doesn't exist yet.
 let _storeCache    = null;
 let _storeCacheExp = 0;
 
 async function getStoreIndex(dbUrl) {
   const now = Date.now();
   if (_storeCache && _storeCacheExp > now) return _storeCache;
+
+  // Try storeCoords first (lightweight index written by price sync worker)
+  try {
+    const coordsData = await restGet(dbUrl, 'storeCoords', READ_TIMEOUT_MS);
+    if (coordsData && typeof coordsData === 'object' && Object.keys(coordsData).length > 0) {
+      // Normalize storeCoords {lat,lng,city} → stores-compatible shape
+      _storeCache = Object.fromEntries(
+        Object.entries(coordsData).map(([k, v]) => [k, {
+          hasCoords: true,
+          latitude:  v.lat ?? v.latitude ?? null,
+          longitude: v.lng ?? v.longitude ?? null,
+          city:      v.city || '',
+        }])
+      );
+      _storeCacheExp = now + STORE_CACHE_MS;
+      return _storeCache;
+    }
+  } catch (_) {}
+
+  // Fallback: full stores node (pre-storeCoords deploy)
   const data = await restGet(dbUrl, 'stores', READ_TIMEOUT_MS);
   _storeCache    = (data && typeof data === 'object') ? data : {};
   _storeCacheExp = now + STORE_CACHE_MS;
@@ -79,6 +96,79 @@ const translate = q => {
   for (const [h, e] of Object.entries(HE_EN)) if (l.includes(h) || h.includes(l)) return e;
   return null;
 };
+
+// ── Relevance scoring (Hebrew-aware) ─────────────────────────────────────────
+// Normalizes Hebrew/English product text so that "חלב 3%", "חלב 3 אחוז" and
+// "תנובה חלב 3%" collapse to comparable token sets. Pure + deterministic so it
+// can be unit-tested in isolation.
+export function normalizeProductText(s) {
+  if (!s) return '';
+  let t = String(s).toLowerCase();
+  // Hebrew final letters → standard forms
+  t = t.replace(/ך/g, 'כ').replace(/ם/g, 'מ').replace(/ן/g, 'נ').replace(/ף/g, 'פ').replace(/ץ/g, 'צ');
+  // Percent: "3 אחוז" / "3%" → "3"
+  t = t.replace(/אחוז/g, '%').replace(/%/g, ' ');
+  // Unit normalization → canonical tokens
+  t = t.replace(/מ["'׳]?ל|ml|מיליליטר/g, ' ml ');
+  t = t.replace(/ק["'׳]?ג|קילו(?:גרם)?|kg/g, ' kg ');
+  t = t.replace(/ליטר|ל["'׳]/g, ' l ');
+  t = t.replace(/גרם|ג["'׳]|gr?\b/g, ' g ');
+  // Strip punctuation / quotes / apostrophes
+  t = t.replace(/["'`׳״.,()\[\]/\\\-_+]/g, ' ');
+  // Collapse whitespace
+  return t.replace(/\s+/g, ' ').trim();
+}
+
+function _tokens(s) { return normalizeProductText(s).split(' ').filter(Boolean); }
+
+// Score one product name against one query string (both pre-normalized inside).
+// Returns 0–100. Head-noun (first token) match is weighted so that the product
+// TYPE wins: "חלב תנובה" outranks "שוקולד חלב" for query "חלב".
+function _scoreOne(query, name) {
+  const qn = normalizeProductText(query);
+  const nn = normalizeProductText(name);
+  if (!qn || !nn) return 0;
+  if (nn === qn) return 100;
+  if (nn.startsWith(qn + ' ') || nn === qn) return 94;
+
+  const qTok = qn.split(' ').filter(Boolean);
+  const nTok = nn.split(' ').filter(Boolean);
+  const nSet = new Set(nTok);
+  const matched = qTok.filter(t => nSet.has(t)).length;
+  const coverage = qTok.length ? matched / qTok.length : 0;
+
+  let base;
+  if (coverage >= 1)        base = 80;            // all query tokens present
+  else if (coverage >= 0.5) base = 50 + coverage * 25;
+  else if (nn.includes(qn)) base = 50;            // loose substring
+  else                      base = coverage * 40; // weak
+
+  // Head-noun bonus: query's first token IS the product's first token → it's
+  // the main product type, not an incidental mention.
+  if (qTok[0] && nTok[0] === qTok[0]) base += 10;
+  // Starts-with the full query → strong
+  if (nn.startsWith(qn)) base += 6;
+
+  return Math.min(100, Math.round(base));
+}
+
+// Best score across Hebrew query, English query, and the product brand line.
+export function scoreProductMatch(heQuery, enQuery, product) {
+  const name  = product.name || '';
+  const brand = product.brand || '';
+  const nameScore = Math.max(
+    _scoreOne(heQuery, name),
+    enQuery && enQuery !== heQuery ? _scoreOne(enQuery, name) : 0
+  );
+  // Brand-only match (query is a brand like "תנובה") gives a moderate score.
+  const brandScore = Math.max(
+    _scoreOne(heQuery, brand),
+    enQuery && enQuery !== heQuery ? _scoreOne(enQuery, brand) : 0
+  );
+  let score = Math.max(nameScore, brandScore * 0.6);
+  if (product.isIsraeli) score += 6;   // modest tiebreaker, never dominant
+  return Math.round(Math.min(100, score));
+}
 
 // ── Main handler ─────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
@@ -125,7 +215,7 @@ export default async function handler(req, res) {
       );
       timings.totalMs = Date.now() - t0;
 
-      const response = { version: '6.2.0', barcode: clean, ...result };
+      const response = { version: '6.3.0', barcode: clean, ...result };
       if (isDebug) response.timings = timings;
       return res.status(200).json(response);
 
@@ -159,7 +249,7 @@ export default async function handler(req, res) {
   const query  = String(q).trim();
   const hebrew = isHebrew(query);
   const en     = hebrew ? (translate(query) || query) : query;
-  console.log(`[prices v6.2] search: "${query}" → "${en}"`);
+  console.log(`[prices v6.3] search: "${query}" → "${en}"`);
 
   const dbUrl = getDbUrl();
 
@@ -193,11 +283,22 @@ export default async function handler(req, res) {
       return { ...p, ...layered };
     }));
 
+    // Relevance score per product (deterministic, Hebrew-aware)
+    for (const p of enriched) p._score = scoreProductMatch(query, en, p);
+
+    // Rank: relevance first, then availability (has prices), then source quality.
+    // This ensures "חלב תנובה" beats "שוקולד חלב"/"Kinder Chocolate" for query "חלב".
     const ORDER = { official: 0, override: 0, proxy: 1, manual: 2, none: 3 };
     enriched.sort((a, b) =>
-      (ORDER[a.source] ?? 3) - (ORDER[b.source] ?? 3) ||
-      (b.prices?.length || 0) - (a.prices?.length || 0)
+      (b._score - a._score) ||
+      ((b.prices?.length ? 1 : 0) - (a.prices?.length ? 1 : 0)) ||
+      ((ORDER[a.source] ?? 3) - (ORDER[b.source] ?? 3)) ||
+      ((b.prices?.length || 0) - (a.prices?.length || 0))
     );
+
+    // Drop weak matches (score < 50) UNLESS that would leave too few results.
+    const strong = enriched.filter(p => p._score >= 50);
+    const ranked = strong.length >= 3 ? strong : enriched;
 
     let syncStatus = null;
     if (dbUrl) {
@@ -209,8 +310,8 @@ export default async function handler(req, res) {
 
     timings.totalMs = Date.now() - t0;
     const response = {
-      version: '6.2.0', query, englishQuery: en,
-      results: enriched.slice(0, 20), total: enriched.length,
+      version: '6.3.0', query, englishQuery: en,
+      results: ranked.slice(0, 20), total: ranked.length,
       syncStatus,
     };
     if (isDebug) response.timings = timings;
@@ -220,7 +321,7 @@ export default async function handler(req, res) {
     console.error('[prices] search error:', e.message);
     timings.totalMs = Date.now() - t0;
     return res.status(200).json({
-      version: '6.2.0', query, results: [], error: e.message,
+      version: '6.3.0', query, results: [], error: e.message,
       ...(isDebug ? { timings } : {}),
     });
   }
@@ -270,7 +371,7 @@ async function buildLayeredPrices(
         override:     overrides[key] ?? null,
       }));
 
-    // Radius filter — use cached store index in barcode mode
+    // Radius filter — use cached store index (prefers storeCoords, falls back to stores/)
     if (hasLoc && official.length > 0) {
       let idx = storeIndex;
       if (idx === undefined) {
@@ -426,7 +527,7 @@ async function searchOFF(hebrewQuery, englishQuery) {
   for (const url of urls) {
     try {
       const r = await fetch(url, {
-        headers: { 'User-Agent': 'FamilyShoppingIL/6.2' },
+        headers: { 'User-Agent': 'FamilyShoppingIL/6.3' },
         signal: AbortSignal.timeout(10_000),
       });
       if (!r.ok) continue;

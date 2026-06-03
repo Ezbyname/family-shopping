@@ -1,49 +1,52 @@
-// api/_firebase.js — v2.1.0 — lazy Firebase init + REST bypass for public reads
+// api/_firebase.js — v2.3.0 — lazy Firebase init, REST bypass, shared validators, timeouts, logging
+//
+// v2.3.0 merged:
+//   main  (v2.1): REST bypass (getAdminToken/restGet), CSRF checkOrigin, getLastError/getDbUrl
+//   branch (v2.2): withTimeout, logError, sanitizePhone, strict isValidBarcode, cors alias
 let _db = null;
 let _lastError = null;
 
 export async function getDB() {
   if (_db) return _db;
-  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const projectId   = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
-  const url = process.env.FIREBASE_DATABASE_URL;
+  const privateKey  = process.env.FIREBASE_PRIVATE_KEY;
+  const url         = process.env.FIREBASE_DATABASE_URL;
 
   if (!projectId || !clientEmail || !privateKey || !url) {
-    _lastError = 'Missing env vars: ' + [!projectId && 'PROJECT_ID', !clientEmail && 'CLIENT_EMAIL', !privateKey && 'PRIVATE_KEY', !url && 'DB_URL'].filter(Boolean).join(', ');
+    _lastError = 'Missing env vars: ' + [
+      !projectId   && 'PROJECT_ID',
+      !clientEmail && 'CLIENT_EMAIL',
+      !privateKey  && 'PRIVATE_KEY',
+      !url         && 'DB_URL',
+    ].filter(Boolean).join(', ');
     return null;
   }
 
   try {
     const { initializeApp, cert, getApps } = await import('firebase-admin/app');
-    const { getDatabase } = await import('firebase-admin/database');
-
+    const { getDatabase }                  = await import('firebase-admin/database');
     if (!getApps().length) {
-      const key = privateKey.replace(/\\n/g, '\n');
       initializeApp({
-        credential: cert({ projectId, clientEmail, privateKey: key }),
-        databaseURL: url
+        credential:  cert({ projectId, clientEmail, privateKey: privateKey.replace(/\\n/g, '\n') }),
+        databaseURL: url,
       });
     }
     _db = getDatabase();
     return _db;
   } catch (e) {
     _lastError = `Firebase init failed: ${e.message}`;
+    console.error('[firebase] init error:', e.message);
     return null;
   }
 }
 
-export function getLastError() {
-  return _lastError;
-}
+export function getLastError() { return _lastError; }
 
 // ── REST bypass — avoids Admin SDK WebSocket hang in Vercel ─────────────────
-// Uses fetch() directly against the Firebase RTDB REST API.
-// A service-account OAuth2 token is generated once and cached 50 min, giving
-// full admin access (bypasses all database security rules, same as Admin SDK).
 let _adminToken    = null;
 let _adminTokenExp = 0;
-let _tokenPromise  = null;   // deduplicates concurrent cold-start requests
+let _tokenPromise  = null;
 
 export function getDbUrl() {
   return process.env.FIREBASE_DATABASE_URL || null;
@@ -51,7 +54,7 @@ export function getDbUrl() {
 
 async function _generateAdminToken() {
   const email = process.env.FIREBASE_CLIENT_EMAIL || '';
-  const key   = (process.env.FIREBASE_PRIVATE_KEY  || '').replace(/\\n/g, '\n');
+  const key   = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
   if (!email || !key) return null;
   try {
     const now    = Math.floor(Date.now() / 1000);
@@ -81,8 +84,6 @@ async function _generateAdminToken() {
   }
 }
 
-// Returns a valid Google OAuth2 access token (or null if credentials missing/broken).
-// Cached for 50 minutes; concurrent callers share one in-flight request.
 export async function getAdminToken() {
   const now = Date.now();
   if (_adminToken && _adminTokenExp > now) return _adminToken;
@@ -97,9 +98,7 @@ export async function getAdminToken() {
   return _tokenPromise;
 }
 
-// restGet — fetch a Firebase RTDB node via HTTP (bypasses Admin SDK WebSocket).
-// Returns the node value (any JSON type), or null if the node is missing.
-// Throws on network error; throws { isTimeout: true } on timeout.
+/** Fetch a Firebase RTDB node via REST (bypasses Admin SDK WebSocket hang). */
 export async function restGet(dbUrl, path, timeoutMs = 5_000) {
   const token = await getAdminToken();
   const auth  = token ? `?access_token=${encodeURIComponent(token)}` : '';
@@ -107,7 +106,7 @@ export async function restGet(dbUrl, path, timeoutMs = 5_000) {
   try {
     const r = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
     if (!r.ok) throw new Error(`REST HTTP ${r.status} for ${path}`);
-    return await r.json(); // Firebase returns JSON null for missing nodes
+    return await r.json();
   } catch (e) {
     if (e.name === 'TimeoutError' || e.name === 'AbortError') {
       throw Object.assign(new Error(`timeout:rest:${path}`), { isTimeout: true });
@@ -123,40 +122,86 @@ export function haversine(lat1, lng1, lat2, lng2) {
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
-export const setCors = (res) => {
+/** Set permissive CORS headers. */
+export const cors = (res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 };
+/** Alias for cors() — used by older API modules. */
+export const setCors = cors;
 
 // ── CSRF: Origin validation ──────────────────────────────────────────────────
-// Returns true when the request is safe to proceed.
-//
-// Non-browser callers (curl, server-to-server) never send Origin → always allowed.
-// Browser callers always include Origin for cross-origin fetches → we check it.
-//
-// Configure: set ALLOWED_ORIGINS env var to comma-separated list of permitted
-// origins, e.g. "https://example.com,https://staging.example.com".
-// If ALLOWED_ORIGINS is empty/unset: all origins are permitted (dev/preview fallback).
-//
-// Note: Authorization: Bearer already mitigates most CSRF risk because a
-// cross-site attacker cannot read the victim's Firebase token (same-origin policy).
-// This check adds defence-in-depth for unexpected future auth changes.
 export function checkOrigin(req) {
-  const origin = req.headers['origin'];
-  if (!origin) return true; // non-browser caller — no Origin header → allow
+  const origin  = req.headers['origin'];
+  if (!origin) return true;
   const allowed = (process.env.ALLOWED_ORIGINS || '')
     .split(',').map(s => s.trim()).filter(Boolean);
-  if (allowed.length === 0) return true; // not configured → allow all (dev fallback)
+  if (allowed.length === 0) return true;
   return allowed.includes(origin);
 }
 
-export const isValidBarcode = (str) => {
-  const clean = String(str).replace(/\D/g, '');
-  return clean.length >= 8 && clean.length <= 14;
-};
+// ── Validators ───────────────────────────────────────────────────────────────
 
-export const isValidPrice = (p) => {
+/**
+ * Accept barcodes with exactly 8, 12, 13, or 14 digits (EAN-8, UPC-A, EAN-13, ITF-14).
+ * Rejects empty strings, all-zeros, non-string inputs.
+ */
+export function isValidBarcode(code) {
+  if (!code || typeof code !== 'string') return false;
+  const s = code.replace(/\D/g, '');
+  if (!/^(8|12|13|14)$/.test(String(s.length))) return false;
+  if (/^0+$/.test(s)) return false;
+  return true;
+}
+
+/** Accept prices in the range 0.01 – 10 000 ILS. */
+export function isValidPrice(p) {
   const n = parseFloat(p);
-  return !isNaN(n) && n > 0.01 && n < 10000;
-};
+  return isFinite(n) && n >= 0.01 && n <= 10_000;
+}
+
+// ── Shared utilities (hardening sprint) ─────────────────────────────────────
+
+/**
+ * Race a promise against a timeout.
+ * Rejects with { isTimeout: true } so callers can distinguish timeouts from errors.
+ */
+export function withTimeout(promise, ms = 8000, label = 'operation') {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(
+      () => reject(Object.assign(new Error(`timeout:${label} after ${ms}ms`), { isTimeout: true })),
+      ms
+    );
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * Emit a structured JSON error log line indexed by Vercel.
+ */
+export function logError(context, err, meta = {}) {
+  console.error(JSON.stringify({
+    ts:  new Date().toISOString(),
+    ctx: context,
+    err: err?.message ?? String(err),
+    ...(process.env.NODE_ENV !== 'production' && err?.stack
+      ? { stack: err.stack.split('\n').slice(0, 4).join(' | ') }
+      : {}),
+    ...meta,
+  }));
+}
+
+/**
+ * Sanitize a phone number for use in a tel: URI.
+ * Allowlist: digits, +, -, spaces, parentheses only.
+ * Returns null if the value cannot be an E.164 phone number (prevents tel: injection).
+ */
+export function sanitizePhone(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const stripped = raw.replace(/[^\d+\-\s()]/g, '').trim();
+  const digits   = stripped.replace(/\D/g, '');
+  if (digits.length < 7 || digits.length > 15) return null;
+  return stripped;
+}

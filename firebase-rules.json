@@ -1,0 +1,74 @@
+{
+  "rules": {
+    // ── Public price data (read-only; written only by service account) ────────
+    "prices":      { ".read": true,  ".write": false },
+    "stores":      { ".read": true,  ".write": false },
+    "storeCoords": { ".read": true,  ".write": false },
+    "syncStatus":  { ".read": true,  ".write": false },
+    "syncSummary": { ".read": true,  ".write": false },
+    "proxyCache":  { ".read": true,  ".write": false },
+
+    // ── Analytics — auth-gated + field-length validation ─────────────────────
+    // Prevents unauthenticated writes and limits field sizes to resist abuse.
+    // The app signs in anonymously at startup (onAuthStateChanged in index.html),
+    // so auth !== null is always satisfied for real users.
+    "analytics": {
+      "events": {
+        "$date": {
+          ".read":  false,
+          ".write": "auth !== null",
+          "$entry": {
+            ".validate": "newData.hasChildren(['event', 'ts', 'group', 'platform'])
+              && newData.child('event').isString()
+              && newData.child('event').val().length <= 40
+              && newData.child('ts').isNumber()
+              && newData.child('ts').val() > 0
+              && newData.child('group').isString()
+              && newData.child('group').val().length <= 6
+              && newData.child('platform').isString()
+              && newData.child('platform').val().length <= 10"
+          }
+        }
+      }
+    },
+
+    // ── Price reports (crowdsourced warning signal) ───────────────────────────
+    "priceReports": {
+      ".read": true,
+      "$barcode": {
+        "$chainKey": {
+          "$reportId": {
+            ".write": "auth !== null"
+          }
+        }
+      }
+    },
+
+    // ── User price overrides (personal, per-user) ────────────────────────────
+    "userPriceOverrides": {
+      "$userId": {
+        ".read":  "auth !== null && auth.uid === $userId",
+        ".write": "auth !== null && auth.uid === $userId"
+      }
+    },
+
+    // ── Group data ───────────────────────────────────────────────────────────
+    "groups": {
+      "$groupId": {
+        ".read":  "root.child('groups').child($groupId).child('members').hasChild(auth.uid)",
+        ".write": "root.child('groups').child($groupId).child('members').hasChild(auth.uid)"
+      }
+    },
+
+    // ── Manual family prices ─────────────────────────────────────────────────
+    "manualPrices": {
+      "$groupId": {
+        ".read":  "root.child('groups').child($groupId).child('members').hasChild(auth.uid)",
+        ".write": "root.child('groups').child($groupId).child('members').hasChild(auth.uid)"
+      }
+    },
+
+    // ── Deny everything else ─────────────────────────────────────────────────
+    "$other": { ".read": false, ".write": false }
+  }
+}
