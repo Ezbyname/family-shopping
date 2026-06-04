@@ -1,10 +1,12 @@
 // Unregister stale service workers so new split-file app loads correctly.
+// Uses sessionStorage flag to prevent reload loops.
 // Safe to remove after all users have updated (a few weeks).
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && !sessionStorage.getItem('sw-killed')) {
   navigator.serviceWorker.getRegistrations().then(regs => {
-    regs.forEach(reg => {
-      reg.registration && reg.registration.waiting && reg.registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-      reg.unregister();
+    if (regs.length === 0) return;
+    sessionStorage.setItem('sw-killed', '1');
+    Promise.all(regs.map(reg => reg.unregister())).then(() => {
+      window.location.reload();
     });
   });
 }
