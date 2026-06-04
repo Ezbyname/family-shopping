@@ -37,14 +37,14 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
 /* ── SPLASH SCREEN ──────────────────────────────────────────────────────── */
 #splash-overlay{
   position:fixed;inset:0;z-index:9999;
-  background:#ffffff;
+  background:#1b4a1b;          /* fallback — matches image green */
   display:flex;align-items:center;justify-content:center;
   overflow:hidden;
   transition:opacity .55s ease;
 }
 #splash-overlay img{
   width:100%;height:100%;
-  object-fit:contain;
+  object-fit:cover;
   display:block;
 }
 #splash-overlay.fade-out{opacity:0}
@@ -4334,7 +4334,7 @@ function itemHTML(item) {
       ? `<img class="ip-tile-img" src="${esc(at.image)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span class="ip-tile-icon" style="display:none">${_ipEmoji(item.name)}</span>`
       : `<span class="ip-tile-icon">${_ipEmoji(item.name)}</span>`;
     ipTile = `<div class="ip-tile-wrap">
-      <button class="ip-tile has-product" onclick="openBrandPicker('attach','${item.id}',${JSON.stringify(item.name)})" title="${label}">
+      <button class="ip-tile has-product" onclick="openBrandPicker('attach','${item.id}','${(item.name||'').replace(/'/g,&quot;\\\'&quot;)}')" title="${label}">
         ${iconHtml}
         <span class="ip-tile-label">${label}</span>
         ${sub ? `<span class="ip-tile-sub">${sub}</span>` : ''}
@@ -4342,7 +4342,7 @@ function itemHTML(item) {
       <button class="ip-clear-btn" onclick="clearItemProduct('${item.id}',event)" title="הסר מוצר">✕</button>
     </div>`;
   } else if (!isFavTab) {
-    ipTile = `<button class="ip-tile" onclick="openBrandPicker('attach','${item.id}',${JSON.stringify(item.name)})" title="בחר מוצר ספציפי">
+    ipTile = `<button class="ip-tile" onclick="openBrandPicker('attach','${item.id}','${(item.name||'').replace(/'/g,&quot;\\\'&quot;)}')" title="בחר מוצר ספציפי">
       <span class="ip-tile-icon">${_ipEmoji(item.name)}</span>
       <span class="ip-tile-label" style="color:var(--muted)">בחר מוצר</span>
     </button>`;
@@ -6378,14 +6378,14 @@ function renderFavoritesPanel() {
         ? `<img class="ip-tile-img" src="${esc(at.image)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span class="ip-tile-icon" style="display:none">${_ipEmoji(fav.name)}</span>`
         : `<span class="ip-tile-icon">${_ipEmoji(fav.name)}</span>`;
       ipTile = `<div class="ip-tile-wrap">
-        <button class="ip-tile has-product" onclick="openBrandPicker('fav-attach','${fav._id}',${JSON.stringify(fav.name)})" title="${label}">
+        <button class="ip-tile has-product" onclick="openBrandPicker('fav-attach','${fav._id}','${(fav.name||'').replace(/'/g,&quot;\\\'&quot;)}')" title="${label}">
           ${iconHtml}
           <span class="ip-tile-label">${label}</span>
         </button>
         <button class="ip-clear-btn" onclick="clearFavProduct('${fav._id}',event)" title="הסר מוצר">✕</button>
       </div>`;
     } else {
-      ipTile = `<button class="ip-tile" onclick="openBrandPicker('fav-attach','${fav._id}',${JSON.stringify(fav.name)})" title="בחר מוצר ספציפי">
+      ipTile = `<button class="ip-tile" onclick="openBrandPicker('fav-attach','${fav._id}','${(fav.name||'').replace(/'/g,&quot;\\\'&quot;)}')" title="בחר מוצר ספציפי">
         <span class="ip-tile-icon">${_ipEmoji(fav.name)}</span>
         <span class="ip-tile-label" style="color:var(--muted)">בחר מוצר</span>
       </button>`;
