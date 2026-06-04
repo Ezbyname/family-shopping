@@ -20,6 +20,57 @@ const db  = getDatabase(app);
 // Single source of truth for the frontend build. BUMP on every shipped fix so
 // "which build am I running?" is answerable from the UI (group/settings sheet).
 const APP_VERSION = '3.1.0';   // 2026-06: search relevance + price stability + radius/pagination + clickable store details
+
+// ── USER IDENTITY ─────────────────────────────────────────────────────────
+// Silent upsert — called on every auth. Never blocks UI, never fails loudly.
+// Creates users/{uid} if missing; updates lastSeen + appVersion always.
+async function upsertUserProfile(uid) {
+  if (!uid) return;
+  try {
+    const userRef = ref(db, `users/${uid}`);
+    const snap = await get(userRef);
+    const now = Date.now();
+    if (!snap.exists()) {
+      // First time this device has a real UID — write full profile
+      await set(userRef, {
+        userId:           uid,
+        displayName:      myName || null,
+        groupId:          groupId || null,
+        createdAt:        now,
+        lastSeen:         now,
+        appVersion:       APP_VERSION,
+        migrationVersion: 1,
+      });
+    } else {
+      // Existing user — update mutable fields only (patch, not replace)
+      await update(userRef, {
+        lastSeen:         now,
+        appVersion:       APP_VERSION,
+        ...(myName    && { displayName: myName }),
+        ...(groupId   && { groupId }),
+      });
+    }
+  } catch(e) {
+    // Never block the app over a profile write failure
+    console.warn('[identity] upsertUserProfile failed (non-fatal):', e.message);
+  }
+}
+
+// ── WHATSAPP / SMS DATA MODEL ──────────────────────────────────────────────
+// Schema scaffolding for future NLP integration. Not implemented yet.
+// Incoming messages will be parsed and stored at:
+//   incomingMessages/{groupId}/{messageId}
+//   → { raw, parsedAction, parsedItems, senderId, receivedAt, processed }
+//
+// parsedAction: 'add' | 'bought' | 'query'
+// parsedItems:  [{ name, quantity, unit }]
+//
+// Item schema (Phase 4 — already partially live on new items):
+//   groups/{groupId}/items/{itemId}
+//   → { name, qty, bought, fav, ts,
+//       addedBy?: uid, addedAt?: ts, addedByDisplayName?: str,
+//       purchasedBy?: uid, purchasedAt?: ts }
+// Old items missing ownership fields continue to work — fields are optional.
 window._lastApiVersion = null; // last `version` seen from /api/prices (server-side build)
 
 window._renderVersionFooter = function() {
@@ -123,6 +174,7 @@ window.createGroup=async function(){
   }
 
   saveLocal(); connectToGroup();
+  upsertUserProfile(myId).catch(() => {});
 };
 
 window.joinGroup=async function(){
@@ -168,6 +220,7 @@ window.joinGroup=async function(){
   }
 
   saveLocal(); connectToGroup();
+  upsertUserProfile(myId).catch(() => {});
 };
 
 // ── ANALYTICS ────────────────────────────────────────────────────────────────
@@ -5143,6 +5196,31 @@ window.confirmManualEntry = async function() {
 // ── FIREBASE ANONYMOUS AUTH + INIT ──
 const auth = getAuth();
 
+
+// ── CONTINUE OPTION — shown on setup screen when user already has a group ──
+window.showContinueIfReturning = function() {
+  const saved = (() => { try { return JSON.parse(localStorage.getItem('fsl_v2') || '{}'); } catch(_) { return {}; } })();
+  if (!saved.groupId || !saved.myName) return; // new user — show normal setup
+
+  const existing = document.getElementById('setup-continue-card');
+  if (existing) return; // already shown
+
+  const card = document.createElement('div');
+  card.id = 'setup-continue-card';
+  card.style.cssText = 'background:#fff;border:2px solid var(--accent);border-radius:16px;padding:16px 18px;margin:12px 16px 0;text-align:center;';
+  card.innerHTML = `
+    <div style="font-size:14px;color:var(--muted);margin-bottom:6px">ברוך השב!</div>
+    <div style="font-size:16px;font-weight:700;margin-bottom:12px">${saved.myName} · ${saved.groupName || saved.groupId}</div>
+    <button class="btn-p" style="width:100%" onclick="(function(){
+      const u=JSON.parse(localStorage.getItem('fsl_v2')||'{}');
+      myName=u.myName;myId=u.myId||myId;groupId=u.groupId;groupName=u.groupName;
+      loadSavedProfile();connectToGroup();
+    })()">▶ המשך לקבוצה</button>
+  `;
+  const setupEl = document.getElementById('setup-screen');
+  if (setupEl) setupEl.insertBefore(card, setupEl.firstChild);
+};
+
 onAuthStateChanged(auth, async (user) => {
   if (user) {
     const firebaseUid = user.uid;
@@ -5176,12 +5254,14 @@ onAuthStateChanged(auth, async (user) => {
         loadSavedProfile();
         connectToGroup();
         setTimeout(updateHeaderAvatar, 300);
+        upsertUserProfile(firebaseUid).catch(() => {}); // fire-and-forget
       } catch(_) {
         showScreen('setup-screen');
       }
     } else {
       console.log('[auth] ✓ signed in | uid:', firebaseUid, '| no saved session → setup screen');
       showScreen('setup-screen');
+      showContinueIfReturning();
 
       // Pre-fill join form if user arrived via an invite link
       if (window._pendingInviteCode) {
