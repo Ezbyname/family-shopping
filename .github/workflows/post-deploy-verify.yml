@@ -1,0 +1,96 @@
+name: Post-Deploy Verification
+
+# Triggered by Vercel webhook after a successful production deployment.
+# Vercel → Settings → Git → Deploy Hooks → create a hook that calls this workflow.
+# Also runnable manually with a custom URL.
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_url:
+        description: 'Vercel deployment URL to verify'
+        required: true
+      trigger:
+        description: 'What triggered this (vercel-webhook, manual, etc.)'
+        required: false
+        default: 'manual'
+
+  # Vercel deploy hook calls this via repository_dispatch
+  repository_dispatch:
+    types: [vercel-deployment-ready]
+
+jobs:
+  verify:
+    name: Verify Deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: tests/package.json
+
+      - name: Install test deps
+        working-directory: tests
+        run: npm ci
+
+      - name: Resolve deployment URL
+        id: url
+        run: |
+          URL="${{ github.event.inputs.deployment_url || github.event.client_payload.url || vars.VERCEL_PRODUCTION_URL }}"
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "Testing: $URL"
+
+      - name: Smoke — Vercel asset availability
+        working-directory: tests
+        env:
+          TEST_BASE_URL: ${{ steps.url.outputs.url }}
+        run: node smoke/vercel-health.js
+
+      - name: Smoke — Firebase connectivity
+        working-directory: tests
+        env:
+          TEST_BASE_URL: ${{ steps.url.outputs.url }}
+        run: node smoke/firebase-health.js
+
+      - name: Install Playwright
+        working-directory: tests
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E — Critical flows only (mobile-chrome)
+        working-directory: tests
+        env:
+          TEST_BASE_URL: ${{ steps.url.outputs.url }}
+          CI: 'true'
+        run: npx playwright test --project=mobile-chrome
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-deploy-report-${{ github.run_id }}
+          path: tests/playwright-report/
+          retention-days: 30
+
+      - name: Gate result
+        if: failure()
+        run: |
+          echo "❌ Post-deploy verification FAILED"
+          echo "Deployment URL: ${{ steps.url.outputs.url }}"
+          echo ""
+          echo "ROLLBACK INSTRUCTIONS:"
+          echo "1. Go to Vercel dashboard → Deployments"
+          echo "2. Find the previous successful deployment"
+          echo "3. Click ⋯ → Promote to Production"
+          echo "4. Alternatively: git revert HEAD && git push origin main"
+          exit 1
+
+      - name: Deployment verified
+        if: success()
+        run: |
+          echo "✅ Deployment verified: ${{ steps.url.outputs.url }}"
+          echo "All critical flows are healthy."
