@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -37,14 +37,14 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
 /* ── SPLASH SCREEN ──────────────────────────────────────────────────────── */
 #splash-overlay{
   position:fixed;inset:0;z-index:9999;
-  background:#1b4a1b;          /* fallback — matches image green */
+  background:#ffffff;
   display:flex;align-items:center;justify-content:center;
   overflow:hidden;
   transition:opacity .55s ease;
 }
 #splash-overlay img{
   width:100%;height:100%;
-  object-fit:cover;
+  object-fit:contain;
   display:block;
 }
 #splash-overlay.fade-out{opacity:0}
@@ -1794,7 +1794,7 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
 
 <!-- SPLASH SCREEN — visible 4 s then fades out -->
 <div id="splash-overlay" aria-hidden="true">
-  <img src="splash.png" alt="">
+  <img src="icon-splash.png" alt="">🛒</text>'},(s=>{s.setAttribute('viewBox','0 0 200 200');s.setAttribute('width','180');s.setAttribute('height','180');return s;})())">
 </div>
 
 <!-- LOADING -->
