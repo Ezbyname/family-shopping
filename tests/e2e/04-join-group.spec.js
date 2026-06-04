@@ -1,54 +1,57 @@
 // 04-join-group.spec.js — Join group flow
-import { test, expect } from './fixtures/test-fixtures.js';
+// @critical: "clicking join tab shows code input"
+import { test, expect, clearSession } from './fixtures/test-fixtures.js';
 
 test.describe('Join group', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
+    await clearSession(page);
     await page.reload();
   });
 
-  test('join group button/option is visible on setup screen', async ({ appPage }) => {
+  test('join tab (#stab-join) is visible on setup screen @critical', async ({ appPage }) => {
     await appPage.goto();
     await appPage.waitForAppReady();
-
-    const joinBtn = appPage.page.locator(
-      '#btn-join-group, button:has-text("הצטרף"), button:has-text("Join"), a:has-text("הצטרף")'
-    ).first();
-    await expect(joinBtn).toBeVisible({ timeout: 8_000 });
+    await expect(appPage.page.locator('#stab-join')).toBeVisible({ timeout: 8_000 });
   });
 
-  test('clicking join shows code entry input', async ({ appPage, page }) => {
+  test('clicking join tab reveals jn-code input', async ({ appPage, page }) => {
     await appPage.goto();
     await appPage.waitForAppReady();
 
-    await appPage.clickJoinGroup();
+    await appPage.clickJoinTab();
 
-    const codeInput = page.locator(
-      '#join-code-input, input[placeholder*="קוד"], input[placeholder*="code"], input[maxlength]'
-    ).first();
-    await expect(codeInput).toBeVisible({ timeout: 5_000 });
+    // Join pane (#spane-join) becomes active; jn-code input is inside it
+    await expect(page.locator('#jn-code')).toBeVisible({ timeout: 5_000 });
   });
 
-  test('join with invalid code shows error feedback', async ({ appPage, page }) => {
+  test('jn-name and jn-code inputs accept text', async ({ appPage, page }) => {
     await appPage.goto();
     await appPage.waitForAppReady();
+    await appPage.clickJoinTab();
 
-    await appPage.clickJoinGroup();
-    await appPage.fillGroupCode('INVALID_CODE_XXXX');
-    await appPage.confirmJoin();
+    await page.locator('#jn-name').fill('TestMember');
+    await page.locator('#jn-code').fill('123456');
 
-    // App should show some form of error (toast, alert, or inline message)
-    // It must NOT navigate to main app with a bad code
-    await page.waitForTimeout(3000);
-    const mainApp = await page.locator('#main-app').isVisible().catch(() => false);
-    // Either still on setup, or error shown — main app with real data should NOT appear
-    // (unless by coincidence INVALID_CODE_XXXX is a real group — extremely unlikely)
-    // We can't assert much here without controlling Firebase, so just check no crash
+    await expect(page.locator('#jn-name')).toHaveValue('TestMember');
+    await expect(page.locator('#jn-code')).toHaveValue('123456');
+  });
+
+  test('invalid code does not crash the app', async ({ appPage, page }) => {
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
-    expect(errors.filter(e => e.includes('Unhandled') || e.includes('TypeError'))).toHaveLength(0);
+
+    await appPage.goto();
+    await appPage.waitForAppReady();
+    await appPage.clickJoinTab();
+    await appPage.fillJoinName('TestUser');
+    await appPage.fillGroupCode('BADCODE');
+    await appPage.submitJoinGroup();
+
+    await page.waitForTimeout(3000);
+    const fatal = errors.filter(e => e.includes('TypeError') || e.includes('ReferenceError'));
+    expect(fatal).toHaveLength(0);
   });
 
 });

@@ -8,7 +8,7 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 8_000 },
   fullyParallel: false,  // Firebase listeners need sequential access per test group
-  retries: process.env.CI ? 2 : 0,
+  retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 2 : 1,
   reporter: process.env.CI
     ? [['github'], ['html', { open: 'never', outputFolder: 'playwright-report' }]]

@@ -1,84 +1,55 @@
-// 05-shopping-list.spec.js — Add item + mark purchased flows
-import { test, expect } from './fixtures/test-fixtures.js';
+// 05-shopping-list.spec.js — Add item + Firebase write round-trip
+// @critical: "item appears in list after add"
+import { test, expect, setSession } from './fixtures/test-fixtures.js';
 
 test.describe('Shopping list operations', () => {
 
-  // Pre-seed a returning user so we land in the main app
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    await page.evaluate(() => {
-      localStorage.setItem('myName',   'ListTester');
-      localStorage.setItem('groupId',  'ci-test-group');
-      localStorage.setItem('groupName','CI Test Group');
+    // Use the real fsl_v2 contract to land in main-screen
+    await setSession(page, {
+      myName:    'ListTester',
+      groupId:   'ci-test-group',
+      groupName: 'CI Test Group',
     });
     await page.reload();
   });
 
-  test('add item input is visible in main app', async ({ appPage, page }) => {
+  test('new-item-input is visible in main-screen', async ({ appPage, page }) => {
     await appPage.waitForAppReady();
-
-    // Navigate to the list tab if tabs exist
-    const listTab = page.locator(
-      'button:has-text("רשימה"), button:has-text("List"), [data-tab="list"], nav button'
-    ).first();
-    if (await listTab.count() > 0) await listTab.click();
-
-    const addInput = page.locator(
-      '#new-item-input, input[placeholder*="פריט"], input[placeholder*="הוסף"], input[placeholder*="Add"]'
-    ).first();
-    await expect(addInput).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#main-screen.active')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#new-item-input')).toBeVisible({ timeout: 8_000 });
   });
 
-  test('add button is present next to input', async ({ appPage, page }) => {
+  test('add-item button is visible ([data-testid="add-item-btn"])', async ({ appPage, page }) => {
     await appPage.waitForAppReady();
-
-    const addBtn = page.locator(
-      '#btn-add-item, button:has-text("הוסף"), button:has-text("Add"), button[type="submit"]'
-    ).first();
-    await expect(addBtn).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('[data-testid="add-item-btn"]')).toBeVisible({ timeout: 8_000 });
   });
 
-  test('typing in item input does not crash the app', async ({ appPage, page }) => {
+  test('typing in new-item-input does not crash @critical', async ({ appPage, page }) => {
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
 
     await appPage.waitForAppReady();
+    const input = page.locator('#new-item-input');
+    await expect(input).toBeVisible({ timeout: 8_000 });
 
-    const addInput = page.locator(
-      '#new-item-input, input[placeholder*="פריט"], input[placeholder*="הוסף"]'
-    ).first();
-
-    if (await addInput.isVisible()) {
-      await addInput.fill('חלב');
-      await addInput.fill('');  // clear
-      await addInput.fill('לחם');
-    }
+    await input.fill('חלב');
+    await input.fill('');
+    await input.fill('לחם');
 
     const fatal = errors.filter(e => e.includes('TypeError') || e.includes('ReferenceError'));
     expect(fatal).toHaveLength(0);
   });
 
-  test('item appears in list after add (Firebase write round-trip)', async ({ appPage, page }) => {
+  test('item appears in list after add — Firebase round-trip @critical', async ({ appPage, page }) => {
     await appPage.waitForAppReady();
 
     const itemName = `חלב_${Date.now()}`;
+    await page.locator('#new-item-input').fill(itemName);
+    await page.locator('[data-testid="add-item-btn"]').click();
 
-    const addInput = page.locator(
-      '#new-item-input, input[placeholder*="פריט"], input[placeholder*="הוסף"]'
-    ).first();
-
-    if (!await addInput.isVisible()) {
-      test.skip('Add item input not found — skipping write round-trip test');
-      return;
-    }
-
-    await addInput.fill(itemName);
-    const addBtn = page.locator(
-      '#btn-add-item, button:has-text("הוסף"), button[type="submit"]'
-    ).first();
-    await addBtn.click();
-
-    // Item should appear within 5 seconds (Firebase write + listener)
+    // Firebase write + realtime listener should surface the item within 8 seconds
     await expect(page.locator(`text=${itemName}`).first()).toBeVisible({ timeout: 8_000 });
   });
 

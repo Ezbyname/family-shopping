@@ -1,5 +1,5 @@
-// AppPage.js — base page object for the Family Shopping PWA
-// All selectors are resilience-first: prefer data-testid, then ARIA, then text
+// AppPage.js — Page Object for Family Shopping PWA
+// All selectors verified against index.html DOM on 2026-06-04.
 
 export class AppPage {
   constructor(page) {
@@ -10,99 +10,80 @@ export class AppPage {
 
   async goto() {
     await this.page.goto('/');
-    // Wait for Firebase auth to initialize (anonymous sign-in)
-    await this.page.waitForFunction(
-      () => !document.querySelector('#splash-screen') ||
-            document.querySelector('#splash-screen').style.display === 'none',
-      { timeout: 15_000 }
-    );
+    // Wait for splash overlay to disappear (CSS fade-out + display:none)
+    await this.page.waitForSelector('#splash-overlay', { state: 'hidden', timeout: 10_000 });
   }
 
   async waitForAppReady() {
-    // App is ready when setup-screen or main-app is visible
+    // Screens are shown via .screen.active (CSS class, not inline style)
     await this.page.waitForSelector(
-      '#setup-screen:not([style*="display: none"]), #main-app:not([style*="display: none"])',
+      '#setup-screen.active, #main-screen.active, #profile-screen.active',
       { timeout: 15_000 }
     );
   }
 
   // ── Setup screen helpers ──────────────────────────────────────────────────
 
-  isOnSetupScreen() {
-    return this.page.locator('#setup-screen').isVisible();
+  async isOnSetupScreen() {
+    return this.page.locator('#setup-screen.active').isVisible();
   }
 
-  isOnMainApp() {
-    return this.page.locator('#main-app').isVisible();
+  async isOnMainScreen() {
+    return this.page.locator('#main-screen.active').isVisible();
   }
 
-  async fillName(name) {
-    const input = this.page.locator('#setup-name, input[placeholder*="שם"], input[type="text"]').first();
-    await input.fill(name);
+  // Fill name on the CREATE tab (input id="cn-name")
+  async fillCreateName(name) {
+    await this.page.locator('#cn-name').fill(name);
   }
 
-  async clickCreateGroup() {
-    await this.page.locator('#btn-create-group, button:has-text("צור קבוצה"), button:has-text("Create")').first().click();
+  // Fill name on the JOIN tab (input id="jn-name")
+  async fillJoinName(name) {
+    await this.page.locator('#jn-name').fill(name);
   }
 
-  async clickJoinGroup() {
-    await this.page.locator('#btn-join-group, button:has-text("הצטרף"), button:has-text("Join")').first().click();
+  // Click the "Create group" setup tab (#stab-create)
+  async clickCreateTab() {
+    await this.page.locator('#stab-create').click();
   }
 
+  // Click the "Join group" setup tab (#stab-join)
+  async clickJoinTab() {
+    await this.page.locator('#stab-join').click();
+  }
+
+  // Submit the create-group form
+  async submitCreateGroup() {
+    await this.page.locator('button[onclick="createGroup()"]').click();
+  }
+
+  // Fill the join-code input (input id="jn-code")
   async fillGroupCode(code) {
-    const input = this.page.locator('#join-code-input, input[placeholder*="קוד"], input[placeholder*="code"]').first();
-    await input.fill(code);
+    await this.page.locator('#jn-code').fill(code);
   }
 
-  async confirmJoin() {
-    await this.page.locator('button:has-text("אישור"), button:has-text("Confirm"), button:has-text("הצטרף")').last().click();
+  // Submit the join-group form
+  async submitJoinGroup() {
+    await this.page.locator('button[onclick="joinGroup()"]').click();
   }
 
-  // ── Main app helpers ──────────────────────────────────────────────────────
+  // ── Shopping list helpers ─────────────────────────────────────────────────
 
   async addShoppingItem(itemName) {
-    const input = this.page.locator(
-      '#new-item-input, input[placeholder*="פריט"], input[placeholder*="item"], input[placeholder*="הוסף"]'
-    ).first();
-    await input.fill(itemName);
-    const addBtn = this.page.locator(
-      'button:has-text("הוסף"), button:has-text("Add"), #btn-add-item'
-    ).first();
-    await addBtn.click();
+    await this.page.locator('#new-item-input').fill(itemName);
+    await this.page.locator('[data-testid="add-item-btn"]').click();
   }
-
-  async markItemPurchased(itemName) {
-    // Find the checkbox or bought button next to the item
-    const row = this.page.locator(`text=${itemName}`).first();
-    const checkbox = row.locator('.. input[type="checkbox"], .. button[class*="check"], .. button[class*="bought"]').first();
-    if (await checkbox.count() > 0) {
-      await checkbox.click();
-    } else {
-      // Fallback: tap the item row itself (some UIs use click-to-toggle)
-      await row.click();
-    }
-  }
-
-  async getGroupCode() {
-    // The group code is usually shown in settings or share dialog
-    const settingsTab = this.page.locator('button:has-text("הגדרות"), button:has-text("Settings"), [data-tab="settings"]').first();
-    if (await settingsTab.count() > 0) await settingsTab.click();
-    const codeEl = this.page.locator('[class*="group-code"], [class*="invite-code"], text=/[A-Z0-9]{4,8}/').first();
-    return codeEl.textContent();
-  }
-
-  // ── Assertion helpers ─────────────────────────────────────────────────────
 
   async expectItemInList(itemName) {
     await this.page.locator(`text=${itemName}`).first().waitFor({ state: 'visible', timeout: 8_000 });
   }
 
+  // ── Assertion helpers ─────────────────────────────────────────────────────
+
   async expectNoErrorBanner() {
-    const errorBanner = this.page.locator('[class*="error"], [class*="alert-danger"], text=/שגיאה|Error/i');
-    const count = await errorBanner.count();
-    if (count > 0) {
-      const text = await errorBanner.first().textContent();
-      throw new Error(`Unexpected error banner: "${text}"`);
+    const banner = this.page.locator('[class*="error-banner"], [class*="alert-danger"]');
+    if (await banner.count() > 0 && await banner.first().isVisible()) {
+      throw new Error(`Unexpected error banner: "${await banner.first().textContent()}"`);
     }
   }
 }
