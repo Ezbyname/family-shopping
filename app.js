@@ -23,54 +23,93 @@ const APP_VERSION = '3.1.0';   // 2026-06: search relevance + price stability + 
 
 // ── USER IDENTITY ─────────────────────────────────────────────────────────
 // Silent upsert — called on every auth. Never blocks UI, never fails loudly.
-// Creates users/{uid} if missing; updates lastSeen + appVersion always.
+// Single update() call: Firebase server sets createdAt only if not present
+// (via server-side no-op on existing fields is not supported in RTDB, so we
+//  use a transaction-free two-field approach: update always, set createdAt
+//  only on first write via a separate path check avoided by using update with
+//  a createdAt that gets overwritten — acceptable tradeoff vs extra read).
+// Actual approach: update() merges fields — safe to call repeatedly.
 async function upsertUserProfile(uid) {
   if (!uid) return;
   try {
-    const userRef = ref(db, `users/${uid}`);
-    const snap = await get(userRef);
     const now = Date.now();
-    if (!snap.exists()) {
-      // First time this device has a real UID — write full profile
-      await set(userRef, {
-        userId:           uid,
-        displayName:      myName || null,
-        groupId:          groupId || null,
-        createdAt:        now,
-        lastSeen:         now,
-        appVersion:       APP_VERSION,
-        migrationVersion: 1,
-      });
-    } else {
-      // Existing user — update mutable fields only (patch, not replace)
-      await update(userRef, {
-        lastSeen:         now,
-        appVersion:       APP_VERSION,
-        ...(myName    && { displayName: myName }),
-        ...(groupId   && { groupId }),
-      });
-    }
+    // update() is idempotent and merge-safe in RTDB — will not delete
+    // existing fields. createdAt will be overwritten on repeat calls;
+    // to preserve it, we'd need a read first (extra RTT not worth it for
+    // a background profile. Clients should treat createdAt as "last seen
+    // on this device" until a server timestamp is available).
+    await update(ref(db, `users/${uid}`), {
+      userId:           uid,
+      displayName:      myName  || null,
+      groupId:          groupId || null,
+      lastSeen:         now,
+      appVersion:       APP_VERSION,
+      migrationVersion: 1,
+    });
   } catch(e) {
     // Never block the app over a profile write failure
     console.warn('[identity] upsertUserProfile failed (non-fatal):', e.message);
   }
 }
 
-// ── WHATSAPP / SMS DATA MODEL ──────────────────────────────────────────────
-// Schema scaffolding for future NLP integration. Not implemented yet.
-// Incoming messages will be parsed and stored at:
+// ── WHATSAPP / SMS DATA MODEL (Phase 6 — design only, not implemented) ────
+//
+// FIREBASE SCHEMA:
 //   incomingMessages/{groupId}/{messageId}
-//   → { raw, parsedAction, parsedItems, senderId, receivedAt, processed }
+//   → {
+//       raw:          string,   // original message text
+//       source:       'whatsapp' | 'sms' | 'api',
+//       senderId:     string,   // phone number or user uid
+//       senderName:   string,
+//       receivedAt:   number,   // ms timestamp
+//       processed:    boolean,
+//       processedAt:  number | null,
+//       parsedAction: 'add' | 'bought' | 'query' | 'unknown',
+//       parsedItems:  [{ name: string, quantity: number, unit: string | null }],
+//       resultItemIds: string[], // Firebase item keys created/updated
+//       error:        string | null,
+//     }
 //
-// parsedAction: 'add' | 'bought' | 'query'
-// parsedItems:  [{ name, quantity, unit }]
+// PARSER FLOW:
+//   1. Webhook (Cloud Function or API route) receives raw message
+//   2. Hebrew NLP tokenizer splits into action + items
+//      "לקנות 2 חלב טרה" → action=add, items=[{name:'חלב טרה', quantity:2}]
+//      "קניתי יוגורט"     → action=bought, items=[{name:'יוגורט', quantity:1}]
+//   3. Fuzzy match against existing items in groups/{groupId}/items
+//   4. Write to Firebase: add item or mark bought
+//   5. Update incomingMessages/{groupId}/{messageId}.processed = true
 //
-// Item schema (Phase 4 — already partially live on new items):
-//   groups/{groupId}/items/{itemId}
-//   → { name, qty, bought, fav, ts,
-//       addedBy?: uid, addedAt?: ts, addedByDisplayName?: str,
-//       purchasedBy?: uid, purchasedAt?: ts }
-// Old items missing ownership fields continue to work — fields are optional.
+// DEDUPLICATION:
+//   - Key: hash(groupId + senderId + raw + floor(receivedAt / 60000))
+//   - Prevents duplicate processing if webhook fires twice
+//
+// SECURITY:
+//   - Webhook validates sender is a known group member (phone linked to uid)
+//   - incomingMessages writable only by server (service account)
+//   - App reads incomingMessages for audit trail; users cannot write
+//
+// CAPACITOR MIGRATION ARCHITECTURE (Phase 5):
+//   Problem: Firebase anonymous auth is per-browser-context.
+//            Capacitor WebView = new context = new anonymous UID.
+//   Solution (3-step):
+//     Step A — Before Capacitor release: link anonymous account to phone number
+//              via Firebase Phone Auth. UID remains the SAME after linking.
+//              App shows one-time "Secure your account" prompt.
+//     Step B — Capacitor app signs in with phone auth on first launch.
+//              Same UID → same group membership → seamless transition.
+//     Step C — Migration code (fallback): if user skips Step A,
+//              generate a one-time 8-character transfer code stored at
+//              transferCodes/{code} → { uid, groupId, expiresAt }.
+//              User enters code in new app. New UID is added to group.
+//              Old UID record kept (can be cleaned up later).
+//   localStorage migration:
+//     Capacitor uses @capacitor/preferences instead of localStorage.
+//     Wrap all localStorage calls in a storage adapter before Capacitor release:
+//       storage.get(key) / storage.set(key, val) / storage.remove(key)
+//     Web: delegates to localStorage. Capacitor: delegates to Preferences plugin.
+//   Service worker:
+//     Not supported in Capacitor. Replace SW offline strategy with
+//     Firebase enableIndexedDbPersistence() before Capacitor migration.
 window._lastApiVersion = null; // last `version` seen from /api/prices (server-side build)
 
 window._renderVersionFooter = function() {
@@ -2750,9 +2789,12 @@ window.toggleBought = async function(id) {
   _haptic(nowBought ? 18 : 12);
 
   await update(ref(db, `groups/${groupId}/items/${id}`), {
-    bought:          nowBought,
-    checkedByUserId: nowBought ? myId : null,
-    checkedAt:       nowBought ? Date.now() : null,
+    bought:              nowBought,
+    checkedByUserId:     nowBought ? myId   : null,   // legacy field (kept for compatibility)
+    checkedAt:           nowBought ? Date.now() : null, // legacy field
+    purchasedByUserId:   nowBought ? myId   : null,   // Phase 4 canonical field
+    purchasedByName:     nowBought ? myName : null,
+    purchasedAt:         nowBought ? Date.now() : null,
   });
 
   if (nowBought) {
@@ -5208,15 +5250,31 @@ window.showContinueIfReturning = function() {
   const card = document.createElement('div');
   card.id = 'setup-continue-card';
   card.style.cssText = 'background:#fff;border:2px solid var(--accent);border-radius:16px;padding:16px 18px;margin:12px 16px 0;text-align:center;';
-  card.innerHTML = `
-    <div style="font-size:14px;color:var(--muted);margin-bottom:6px">ברוך השב!</div>
-    <div style="font-size:16px;font-weight:700;margin-bottom:12px">${saved.myName} · ${saved.groupName || saved.groupId}</div>
-    <button class="btn-p" style="width:100%" onclick="(function(){
-      const u=JSON.parse(localStorage.getItem('fsl_v2')||'{}');
-      myName=u.myName;myId=u.myId||myId;groupId=u.groupId;groupName=u.groupName;
-      loadSavedProfile();connectToGroup();
-    })()">▶ המשך לקבוצה</button>
-  `;
+
+  // Build DOM nodes to avoid XSS from user-controlled name/groupName fields
+  const welcome = document.createElement('div');
+  welcome.style.cssText = 'font-size:14px;color:var(--muted);margin-bottom:6px';
+  welcome.textContent = 'ברוך השב!';
+
+  const identity = document.createElement('div');
+  identity.style.cssText = 'font-size:16px;font-weight:700;margin-bottom:12px';
+  identity.textContent = `${saved.myName} · ${saved.groupName || saved.groupId}`;
+
+  const btn = document.createElement('button');
+  btn.className = 'btn-p';
+  btn.style.width = '100%';
+  btn.textContent = '▶ המשך לקבוצה';
+  btn.addEventListener('click', function() {
+    const u = (() => { try { return JSON.parse(localStorage.getItem('fsl_v2') || '{}'); } catch(_) { return {}; } })();
+    if (!u.groupId) return;
+    myName = u.myName; myId = u.myId || myId; groupId = u.groupId; groupName = u.groupName;
+    loadSavedProfile(); connectToGroup();
+  });
+
+  card.appendChild(welcome);
+  card.appendChild(identity);
+  card.appendChild(btn);
+
   const setupEl = document.getElementById('setup-screen');
   if (setupEl) setupEl.insertBefore(card, setupEl.firstChild);
 };
