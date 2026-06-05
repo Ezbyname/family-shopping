@@ -36,6 +36,7 @@ test.describe('New user registration', () => {
 
     await appPage.clickCreateTab();
     await appPage.fillCreateName(testUserName);
+    await appPage.fillGroupName('CI Test Family');
     await appPage.submitCreateGroup();
 
     // After Firebase write completes, app transitions to main-screen

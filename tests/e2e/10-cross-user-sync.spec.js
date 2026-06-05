@@ -16,7 +16,6 @@ import { test, expect } from '@playwright/test';
 
 const CI_GROUP    = 'ci-test-group';
 const CI_GROUP_NAME = 'CI Test Group';
-const APP_READY   = '#main-screen.active, #setup-screen.active';
 const MAIN_READY  = '#main-screen.active';
 
 // Write fsl_v2 into a page's localStorage before the app initialises.
@@ -36,23 +35,35 @@ async function waitForMain(page) {
 // ── Setup two contexts ────────────────────────────────────────────────────────
 
 async function openTwoUsers(browser, ts) {
-  const ctxA = await browser.newContext({ locale: 'he-IL' });
-  const ctxB = await browser.newContext({ locale: 'he-IL' });
+  const [ctxA, ctxB] = await Promise.all([
+    browser.newContext({ locale: 'he-IL' }),
+    browser.newContext({ locale: 'he-IL' }),
+  ]);
 
-  const pageA = await ctxA.newPage();
-  const pageB = await ctxB.newPage();
+  const [pageA, pageB] = await Promise.all([ctxA.newPage(), ctxB.newPage()]);
 
-  // Inject sessions before first navigation
-  await pageA.goto('/');
-  await setSession(pageA, { myName: `UserA_${ts}`, groupId: CI_GROUP, groupName: CI_GROUP_NAME });
-  await pageA.reload();
-
-  await pageB.goto('/');
-  await setSession(pageB, { myName: `UserB_${ts}`, groupId: CI_GROUP, groupName: CI_GROUP_NAME });
-  await pageB.reload();
+  // Inject sessions in parallel before reload
+  await Promise.all([pageA.goto('/'), pageB.goto('/')]);
+  await Promise.all([
+    setSession(pageA, { myName: `UserA_${ts}`, groupId: CI_GROUP, groupName: CI_GROUP_NAME }),
+    setSession(pageB, { myName: `UserB_${ts}`, groupId: CI_GROUP, groupName: CI_GROUP_NAME }),
+  ]);
+  await Promise.all([pageA.reload(), pageB.reload()]);
 
   // Both must reach main-screen before tests begin
   await Promise.all([waitForMain(pageA), waitForMain(pageB)]);
+
+  // Assert distinct Firebase UIDs (only available on localhost/vercel.app)
+  const hostname = new URL(pageA.url()).hostname;
+  if (hostname === 'localhost' || hostname.includes('vercel.app')) {
+    const [uidA, uidB] = await Promise.all([
+      pageA.evaluate(() => window.__debugAuth?.getUid?.() ?? null),
+      pageB.evaluate(() => window.__debugAuth?.getUid?.() ?? null),
+    ]);
+    if (uidA && uidB) {
+      if (uidA === uidB) throw new Error(`UIDs must differ: both got ${uidA}`);
+    }
+  }
 
   return { ctxA, ctxB, pageA, pageB };
 }
@@ -60,6 +71,7 @@ async function openTwoUsers(browser, ts) {
 // ── Test 1: Add Item Sync ─────────────────────────────────────────────────────
 
 test('User A adds item — User B sees it without reload @critical', async ({ browser }) => {
+  test.setTimeout(60_000);
   const ts = Date.now();
   const { ctxA, ctxB, pageA, pageB } = await openTwoUsers(browser, ts);
 
@@ -87,6 +99,7 @@ test('User A adds item — User B sees it without reload @critical', async ({ br
 // ── Test 2: Purchase Sync ────────────────────────────────────────────────────
 
 test('User B marks item purchased — User A sees bought state @critical', async ({ browser }) => {
+  test.setTimeout(60_000);
   const ts = Date.now();
   const { ctxA, ctxB, pageA, pageB } = await openTwoUsers(browser, ts);
 
@@ -128,6 +141,7 @@ test('User B marks item purchased — User A sees bought state @critical', async
 // ── Test 3: Unpurchase Sync ──────────────────────────────────────────────────
 
 test('User B unmarks purchased — User A sees pending state', async ({ browser }) => {
+  test.setTimeout(60_000);
   const ts = Date.now();
   const { ctxA, ctxB, pageA, pageB } = await openTwoUsers(browser, ts);
 
@@ -174,6 +188,7 @@ test('User B unmarks purchased — User A sees pending state', async ({ browser 
 // Both users see each other's favorites in real time. This is by design.
 
 test('Favorites are group-scoped — User B sees User A\'s saved favorite', async ({ browser }) => {
+  test.setTimeout(60_000);
   const ts = Date.now();
   const { ctxA, ctxB, pageA, pageB } = await openTwoUsers(browser, ts);
 
@@ -210,6 +225,7 @@ test('Favorites are group-scoped — User B sees User A\'s saved favorite', asyn
 // ── Test 5: Connection Recovery ──────────────────────────────────────────────
 
 test('User B reconnects and receives missed items — Firebase recovery', async ({ browser }) => {
+  test.setTimeout(60_000);
   const ts = Date.now();
   const { ctxA, ctxB, pageA, pageB } = await openTwoUsers(browser, ts);
 

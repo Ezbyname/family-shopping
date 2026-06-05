@@ -40,12 +40,23 @@ test.describe('Price comparison', () => {
     expect(body.prices.length).toBe(0);
   });
 
-  test('basket-compare API accepts POST with empty basket @critical', async ({ page }) => {
+  test('basket-compare rejects empty basket with 400 @critical', async ({ page }) => {
     const res = await page.request.post('/api/basket-compare', {
       data: { items: [] },
       headers: { 'Content-Type': 'application/json' },
     });
-    // Must not 500 — empty basket is a valid degenerate case
+    // api/basket-compare.js lines 38-39: empty items array → 400
+    expect(res.status()).toBe(400);
+    const body = await res.json();
+    expect(body).toHaveProperty('error');
+  });
+
+  test('basket-compare API accepts POST with valid basket', async ({ page }) => {
+    const res = await page.request.post('/api/basket-compare', {
+      data: { items: [{ barcode: '7290000066614', quantity: 1 }] },
+      headers: { 'Content-Type': 'application/json' },
+    });
+    // Must not 500 or 405
     expect(res.status()).not.toBe(500);
     expect(res.status()).not.toBe(405);
   });

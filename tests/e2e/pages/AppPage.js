@@ -37,6 +37,11 @@ export class AppPage {
     await this.page.locator('#cn-name').fill(name);
   }
 
+  // Fill group name on the CREATE tab (input id="cn-group")
+  async fillGroupName(name) {
+    await this.page.locator('#cn-group').fill(name);
+  }
+
   // Fill name on the JOIN tab (input id="jn-name")
   async fillJoinName(name) {
     await this.page.locator('#jn-name').fill(name);

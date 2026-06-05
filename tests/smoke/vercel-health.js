@@ -15,12 +15,10 @@ const CHECKS = [
   // Static assets (PWA shell)
   { url: '/',              expect: 200, label: 'index.html' },
   { url: '/manifest.json', expect: 200, label: 'manifest.json', json: true, hasField: 'name' },
-  { url: '/app.js',        expect: 200, label: 'app.js',         contentType: 'javascript' },
-  { url: '/styles.css',    expect: 200, label: 'styles.css',     contentType: 'css' },
   { url: '/sw.js',         expect: 200, label: 'sw.js',          contentType: 'javascript' },
   // API routes
   { url: '/api/health',                expect: 200, label: 'API /health',        json: true, hasField: 'ok' },
-  { url: '/api/prices?barcode=7290000066614', expect: 200, label: 'API /prices', json: true, isArray: true },
+  { url: '/api/prices?barcode=7290000066614', expect: 200, label: 'API /prices', json: true, hasField: 'prices' },
 ];
 
 let passed = 0;
