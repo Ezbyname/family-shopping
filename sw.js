@@ -1,16 +1,18 @@
 // sw.js — Family Shopping PWA Service Worker v3
 // Strategy: Network-first for API/Firebase, Cache-first for app shell
 
-const CACHE_VERSION = 'fsl-v3';
+const CACHE_VERSION = 'fsl-v5';
 const APP_SHELL = [
   '/',
   '/index.html',
+  '/styles.css',
+  '/app.js',
+  '/appinline.js',
+  '/sw-killer.js',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
-  // js/barcode.js and js/analytics.js exist in the repo as standalone modules
-  // but are not yet imported by index.html (inline implementations are active).
-  // They are intentionally excluded from APP_SHELL until integration is complete.
+  '/splash.png',
 ];
 
 // Patterns that should NEVER be served from cache
