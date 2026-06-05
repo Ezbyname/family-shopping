@@ -1,0 +1,60 @@
+name: Production Sanity Gate
+
+# Required merge gate — blocks PRs to main if any @critical flow fails.
+# Configure this as a required status check in:
+#   GitHub → Settings → Branches → main → Require status checks → "Critical Flow Sanity"
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      test_url:
+        description: 'Target URL to test against'
+        required: false
+        default: ''
+
+jobs:
+  critical-flows:
+    name: Critical Flow Sanity
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: ${{ vars.VERCEL_PRODUCTION_URL != '' || github.event.inputs.test_url != '' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install test dependencies
+        working-directory: tests
+        run: npm install
+
+      - name: Install Playwright (Chromium only)
+        working-directory: tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Run @critical flow tests (mobile-chrome)
+        working-directory: tests
+        env:
+          TEST_BASE_URL: ${{ github.event.inputs.test_url || vars.VERCEL_PRODUCTION_URL }}
+          CI: 'true'
+        run: npx playwright test --grep "@critical" --project=mobile-chrome
+
+      - name: Upload sanity report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sanity-report-${{ github.run_id }}
+          path: tests/playwright-report/
+          retention-days: 14
+
+      - name: Upload failure traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sanity-failures-${{ github.run_id }}
+          path: tests/test-results/
+          retention-days: 7

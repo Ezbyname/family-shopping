@@ -1,0 +1,128 @@
+name: CI — Safety Gate
+
+# Runs on every PR and push to main.
+# Blocks merge if any critical flow is broken.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      test_url:
+        description: 'Override test URL (e.g. a Vercel preview)'
+        required: false
+        default: ''
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Job 1: Parser sanity (no Firebase needed) ────────────────────────────
+  parser-sanity:
+    name: Price Parser Sanity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: scripts/package.json
+
+      - name: Install
+        working-directory: scripts
+        run: npm install
+
+      - name: Parser fixture test
+        working-directory: scripts
+        run: npm run sanity:prices:fixture
+
+  # ── Job 2: API smoke tests (requires Firebase secrets) ───────────────────
+  api-smoke:
+    name: API Smoke Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: parser-sanity
+    # Only run when Firebase secrets are available (skip on external forks)
+    if: ${{ vars.VERCEL_PRODUCTION_URL != '' || github.event.inputs.test_url != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: tests/package.json
+
+      - name: Install test deps
+        working-directory: tests
+        run: npm install
+
+      - name: Firebase health smoke test
+        working-directory: tests
+        env:
+          TEST_BASE_URL: ${{ github.event.inputs.test_url || vars.VERCEL_PRODUCTION_URL }}
+        run: node smoke/firebase-health.js
+
+      - name: Vercel deployment smoke test
+        working-directory: tests
+        env:
+          TEST_BASE_URL: ${{ github.event.inputs.test_url || vars.VERCEL_PRODUCTION_URL }}
+        run: node smoke/vercel-health.js
+
+  # ── Job 3: E2E tests ──────────────────────────────────────────────────────
+  e2e:
+    name: E2E Tests (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: api-smoke
+    if: ${{ vars.VERCEL_PRODUCTION_URL != '' || github.event.inputs.test_url != '' }}
+    strategy:
+      fail-fast: false  # run all browsers even if one fails
+      matrix:
+        project: [mobile-chrome, desktop-chrome]
+        # mobile-safari skipped in CI (requires macOS runner — add if budget allows)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: tests/package.json
+
+      - name: Install test deps
+        working-directory: tests
+        run: npm install
+
+      - name: Install Playwright browsers
+        working-directory: tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        working-directory: tests
+        env:
+          TEST_BASE_URL: ${{ github.event.inputs.test_url || vars.VERCEL_PRODUCTION_URL }}
+          CI: 'true'
+        run: npx playwright test --project=${{ matrix.project }}
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.project }}
+          path: tests/playwright-report/
+          retention-days: 14
+
+      - name: Upload test videos/screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failures-${{ matrix.project }}
+          path: tests/test-results/
+          retention-days: 7

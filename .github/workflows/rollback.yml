@@ -1,0 +1,61 @@
+name: Emergency Rollback
+
+# Manual rollback to a specific git SHA or the previous passing deployment.
+# Run this if post-deploy verification catches a regression after deploy.
+
+on:
+  workflow_dispatch:
+    inputs:
+      rollback_sha:
+        description: 'Git SHA to roll back to (leave blank to revert HEAD)'
+        required: false
+        default: ''
+      reason:
+        description: 'Reason for rollback (shown in commit message)'
+        required: true
+        default: 'Post-deploy verification failure'
+
+jobs:
+  rollback:
+    name: Rollback Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production  # Requires approval from repo admin
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 10
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Revert or reset
+        run: |
+          SHA="${{ github.event.inputs.rollback_sha }}"
+          REASON="${{ github.event.inputs.reason }}"
+
+          if [ -n "$SHA" ]; then
+            echo "Rolling back to specific SHA: $SHA"
+            git revert --no-edit HEAD.."$SHA"^
+          else
+            echo "Reverting last commit"
+            git revert --no-edit HEAD
+          fi
+
+      - name: Push rollback
+        run: git push origin main
+
+      - name: Summary
+        run: |
+          echo "## Rollback Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Reason:** ${{ github.event.inputs.reason }}" >> $GITHUB_STEP_SUMMARY
+          echo "**New HEAD:** $(git rev-parse HEAD)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Vercel will auto-deploy from the reverted main branch." >> $GITHUB_STEP_SUMMARY
+          echo "Run the post-deploy-verify workflow to confirm recovery." >> $GITHUB_STEP_SUMMARY

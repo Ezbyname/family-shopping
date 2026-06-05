@@ -129,7 +129,7 @@
       maxlength="50" onkeydown="if(event.key==='Enter')addItem()"
       oninput="_onAddInputChange()">
     <button class="brand-pick-btn" id="brand-pick-btn" onclick="openBrandPicker()" title="בחר מותג ספציפי">🔍</button>
-    <button class="add-btn" onclick="addItem()">+</button>
+    <button class="add-btn" data-testid="add-item-btn" onclick="addItem()">+</button>
   </div>
   <div id="list-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
     <div class="list-wrap" id="list-content"></div>
