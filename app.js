@@ -6940,3 +6940,169 @@ window.applyTheme = function(theme) {
   applyTheme(saved);
 })();
 // ══════════════════════════════════════════════════════════════════════════════
+
+// ═══ TEXT IMPORT (WhatsApp / SMS) ═══
+// V1 scope: line-based parser only. Each line = one item.
+// Multi-item lines are treated as a single item name.
+// Bulk-bought triggers one notification per item (same as manual toggle — by design).
+// Bulk-duplicate qty race under rapid import (same as rapid manual adds — V2 item).
+
+let _importParsed = [];
+
+function _parseImportLines(raw) {
+  const CHECKBOX_RE  = /^[✅☑✔]\s*/u;
+  const NOISE_RE     = /^[-–—•*#\s]*$/u;
+  const BULLET_RE    = /^[*\-–—•]\s+/u;
+  const NL_REMOVE_RE = /^(מחק|תמחק|תוריד|להוריד|הסר|לא צריך|אין צורך ב|בלי)\s+/u;
+  const NL_BOUGHT_RE = /^(קניתי|כבר קניתי|סיימתי לקנות|כבר יש|נקנה|כבר קנינו)\s+/u;
+  const NL_ADD_RE    = /^(לקנות|צריך|תוסיף|להוסיף|קנה|קני|נצטרך|צריכים|תקני|תקנה)\s+/u;
+  const result = [];
+  for (const line of raw.split('\n')) {
+    const t = line.trim();
+    if (!t || NOISE_RE.test(t)) continue;
+    if (CHECKBOX_RE.test(t)) {
+      const n = t.replace(CHECKBOX_RE, '').trim();
+      if (n) result.push({ name: n, action: 'bought' });
+    } else if (NL_REMOVE_RE.test(t)) {
+      const n = t.replace(NL_REMOVE_RE, '').trim();
+      if (n) result.push({ name: n, action: 'remove' });
+    } else if (NL_BOUGHT_RE.test(t)) {
+      const n = t.replace(NL_BOUGHT_RE, '').trim();
+      if (n) result.push({ name: n, action: 'bought' });
+    } else if (NL_ADD_RE.test(t)) {
+      const n = t.replace(NL_ADD_RE, '').trim();
+      if (n) result.push({ name: n, action: 'add' });
+    } else {
+      const n = t.replace(BULLET_RE, '').trim();
+      if (n) result.push({ name: n, action: 'add' });
+    }
+  }
+  return result;
+}
+
+window.openImportModal = function() {
+  const el = document.getElementById('import-overlay');
+  if (el) el.style.display = 'flex';
+  _importShowTextarea();
+  const ta = document.getElementById('import-textarea');
+  if (ta) { ta.value = ''; setTimeout(() => ta.focus(), 50); }
+};
+
+window.closeImportModal = function() {
+  const el = document.getElementById('import-overlay');
+  if (el) el.style.display = 'none';
+  _importParsed = [];
+};
+
+function _importShowTextarea() {
+  const tv = document.getElementById('import-textarea-view');
+  const pv = document.getElementById('import-preview-view');
+  if (tv) tv.style.display = 'flex';
+  if (pv) pv.style.display = 'none';
+}
+
+function _importShowPreview(parsed) {
+  const tv = document.getElementById('import-textarea-view');
+  const pv = document.getElementById('import-preview-view');
+  if (tv) tv.style.display = 'none';
+  if (!pv) return;
+  pv.style.display = 'flex';
+  const ICON = { add: '➕', bought: '✅', remove: '🗑' };
+  const html = parsed.map(({ name, action }) => {
+    const norm = normalizeName(name);
+    const missing = action === 'remove' &&
+      !Object.values(items).some(i => normalizeName(i.name) === norm);
+    return '<div class="import-preview-row' + (missing ? ' import-preview-missing' : '') + '">' +
+      '<span class="import-preview-icon">' + ICON[action] + '</span>' +
+      '<span class="import-preview-name">' + esc(name) + '</span>' +
+      (missing ? '<span class="import-preview-note">לא ברשימה</span>' : '') +
+      '</div>';
+  }).join('');
+  document.getElementById('import-preview-list').innerHTML =
+    html || '<div style="color:var(--muted);text-align:center;padding:16px">לא נמצאו פריטים</div>';
+  _importParsed = parsed;
+}
+
+window.runImport = function() {
+  const raw = document.getElementById('import-textarea')?.value || '';
+  const parsed = _parseImportLines(raw);
+  if (!parsed.length) { toast('⚠️ לא נמצאו פריטים לייבוא'); return; }
+  _importShowPreview(parsed);
+};
+
+window.backToImportEdit = function() { _importShowTextarea(); };
+
+window.executeImport = async function() {
+  if (!_importParsed.length) return;
+  const m = myProfile || {};
+  let added = 0, bought = 0, removed = 0;
+
+  for (const { name, action } of _importParsed) {
+
+    if (action === 'bought') {
+      const existing = findExistingListItem(name, null);
+      if (existing) {
+        await toggleBought(existing.id);
+      } else {
+        const newRef = push(ref(db, `groups/${groupId}/items`));
+        await set(newRef, {
+          name, qty: 1, bought: false, fav: false, barcode: null,
+          addedByUserId: myId, addedByDisplayName: myName,
+          addedByAvatarType:  m.avatarType  || 'emoji',
+          addedByAvatarValue: m.avatarValue || '👤',
+          addedByAvatarEmoji: m.avatarEmoji || null,
+          addedAt: Date.now(), ts: Date.now(),
+        });
+        logActivity('item_added', newRef.key, name);
+        await toggleBought(newRef.key);
+      }
+      bought++;
+
+    } else if (action === 'remove') {
+      const norm = normalizeName(name);
+      const id = Object.keys(items).find(k => normalizeName(items[k].name) === norm);
+      if (id) {
+        const item = items[id];
+        try {
+          await remove(ref(db, `groups/${groupId}/items/${id}`));
+          if (item.addedByUserId && item.addedByUserId !== myId) {
+            const targets = {};
+            targets[item.addedByUserId] = true;
+            await createNotification({
+              type: 'item_deleted', itemId: id, itemName: item.name, targetUsersObj: targets,
+            });
+          }
+          logActivity('item_removed', id, name);
+          removed++;
+        } catch(e) {
+          console.error('[import] delete failed:', e.message);
+        }
+      }
+
+    } else {
+      const existing = findExistingListItem(name, null);
+      if (existing) {
+        await update(ref(db, `groups/${groupId}/items/${existing.id}`), { qty: (existing.qty || 1) + 1 });
+      } else {
+        const newRef = push(ref(db, `groups/${groupId}/items`));
+        set(newRef, {
+          name, qty: 1, bought: false, fav: false, barcode: null,
+          addedByUserId: myId, addedByDisplayName: myName,
+          addedByAvatarType:  m.avatarType  || 'emoji',
+          addedByAvatarValue: m.avatarValue || '👤',
+          addedByAvatarEmoji: m.avatarEmoji || null,
+          addedAt: Date.now(), ts: Date.now(),
+        });
+        logActivity('item_added', newRef.key, name);
+      }
+      added++;
+    }
+  }
+
+  closeImportModal();
+  const parts = [];
+  if (added)   parts.push('➕ ' + added);
+  if (bought)  parts.push('✅ ' + bought);
+  if (removed) parts.push('🗑 ' + removed);
+  toast(parts.length ? '📋 יובאו: ' + parts.join(' · ') : '⚠️ לא בוצעו פעולות');
+};

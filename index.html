@@ -129,6 +129,7 @@
       maxlength="50" onkeydown="if(event.key==='Enter')addItem()"
       oninput="_onAddInputChange()">
     <button class="brand-pick-btn" id="brand-pick-btn" onclick="openBrandPicker()" title="בחר מותג ספציפי">🔍</button>
+    <button class="import-btn" id="import-list-btn" onclick="openImportModal()" title="ייבוא רשימה מוואטסאפ">📋</button>
     <button class="add-btn" data-testid="add-item-btn" onclick="addItem()">+</button>
   </div>
   <div id="list-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
@@ -867,6 +868,34 @@
     </div>
     <div class="bc-body" id="bc-body">
       <div class="bc-loading"><div class="spin"></div><p>משווה את כל הרשימה...</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- import modal -->
+<div class="import-overlay" id="import-overlay" onclick="if(event.target===this)closeImportModal()">
+  <div class="import-modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📋 ייבוא רשימה</div>
+    <div class="import-textarea-view" id="import-textarea-view">
+      <div style="font-size:12px;color:var(--muted);margin-top:-4px">
+        הדבק רשימה מוואטסאפ או SMS — שורה אחת לכל פריט.<br>
+        שורות עם ✅ יסומנו כנקנו.
+      </div>
+      <textarea class="import-textarea" id="import-textarea"
+        placeholder="חלב&#10;לחם&#10;✅ ביצים&#10;מחק חמאה"></textarea>
+      <div class="modal-row">
+        <button class="mbtn primary" onclick="runImport()">📋 המשך</button>
+        <button class="mbtn ghost" onclick="closeImportModal()">ביטול</button>
+      </div>
+    </div>
+    <div class="import-preview-view" id="import-preview-view">
+      <div style="font-size:12px;color:var(--muted);margin-top:-4px">אשר את הפעולות הבאות:</div>
+      <div class="import-preview-list" id="import-preview-list"></div>
+      <div class="modal-row">
+        <button class="mbtn primary" onclick="executeImport()">✅ אשר ובצע</button>
+        <button class="mbtn ghost" onclick="backToImportEdit()">◄ חזור</button>
+      </div>
     </div>
   </div>
 </div>
