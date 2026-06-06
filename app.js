@@ -2503,6 +2503,8 @@ const _BP_SYNONYMS = {
 function normalizeProductQuery(q) {
   if (!q) return ‘’;
   let s = String(q).normalize(‘NFKC’);
+  // Remove emoji and pictographic symbols (common in WhatsApp messages: 🛒 ✅ 🔥 ❤️)
+  s = s.replace(/\p{Extended_Pictographic}/gu, ‘’);
   // Strip leading NL action prefixes (may survive from WhatsApp import item names)
   s = s.replace(/^(לקנות|צריך|תוסיף|להוסיף|קנה|קני|נצטרך|צריכים|תקני|תקנה|מחק|תמחק|קניתי|כבר יש)\s*:?\s*/u, ‘’);
   // Normalize apostrophe/geresh variants → straight apostrophe U+0027
@@ -2525,6 +2527,35 @@ function normalizeProductQuery(q) {
 function _bpNormalizeQuery(q) {
   const s = normalizeProductQuery(q);
   return _BP_SYNONYMS[s] || s;
+}
+
+// Extract quantity and brand from a normalized query.
+// qty and brand are stored for future use; product is the search term.
+// "2 קוטג' תנובה" → { product: "קוטג'", qty: 2, brand: "תנובה" }
+function _bpParseQueryMeta(normQ) {
+  let s = normQ;
+  let qty = null, brand = null, m;
+  if ((m = s.match(/^(\d+)\s*x?\s+/i))     && +m[1] > 0) { qty = +m[1]; s = s.slice(m[0].length).trim(); }
+  else if ((m = s.match(/\s+x?(\d+)$/i))   && +m[1] > 0) { qty = +m[1]; s = s.slice(0, -m[0].length).trim(); }
+  const sLow = s.toLowerCase();
+  for (const br of _IL_BRANDS_SET) {
+    if (sLow.endsWith(' ' + br)) { brand = br; s = s.slice(0, -(br.length + 1)).trim(); break; }
+    else if (sLow === br)        { brand = br; s = '';                                   break; }
+  }
+  return { product: s || normQ, qty, brand };
+}
+
+// Levenshtein distance for short tokens — used in fuzzy scoring.
+// Fast-exits when string lengths differ by more than 3 (tokens are short).
+function _levenshtein(a, b) {
+  if (!a) return b.length; if (!b) return a.length;
+  if (Math.abs(a.length - b.length) > 3) return Math.max(a.length, b.length);
+  const dp = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++)
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+  return dp[a.length][b.length];
 }
 
 function _bpTranslate(q) {
@@ -2565,7 +2596,8 @@ function _bpSelectName(p, queryLang) {
 
 // Score a candidate product for a given query.
 // Higher = more relevant. Negative = should be filtered out.
-function _bpScore(p, query, queryLang, enQuery) {
+// queryBrand (optional): extracted brand token — gives a ranking boost.
+function _bpScore(p, query, queryLang, enQuery, queryBrand) {
   let score = 0;
   const nameLang = _bpDetectLang(p.name);
   const nLow     = p.name.toLowerCase();
@@ -2602,6 +2634,28 @@ function _bpScore(p, query, queryLang, enQuery) {
     if (nLow.includes(eLow)) score += 10;
   }
 
+  // ── 5. Extracted query brand match ───────────────────────────────────────
+  if (queryBrand) {
+    const qbLow = queryBrand.toLowerCase();
+    if (bLow.split(/[\s,/]+/).some(w => w === qbLow) || nLow.includes(qbLow)) score += 20;
+  }
+
+  // ── 6. Fuzzy token match — Levenshtein distance (typo tolerance) ─────────
+  // Adds score for tokens that are close but not exact (edit distance 1-2).
+  // Handles: "ניר" vs "נייר", "קוטץ" vs "קוטג", "טואלת" vs "טואלט"
+  const qTokens = qLow.split(/\s+/).filter(w => w.length >= 3);
+  const nTokens = nLow.split(/\s+/).filter(w => w.length >= 3);
+  if (qTokens.length && nTokens.length) {
+    let fuzzyHits = 0;
+    for (const qt of qTokens) {
+      if (nLow.includes(qt)) continue; // exact already scored in component 3
+      const bestDist = Math.min(...nTokens.map(nt => _levenshtein(qt, nt)));
+      if (bestDist === 1) fuzzyHits += 1;
+      else if (bestDist === 2 && qt.length >= 5) fuzzyHits += 0.5;
+    }
+    if (fuzzyHits > 0) score += (fuzzyHits / qTokens.length) * 12;
+  }
+
   return score;
 }
 // ────────────────────────────────────────────────────────────────────────────
@@ -2614,8 +2668,11 @@ async function _bpRunSearch(query, signal) {
   try {
     const rawQuery  = query;                           // preserved for display only
     const normQ     = _bpNormalizeQuery(rawQuery);     // normalized + synonym-resolved
+    const meta      = _bpParseQueryMeta(normQ);        // extract qty, brand, clean product
+    const queryBrand = meta.brand;                     // null or extracted brand token
+    const productQ  = meta.product;                    // query with qty/brand stripped
     const queryLang = _bpDetectLang(normQ);            // lang detection on clean text
-    const enQuery   = queryLang === 'he' ? (_bpTranslate(normQ) || normQ) : normQ;
+    const enQuery   = queryLang === 'he' ? (_bpTranslate(productQ) || normQ) : normQ;
     const enc       = encodeURIComponent(enQuery);
     const encOrig   = encodeURIComponent(normQ);       // normalized (not raw) for URL 1
 
@@ -2625,10 +2682,10 @@ async function _bpRunSearch(query, signal) {
     const IL     = '&tagtype_0=countries&tag_contains_0=contains&tag_0=israel';
 
     const urls = [
-      // 1. Israel-filtered + original query (finds Hebrew/Arabic named products in Israel)
+      // 1. Israel-filtered + original normalized query
       `${BASE}?search_terms=${encOrig}&search_simple=1&action=process&json=1&page_size=20&fields=${FIELDS}${IL}`,
-      // 2. Israel-filtered + translated query (finds Latin-named products sold in Israel)
-      enQuery !== query
+      // 2. Israel-filtered + translated query (only when translation differs from normalized query)
+      enQuery !== normQ
         ? `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=15&fields=${FIELDS}${IL}`
         : null,
       // 3. Broad fallback — no country filter; low-scored items get filtered by _bpScore
@@ -2666,7 +2723,8 @@ async function _bpRunSearch(query, signal) {
 
     // Score every candidate, filter irrelevant ones, sort by relevance
     const MIN_SCORE = queryLang !== 'latin' ? -10 : -20;
-    const _scored = raw.map(p => ({ ...p, _s: _bpScore(p, normQ, queryLang, enQuery) }));
+    const _scored = raw.map(p => ({ ...p, _s: _bpScore(p, normQ, queryLang, enQuery, queryBrand) }));
+    const topScore = _scored.length ? Math.max(..._scored.map(p => p._s)) : 0;
     _bpProducts = _scored
       .filter(p => p._s > MIN_SCORE)
       .sort((a, b) => b._s - a._s)
@@ -2678,7 +2736,7 @@ async function _bpRunSearch(query, signal) {
       _bpFallback = true;
       _bpProducts = [..._scored].sort((a, b) => b._s - a._s).slice(0, 8).map(({ _s, ...p }) => p);
     }
-    console.log('[match]', { rawQuery, normalizedQuery: normQ, translatedQuery: enQuery, candidateCount: raw.length, finalCount: _bpProducts.length, fallback: _bpFallback });
+    console.log('[search-quality]', { rawQuery, normalizedQuery: normQ, translatedQuery: enQuery, candidateCount: raw.length, finalCount: _bpProducts.length, topScore, fallback: _bpFallback });
 
     if (queryEl) queryEl.textContent = _bpProducts.length
       ? `מצאנו ${_bpProducts.length} מוצרים עבור "${query}"`
@@ -2692,7 +2750,7 @@ async function _bpRunSearch(query, signal) {
       ? '<div class="bp-fallback-note">לא נמצאה התאמה מדויקת — מציג מוצרים דומים</div>'
       : '';
     if (resultsEl) resultsEl.innerHTML = _fallbackNotice + _bpProducts.slice(0, 14).map((p, i) => {
-      const nameHtml = _boldKeyword(p.name, query);
+      const nameHtml = _boldKeyword(p.name, normQ);
       const sub = [p.brand, p.size].filter(Boolean).join(' · ');
       const imgTag = p.image
         ? `<img class="bp-item-img" src="${esc(p.image)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
