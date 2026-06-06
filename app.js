@@ -2215,7 +2215,7 @@ function itemHTML(item) {
       ? `<img class="ip-tile-img" src="${esc(at.image)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span class="ip-tile-icon" style="display:none">${_ipEmoji(item.name)}</span>`
       : `<span class="ip-tile-icon">${_ipEmoji(item.name)}</span>`;
     ipTile = `<div class="ip-tile-wrap">
-      <button class="ip-tile has-product" onclick="openBrandPicker('attach','${item.id}','${encodeURIComponent(item.name||'')}')" title="${label}">
+      <button class="ip-tile has-product" onclick="openBrandPicker('attach','${item.id}','${encodeURIComponent(item.name||'').replace(/'/g,'%27')}')" title="${label}">
         ${iconHtml}
         <span class="ip-tile-label">${label}</span>
         ${sub ? `<span class="ip-tile-sub">${sub}</span>` : ''}
@@ -2223,7 +2223,7 @@ function itemHTML(item) {
       <button class="ip-clear-btn" onclick="clearItemProduct('${item.id}',event)" title="הסר מוצר">✕</button>
     </div>`;
   } else if (!isFavTab) {
-    ipTile = `<button class="ip-tile" onclick="openBrandPicker('attach','${item.id}','${encodeURIComponent(item.name||'')}')" title="בחר מוצר ספציפי">
+    ipTile = `<button class="ip-tile" onclick="openBrandPicker('attach','${item.id}','${encodeURIComponent(item.name||'').replace(/'/g,'%27')}')" title="בחר מוצר ספציפי">
       <span class="ip-tile-icon">${_ipEmoji(item.name)}</span>
       <span class="ip-tile-label" style="color:var(--muted)">בחר מוצר</span>
     </button>`;
@@ -2454,6 +2454,30 @@ const _BP_HE_EN = {
   'עוף':'chicken','בשר':'beef','דג':'fish','עגבניות':'tomatoes',
   'מלפפון':'cucumber','בצל':'onion','שום':'garlic','גזר':'carrot',
   'תפוח אדמה':'potato','ברוקולי':'broccoli','תפוח':'apple','בננה':'banana',
+  // household & hygiene
+  'נייר טואלט':'toilet paper','נייר אסלה':'toilet paper',
+  'נייר מגבת':'paper towel','מגבת נייר':'paper towel',
+  'מגבונים':'wet wipes','מגבון':'wet wipe',
+  'סבון':'soap','סבון ידיים':'hand soap','סבון כלים':'dish soap',
+  'שמפו':'shampoo','מרכך':'conditioner','מרכך שיער':'hair conditioner',
+  'אבקת כביסה':'laundry detergent','נוזל כביסה':'liquid detergent',
+  'מרכך כביסה':'fabric softener','ממיס שומן':'degreaser',
+  'חומר ניקוי':'cleaning product','נוזל ניקוי':'cleaning liquid',
+  'אקונומיקה':'bleach','מי ברז':'water',
+  'תחתיות':'diapers','חיתולים':'diapers','טיטולים':'diapers',
+  'פד':'pad','תחבושת':'sanitary pad',
+  'קרם שיניים':'toothpaste','מברשת שיניים':'toothbrush',
+  'דאודורנט':'deodorant','קרם גוף':'body lotion','קרם פנים':'face cream',
+  'תחבושת פלסטר':'bandage','כדורים':'pills',
+  // kitchen & misc
+  'שקיות זבל':'garbage bags','שקית זבל':'garbage bag',
+  'ניילון נצמד':'cling film','נייר אלומיניום':'aluminum foil',
+  'כלי חד פעמי':'disposable','צלחת חד פעמית':'disposable plate',
+  'כוס חד פעמית':'disposable cup',
+  'מרק':'soup','מרק עוף':'chicken soup','מרק ירקות':'vegetable soup',
+  'שימורים':'canned food','קופסת שימורים':'canned goods',
+  'חטיפים':'snacks','חטיף':'snack',
+  'מים':'water','מים מינרליים':'mineral water','סודה':'soda water',
 };
 function _bpTranslate(q) {
   const l = q.trim();
@@ -4263,14 +4287,14 @@ function renderFavoritesPanel() {
         ? `<img class="ip-tile-img" src="${esc(at.image)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span class="ip-tile-icon" style="display:none">${_ipEmoji(fav.name)}</span>`
         : `<span class="ip-tile-icon">${_ipEmoji(fav.name)}</span>`;
       ipTile = `<div class="ip-tile-wrap">
-        <button class="ip-tile has-product" onclick="openBrandPicker('fav-attach','${fav._id}','${encodeURIComponent(fav.name||'')}')" title="${label}">
+        <button class="ip-tile has-product" onclick="openBrandPicker('fav-attach','${fav._id}','${encodeURIComponent(fav.name||'').replace(/'/g,'%27')}')" title="${label}">
           ${iconHtml}
           <span class="ip-tile-label">${label}</span>
         </button>
         <button class="ip-clear-btn" onclick="clearFavProduct('${fav._id}',event)" title="הסר מוצר">✕</button>
       </div>`;
     } else {
-      ipTile = `<button class="ip-tile" onclick="openBrandPicker('fav-attach','${fav._id}','${encodeURIComponent(fav.name||'')}')" title="בחר מוצר ספציפי">
+      ipTile = `<button class="ip-tile" onclick="openBrandPicker('fav-attach','${fav._id}','${encodeURIComponent(fav.name||'').replace(/'/g,'%27')}')" title="בחר מוצר ספציפי">
         <span class="ip-tile-icon">${_ipEmoji(fav.name)}</span>
         <span class="ip-tile-label" style="color:var(--muted)">בחר מוצר</span>
       </button>`;
