@@ -873,10 +873,12 @@
 </div>
 
 <!-- import modal -->
-<div class="import-overlay" id="import-overlay" onclick="if(event.target===this)closeImportModal()">
+<div class="import-overlay" id="import-overlay">
   <div class="import-modal">
-    <div class="modal-handle"></div>
-    <div class="modal-title">📋 ייבוא רשימה</div>
+    <div class="import-modal-header">
+      <button class="import-close-btn" onclick="closeImportModal()" aria-label="סגור">✕</button>
+      <div class="modal-title" style="margin:0">📋 ייבוא רשימה</div>
+    </div>
     <div class="import-textarea-view" id="import-textarea-view">
       <div style="font-size:12px;color:var(--muted);margin-top:-4px">
         הדבק רשימה מוואטסאפ או SMS — שורה אחת לכל פריט.<br>
