@@ -2512,26 +2512,26 @@ const _BP_SYNONYMS = {
 // Applied before ALL matching: translation, synonym, scoring, API queries.
 // Raw query is preserved separately for display only.
 function normalizeProductQuery(q) {
-  if (!q) return ‘’;
-  let s = String(q).normalize(‘NFKC’);
+  if (!q) return '';
+  let s = String(q).normalize('NFKC');
   // Remove emoji and pictographic symbols (common in WhatsApp messages: 🛒 ✅ 🔥 ❤️)
-  s = s.replace(/\p{Extended_Pictographic}/gu, ‘’);
+  s = s.replace(/\p{Extended_Pictographic}/gu, '');
   // Strip leading NL action prefixes (may survive from WhatsApp import item names)
-  s = s.replace(/^(לקנות|צריך|תוסיף|להוסיף|קנה|קני|נצטרך|צריכים|תקני|תקנה|מחק|תמחק|קניתי|כבר יש)\s*:?\s*/u, ‘’);
+  s = s.replace(/^(לקנות|צריך|תוסיף|להוסיף|קנה|קני|נצטרך|צריכים|תקני|תקנה|מחק|תמחק|קניתי|כבר יש)\s*:?\s*/u, '');
   // Normalize apostrophe/geresh variants → straight apostrophe U+0027
-  s = s.replace(/[‘’׳`ʼ’]/g, "’");
+  s = s.replace(/[''׳`ʼ']/g, "'");
   // Normalize quote/gershayim variants → straight double-quote, then strip wrapping quotes
-  s = s.replace(/[""״]/g, ‘"’).replace(/^"(.+)"$/, ‘$1’).replace(/^’(.+)’$/, ‘$1’);
+  s = s.replace(/[""״]/g, '"').replace(/^"(.+)"$/, '$1').replace(/^'(.+)'$/, '$1');
   // Replace separator characters with spaces
-  s = s.replace(/[-–—,;:/\\|_]/g, ‘ ‘);
+  s = s.replace(/[-–—,;:/\\|_]/g, ' ');
   // Replace bracket/parenthesis chars with spaces (keep inner content)
-  s = s.replace(/[()[\]{}]/g, ‘ ‘);
+  s = s.replace(/[()[\]{}]/g, ' ');
   // Remove trailing dots and ellipsis
-  s = s.replace(/[.…]+$/, ‘’).replace(/^[.…]+/, ‘’);
+  s = s.replace(/[.…]+$/, '').replace(/^[.…]+/, '');
   // Remove internal dots (Hebrew product queries never use decimal notation)
-  s = s.replace(/\.+/g, ‘ ‘);
+  s = s.replace(/\.+/g, ' ');
   // Collapse whitespace
-  return s.replace(/\s+/g, ‘ ‘).trim();
+  return s.replace(/\s+/g, ' ').trim();
 }
 
 // Apply synonym map after full normalization.
@@ -2572,7 +2572,7 @@ function _levenshtein(a, b) {
 function _bpTranslate(q) {
   // q arrives already normalized; apostrophe guard kept as defense-in-depth
   const l     = q.trim();
-  const lNorm = l.replace(/[‘’׳`’ʼ]/g, "’");
+  const lNorm = l.replace(/[''׳`'ʼ]/g, "'");
   if (_BP_HE_EN[l])     return _BP_HE_EN[l];
   if (_BP_HE_EN[lNorm]) return _BP_HE_EN[lNorm];
   // Exact substring match
@@ -2586,7 +2586,7 @@ function _bpTranslate(q) {
   const lTokens = lNorm.split(/\s+/).filter(w => w.length >= 3);
   if (lTokens.length) {
     for (const [h, e] of Object.entries(_BP_HE_EN)) {
-      const hTokens = h.replace(/[‘’׳`’ʼ]/g, ‘’).split(/\s+/).filter(w => w.length >= 3);
+      const hTokens = h.replace(/[''׳`'ʼ]/g, '').split(/\s+/).filter(w => w.length >= 3);
       if (!hTokens.length) continue;
       const allMatch = lTokens.every(lt => hTokens.some(ht => _levenshtein(lt, ht) <= 1));
       if (allMatch) return e;
