@@ -2497,15 +2497,40 @@ const _BP_SYNONYMS = {
   'שמפו לשיניים':  'קרם שיניים',
 };
 
-// Normalize apostrophe variants and apply synonym map before translation.
+// Full text normalization — Unicode, punctuation, separators, whitespace.
+// Applied before ALL matching: translation, synonym, scoring, API queries.
+// Raw query is preserved separately for display only.
+function normalizeProductQuery(q) {
+  if (!q) return ‘’;
+  let s = String(q).normalize(‘NFKC’);
+  // Strip leading NL action prefixes (may survive from WhatsApp import item names)
+  s = s.replace(/^(לקנות|צריך|תוסיף|להוסיף|קנה|קני|נצטרך|צריכים|תקני|תקנה|מחק|תמחק|קניתי|כבר יש)\s*:?\s*/u, ‘’);
+  // Normalize apostrophe/geresh variants → straight apostrophe U+0027
+  s = s.replace(/[‘’׳`ʼ’]/g, "’");
+  // Normalize quote/gershayim variants → straight double-quote, then strip wrapping quotes
+  s = s.replace(/[""״]/g, ‘"’).replace(/^"(.+)"$/, ‘$1’).replace(/^’(.+)’$/, ‘$1’);
+  // Replace separator characters with spaces
+  s = s.replace(/[-–—,;:/\\|_]/g, ‘ ‘);
+  // Replace bracket/parenthesis chars with spaces (keep inner content)
+  s = s.replace(/[()[\]{}]/g, ‘ ‘);
+  // Remove trailing dots and ellipsis
+  s = s.replace(/[.…]+$/, ‘’).replace(/^[.…]+/, ‘’);
+  // Remove internal dots (Hebrew product queries never use decimal notation)
+  s = s.replace(/\.+/g, ‘ ‘);
+  // Collapse whitespace
+  return s.replace(/\s+/g, ‘ ‘).trim();
+}
+
+// Apply synonym map after full normalization.
 function _bpNormalizeQuery(q) {
-  const s = q.trim().replace(/[''׳`’ʼ]/g, "'").replace(/\s+/g, ' ');
+  const s = normalizeProductQuery(q);
   return _BP_SYNONYMS[s] || s;
 }
 
 function _bpTranslate(q) {
+  // q arrives already normalized; apostrophe guard kept as defense-in-depth
   const l     = q.trim();
-  const lNorm = l.replace(/[''׳`’ʼ]/g, "'");
+  const lNorm = l.replace(/[‘’׳`’ʼ]/g, "’");
   if (_BP_HE_EN[l])     return _BP_HE_EN[l];
   if (_BP_HE_EN[lNorm]) return _BP_HE_EN[lNorm];
   for (const [h, e] of Object.entries(_BP_HE_EN)) {
@@ -2587,11 +2612,12 @@ async function _bpRunSearch(query, signal) {
   if (queryEl)   queryEl.textContent = `מחפש "${query}"...`;
   if (resultsEl) resultsEl.innerHTML = '<div class="bp-loading">🔍 מחפש מוצרים...</div>';
   try {
-    const queryLang = _bpDetectLang(query);
-    const normQ     = _bpNormalizeQuery(query);
-    const enQuery   = queryLang === 'he' ? (_bpTranslate(normQ) || query) : query;
+    const rawQuery  = query;                           // preserved for display only
+    const normQ     = _bpNormalizeQuery(rawQuery);     // normalized + synonym-resolved
+    const queryLang = _bpDetectLang(normQ);            // lang detection on clean text
+    const enQuery   = queryLang === 'he' ? (_bpTranslate(normQ) || normQ) : normQ;
     const enc       = encodeURIComponent(enQuery);
-    const encOrig   = encodeURIComponent(query);
+    const encOrig   = encodeURIComponent(normQ);       // normalized (not raw) for URL 1
 
     const BASE   = 'https://world.openfoodfacts.org/cgi/search.pl';
     // Added product_name_ar so Arabic product names are available for ranking
@@ -2640,7 +2666,7 @@ async function _bpRunSearch(query, signal) {
 
     // Score every candidate, filter irrelevant ones, sort by relevance
     const MIN_SCORE = queryLang !== 'latin' ? -10 : -20;
-    const _scored = raw.map(p => ({ ...p, _s: _bpScore(p, query, queryLang, enQuery) }));
+    const _scored = raw.map(p => ({ ...p, _s: _bpScore(p, normQ, queryLang, enQuery) }));
     _bpProducts = _scored
       .filter(p => p._s > MIN_SCORE)
       .sort((a, b) => b._s - a._s)
@@ -2652,7 +2678,7 @@ async function _bpRunSearch(query, signal) {
       _bpFallback = true;
       _bpProducts = [..._scored].sort((a, b) => b._s - a._s).slice(0, 8).map(({ _s, ...p }) => p);
     }
-    console.log('[picker]', { query, normQ, enQuery, rawCount: raw.length, filteredCount: _bpProducts.length, fallback: _bpFallback });
+    console.log('[match]', { rawQuery, normalizedQuery: normQ, translatedQuery: enQuery, candidateCount: raw.length, finalCount: _bpProducts.length, fallback: _bpFallback });
 
     if (queryEl) queryEl.textContent = _bpProducts.length
       ? `מצאנו ${_bpProducts.length} מוצרים עבור "${query}"`
