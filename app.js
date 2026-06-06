@@ -216,6 +216,31 @@ window.createGroup=async function(){
   upsertUserProfile(myId).catch(() => {});
 };
 
+// Returns 'yes' | 'no' | null (dismissed)
+function _showDuplicateMemberDialog(name) {
+  return new Promise(resolve => {
+    const safe = esc(name);
+    const id   = 'dup-member-dlg';
+    const el   = document.createElement('div');
+    el.id      = id;
+    el.style.cssText = 'position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);direction:rtl';
+    el.innerHTML = `
+      <div style="background:var(--surface,#fff);border-radius:18px;padding:24px 20px;max-width:320px;width:90%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.18)">
+        <div style="font-size:16px;font-weight:800;margin-bottom:10px">קיים כבר חבר בשם "${safe}"</div>
+        <div style="font-size:14px;color:var(--muted,#888);margin-bottom:20px">האם אתה אותו אדם?</div>
+        <div style="display:flex;gap:10px;justify-content:center">
+          <button id="dup-yes" style="flex:1;padding:12px;border-radius:12px;border:none;background:var(--accent,#22c55e);color:#111;font-size:15px;font-weight:700;cursor:pointer">כן</button>
+          <button id="dup-no"  style="flex:1;padding:12px;border-radius:12px;border:1.5px solid var(--border,#ddd);background:transparent;font-size:15px;cursor:pointer">לא</button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+    const cleanup = ans => { el.remove(); resolve(ans); };
+    document.getElementById('dup-yes').onclick = () => cleanup('yes');
+    document.getElementById('dup-no').onclick  = () => cleanup('no');
+    el.addEventListener('click', e => { if (e.target === el) cleanup(null); });
+  });
+}
+
 window.joinGroup=async function(){
   const name=document.getElementById('jn-name').value.trim();
   const code=document.getElementById('jn-code').value.trim();
@@ -240,8 +265,38 @@ window.joinGroup=async function(){
     info=snap.val();
   } catch(e) {
     console.error('[joinGroup] group_read_failed:', e.message);
-    toast('❌ שגיאת רשת — נסה שוב');
+    const msg = (e.message||'');
+    if (msg.includes('PERMISSION_DENIED') || msg.toLowerCase().includes('permission denied'))
+      toast('❌ אין גישה לקבוצה — ודא שהקוד נכון ושהקבוצה קיימת');
+    else
+      toast('❌ שגיאת רשת — נסה שוב');
     return;
+  }
+
+  // ── Step 2.5: duplicate member name check ──
+  let dupUid = null, dupMemberData = null;
+  try {
+    const mSnap = await get(ref(db, `groups/${code}/members`));
+    if (mSnap.exists()) {
+      const normNew = normalizeName(name);
+      const entry = Object.entries(mSnap.val()).find(
+        ([uid, m]) => uid !== fbUser.uid && normalizeName(m.name || '') === normNew
+      );
+      if (entry) { dupUid = entry[0]; dupMemberData = entry[1]; }
+    }
+  } catch(_) { /* non-critical — proceed if members can't be read yet */ }
+
+  if (dupUid !== null) {
+    const answer = await _showDuplicateMemberDialog(name);
+    if (answer === 'no') {
+      const nameEl = document.getElementById('jn-name');
+      if (nameEl) { nameEl.value = ''; nameEl.focus(); }
+      toast('שם זה כבר קיים — אנא בחר שם אחר');
+      return;
+    }
+    if (answer === null) return; // dialog dismissed without choice
+    // answer === 'yes' → transfer existing member profile to this session's UID,
+    // then remove the old UID entry so member count stays exactly the same.
   }
 
   groupId=code; groupName=info.name;
@@ -250,12 +305,36 @@ window.joinGroup=async function(){
   console.log('[joinGroup] auth ok | uid:', myId, '| group:', code);
 
   // ── Step 3: write member ──
+  // YES flow: carry the full existing profile (joined date, role, avatar, etc.)
+  //           so no history or preferences are lost.
+  // NEW flow: write minimal record with current timestamp.
+  const memberRecord = dupMemberData
+    ? { ...dupMemberData, id: myId, updatedAt: Date.now() }   // preserve all existing fields
+    : { name, id: myId, joined: Date.now() };
   try {
-    await set(ref(db,`groups/${code}/members/${myId}`),{name,id:myId,joined:Date.now()});
+    await set(ref(db, `groups/${code}/members/${myId}`), memberRecord);
   } catch(e) {
     console.error('[joinGroup] member_write_failed:', e.message);
     toast('לא הצלחנו להצטרף — בדוק הרשאות');
     return;
+  }
+
+  // Remove old UID entry so the member count stays the same (no duplicate rows).
+  // Best-effort — a silent failure here leaves an extra row but doesn't break the app.
+  if (dupUid !== null) {
+    remove(ref(db, `groups/${code}/members/${dupUid}`)).catch(() => {});
+  }
+
+  // Seed myProfile from the copied record so ensureGroupMembership doesn't
+  // overwrite the preserved avatar/role with session defaults.
+  if (dupMemberData) {
+    myProfile = {
+      avatarType:  dupMemberData.avatarType  || 'emoji',
+      avatarValue: dupMemberData.avatarValue || '👤',
+      avatarEmoji: dupMemberData.avatarEmoji || null,
+      displayName: name,
+    };
+    try { localStorage.setItem('fsl_profile', JSON.stringify(myProfile)); } catch(_) {}
   }
 
   saveLocal(); connectToGroup();
@@ -1891,7 +1970,7 @@ function renderPrices(){
 
 window.openMembers=function(){
   document.getElementById('modal-code').textContent=groupId;
-  document.getElementById('members-list').innerHTML=Object.values(members).map(m=>`
+  document.getElementById('members-list').innerHTML=dedupMembers(Object.values(members)).map(m=>`
     <div class="member-row">
       <div class="member-av">${m.name.charAt(0)}</div>
       <div><div class="member-name">${esc(m.name)}</div>
@@ -2512,26 +2591,26 @@ const _BP_SYNONYMS = {
 // Applied before ALL matching: translation, synonym, scoring, API queries.
 // Raw query is preserved separately for display only.
 function normalizeProductQuery(q) {
-  if (!q) return '';
-  let s = String(q).normalize('NFKC');
+  if (!q) return ‘’;
+  let s = String(q).normalize(‘NFKC’);
   // Remove emoji and pictographic symbols (common in WhatsApp messages: 🛒 ✅ 🔥 ❤️)
-  s = s.replace(/\p{Extended_Pictographic}/gu, '');
+  s = s.replace(/\p{Extended_Pictographic}/gu, ‘’);
   // Strip leading NL action prefixes (may survive from WhatsApp import item names)
-  s = s.replace(/^(לקנות|צריך|תוסיף|להוסיף|קנה|קני|נצטרך|צריכים|תקני|תקנה|מחק|תמחק|קניתי|כבר יש)\s*:?\s*/u, '');
+  s = s.replace(/^(לקנות|צריך|תוסיף|להוסיף|קנה|קני|נצטרך|צריכים|תקני|תקנה|מחק|תמחק|קניתי|כבר יש)\s*:?\s*/u, ‘’);
   // Normalize apostrophe/geresh variants → straight apostrophe U+0027
-  s = s.replace(/[''׳`ʼ']/g, "'");
+  s = s.replace(/[‘’׳`ʼ’]/g, "’");
   // Normalize quote/gershayim variants → straight double-quote, then strip wrapping quotes
-  s = s.replace(/[""״]/g, '"').replace(/^"(.+)"$/, '$1').replace(/^'(.+)'$/, '$1');
+  s = s.replace(/[""״]/g, ‘"’).replace(/^"(.+)"$/, ‘$1’).replace(/^’(.+)’$/, ‘$1’);
   // Replace separator characters with spaces
-  s = s.replace(/[-–—,;:/\\|_]/g, ' ');
+  s = s.replace(/[-–—,;:/\\|_]/g, ‘ ‘);
   // Replace bracket/parenthesis chars with spaces (keep inner content)
-  s = s.replace(/[()[\]{}]/g, ' ');
+  s = s.replace(/[()[\]{}]/g, ‘ ‘);
   // Remove trailing dots and ellipsis
-  s = s.replace(/[.…]+$/, '').replace(/^[.…]+/, '');
+  s = s.replace(/[.…]+$/, ‘’).replace(/^[.…]+/, ‘’);
   // Remove internal dots (Hebrew product queries never use decimal notation)
-  s = s.replace(/\.+/g, ' ');
+  s = s.replace(/\.+/g, ‘ ‘);
   // Collapse whitespace
-  return s.replace(/\s+/g, ' ').trim();
+  return s.replace(/\s+/g, ‘ ‘).trim();
 }
 
 // Apply synonym map after full normalization.
@@ -2572,7 +2651,7 @@ function _levenshtein(a, b) {
 function _bpTranslate(q) {
   // q arrives already normalized; apostrophe guard kept as defense-in-depth
   const l     = q.trim();
-  const lNorm = l.replace(/[''׳`'ʼ]/g, "'");
+  const lNorm = l.replace(/[‘’׳`’ʼ]/g, "’");
   if (_BP_HE_EN[l])     return _BP_HE_EN[l];
   if (_BP_HE_EN[lNorm]) return _BP_HE_EN[lNorm];
   // Exact substring match
@@ -2586,7 +2665,7 @@ function _bpTranslate(q) {
   const lTokens = lNorm.split(/\s+/).filter(w => w.length >= 3);
   if (lTokens.length) {
     for (const [h, e] of Object.entries(_BP_HE_EN)) {
-      const hTokens = h.replace(/[''׳`'ʼ]/g, '').split(/\s+/).filter(w => w.length >= 3);
+      const hTokens = h.replace(/[‘’׳`’ʼ]/g, ‘’).split(/\s+/).filter(w => w.length >= 3);
       if (!hTokens.length) continue;
       const allMatch = lTokens.every(lt => hTokens.some(ht => _levenshtein(lt, ht) <= 1));
       if (allMatch) return e;
@@ -4179,6 +4258,56 @@ function updateHeaderAvatar() {
 
 // ── UTILS ──
 
+// Collapse duplicate names — keeps the entry for the current session's UID,
+// or the most-recently-updated entry when neither is the current session.
+// After selecting the winner, merges "richer" profile fields from the loser
+// so a stale default on the winner never silently downgrades role or avatar.
+// Runs at render time; no Firebase writes.
+function dedupMembers(list) {
+  const seen = new Map(); // normalizedName → { winner, loser | null }
+
+  for (const m of list) {
+    const key = normalizeName(m.displayName || m.name || '');
+    if (!key) continue;
+    const existing = seen.get(key);
+    if (!existing) { seen.set(key, { winner: m, loser: null }); continue; }
+
+    const mTs    = m.updatedAt || m.joined || 0;
+    const exTs   = existing.winner.updatedAt || existing.winner.joined || 0;
+    const mIsMe  = (m.uid || m.id) === myId;
+    const exIsMe = (existing.winner.uid || existing.winner.id) === myId;
+
+    let winner, loser;
+    if      (mIsMe)               { winner = m;               loser = existing.winner; }
+    else if (exIsMe)              { winner = existing.winner; loser = m; }
+    else if (mTs > exTs)          { winner = m;               loser = existing.winner; }
+    else                          { winner = existing.winner; loser = m; }
+
+    seen.set(key, { winner, loser });
+  }
+
+  return Array.from(seen.values()).map(({ winner, loser }) => {
+    if (!loser) return winner;
+    // Merge richer fields from loser so winner is never silently downgraded.
+    const merged = { ...winner };
+    // Role: admin outranks member — never strip admin
+    if (loser.role === 'admin' && merged.role !== 'admin') merged.role = 'admin';
+    if (loser.roles?.admin && !merged.roles?.admin)
+      merged.roles = { ...(merged.roles || {}), admin: true };
+    // Avatar: prefer non-default over default emoji '👤'
+    const winnerIsDefault = !merged.avatarType || merged.avatarType === 'emoji' &&
+                            (merged.avatarValue === '👤' || !merged.avatarValue);
+    const loserIsRicher   = loser.avatarType && !(loser.avatarType === 'emoji' &&
+                            (loser.avatarValue === '👤' || !loser.avatarValue));
+    if (winnerIsDefault && loserIsRicher) {
+      merged.avatarType  = loser.avatarType;
+      merged.avatarValue = loser.avatarValue;
+      merged.avatarEmoji = loser.avatarEmoji;
+    }
+    return merged;
+  });
+}
+
 // Normalize name for duplicate detection
 function normalizeName(name) {
   return String(name || '')
@@ -4747,6 +4876,8 @@ window.closeGroupSheet = function() {
 };
 
 function _gsTouchStart(e) {
+  // Don't hijack taps on interactive elements — let click fire normally
+  if (e.target.closest('button,a,input,select,textarea')) { _gsSwipeActive = false; return; }
   const sheet = document.getElementById('gs-sheet');
   // Only start swipe-down tracking when at the top of the scroll area
   if (sheet.scrollTop > 4) { _gsSwipeActive = false; return; }
@@ -4795,7 +4926,7 @@ function _renderGroupSheet() {
   // Members — smart ordering: me → admins → online → offline
   const membersEl = document.getElementById('gs-members');
   if (membersEl) {
-    const mList = Object.values(members || {});
+    const mList = dedupMembers(Object.values(members || {}));
     if (!mList.length) {
       membersEl.innerHTML =
         `<div style="padding:10px 20px;font-size:12px;color:var(--muted)">אין חברים עדיין</div>`;
@@ -4938,7 +5069,13 @@ window.joinAnotherGroup = async function() {
     closeOL2('add-group-overlay');
     await switchGroup(code);
     toast(`✅ הצטרפת לקבוצה: ${newName}`);
-  } catch(e) { toast('❌ ' + e.message); }
+  } catch(e) {
+    const msg = (e.message||'');
+    if (msg.includes('PERMISSION_DENIED') || msg.toLowerCase().includes('permission denied'))
+      toast('❌ שגיאת הרשאות — הקוד שגוי או שאין גישה לקבוצה זו');
+    else
+      toast('❌ ' + msg);
+  }
 };
 
 // ── CREATE ANOTHER GROUP ──
