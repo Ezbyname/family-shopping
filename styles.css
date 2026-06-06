@@ -1781,8 +1781,8 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
   color:var(--text);font-family:'Rubik',sans-serif;font-size:14px;
   outline:none;resize:none;direction:rtl;}
 .import-textarea:focus{border-color:var(--accent)}
-.import-textarea-view,.import-preview-view{display:flex;flex-direction:column;gap:10px;flex:1}
-.import-preview-view{display:none}
+.import-textarea-view{display:flex;flex-direction:column;gap:10px;flex:1}
+.import-preview-view{display:none;flex-direction:column;gap:10px;flex:1}
 .import-preview-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;min-height:80px;max-height:220px}
 .import-preview-row{display:flex;align-items:center;gap:8px;padding:7px 10px;
   background:var(--card);border-radius:10px;font-size:14px}
