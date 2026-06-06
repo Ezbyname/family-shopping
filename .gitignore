@@ -19,3 +19,4 @@ Thumbs.db
 # ── Generated data files ──────────────────────────────────────────────────────
 # Store snapshot — generated file, updated monthly on VPS
 workers/prices/data/stores-geocoded.json
+apply-import.py
