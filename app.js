@@ -2472,6 +2472,9 @@ const _BP_HE_EN = {
   // kitchen & misc
   'שקיות זבל':'garbage bags','שקית זבל':'garbage bag',
   'ניילון נצמד':'cling film','נייר אלומיניום':'aluminum foil',
+  'נייר אפייה':'baking paper','נייר לאפייה':'baking paper',
+  'ספריי ניקוי':'cleaning spray','ספריי':'spray',
+  'נוזל כלים':'dish soap',
   'כלי חד פעמי':'disposable','צלחת חד פעמית':'disposable plate',
   'כוס חד פעמית':'disposable cup',
   'מרק':'soup','מרק עוף':'chicken soup','מרק ירקות':'vegetable soup',
@@ -2483,10 +2486,16 @@ const _BP_HE_EN = {
 // Canonical synonym map — variant phrasings → canonical _BP_HE_EN key.
 // Add entries here to cover misspellings, alternative phrasing, singular/plural.
 const _BP_SYNONYMS = {
+  // toilet paper variants & typos
   'נייר שירותים':  'נייר טואלט',
   'טישו טואלט':    'נייר טואלט',
-  'נייר טואלת':    'נייר טואלט',   // common misspelling
+  'נייר טואלת':    'נייר טואלט',
+  'ניר טואלט':     'נייר טואלט',   // missing yod
+  'ניר טואלת':     'נייר טואלט',
+  // paper towel
   'נייר מגבות':    'נייר מגבת',
+  'ניר מגבת':      'נייר מגבת',
+  // other
   'מגבונים לחים':  'מגבונים',
   'משחת שיניים':   'קרם שיניים',
   'משחה לשיניים':  'קרם שיניים',
@@ -2495,6 +2504,8 @@ const _BP_SYNONYMS = {
   'חיתול':         'חיתולים',
   'טיטול':         'טיטולים',
   'שמפו לשיניים':  'קרם שיניים',
+  // common Hebrew typos
+  "קוטץ":          "קוטג'",         // ץ/ג final-letter confusion
 };
 
 // Full text normalization — Unicode, punctuation, separators, whitespace.
@@ -2564,8 +2575,22 @@ function _bpTranslate(q) {
   const lNorm = l.replace(/[‘’׳`’ʼ]/g, "’");
   if (_BP_HE_EN[l])     return _BP_HE_EN[l];
   if (_BP_HE_EN[lNorm]) return _BP_HE_EN[lNorm];
+  // Exact substring match
   for (const [h, e] of Object.entries(_BP_HE_EN)) {
     if (l.includes(h) || lNorm.includes(h)) return e;
+  }
+  // Fuzzy token match — catches typos like "ניר" (missing yod) vs "נייר".
+  // Only fires when exact/substring both failed.
+  // Requires ALL query tokens to find a match (exact or dist≤1) within the SAME dict key.
+  // This prevents "ניר מגבת" from falsely matching "נייר טואלט" via the "ניר"≈"נייר" hit alone.
+  const lTokens = lNorm.split(/\s+/).filter(w => w.length >= 3);
+  if (lTokens.length) {
+    for (const [h, e] of Object.entries(_BP_HE_EN)) {
+      const hTokens = h.replace(/[‘’׳`’ʼ]/g, ‘’).split(/\s+/).filter(w => w.length >= 3);
+      if (!hTokens.length) continue;
+      const allMatch = lTokens.every(lt => hTokens.some(ht => _levenshtein(lt, ht) <= 1));
+      if (allMatch) return e;
+    }
   }
   return null;
 }
@@ -2736,7 +2761,7 @@ async function _bpRunSearch(query, signal) {
       _bpFallback = true;
       _bpProducts = [..._scored].sort((a, b) => b._s - a._s).slice(0, 8).map(({ _s, ...p }) => p);
     }
-    console.log('[search-quality]', { rawQuery, normalizedQuery: normQ, translatedQuery: enQuery, candidateCount: raw.length, finalCount: _bpProducts.length, topScore, fallback: _bpFallback });
+    console.log('[search-quality]', { rawQuery, normalizedQuery: normQ, translatedQuery: enQuery, topScore, resultCount: _bpProducts.length, candidateCount: raw.length, fallback: _bpFallback });
 
     if (queryEl) queryEl.textContent = _bpProducts.length
       ? `מצאנו ${_bpProducts.length} מוצרים עבור "${query}"`
@@ -2747,7 +2772,7 @@ async function _bpRunSearch(query, signal) {
     }
     const isAttach = _bpMode === 'attach' || _bpMode === 'fav-attach';
     const _fallbackNotice = _bpFallback
-      ? '<div class="bp-fallback-note">לא נמצאה התאמה מדויקת — מציג מוצרים דומים</div>'
+      ? '<div class="bp-fallback-note">לא נמצאה התאמה מדויקת — מציגים תוצאות דומות</div>'
       : '';
     if (resultsEl) resultsEl.innerHTML = _fallbackNotice + _bpProducts.slice(0, 14).map((p, i) => {
       const nameHtml = _boldKeyword(p.name, normQ);
