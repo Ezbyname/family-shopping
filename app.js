@@ -2215,7 +2215,7 @@ function itemHTML(item) {
       ? `<img class="ip-tile-img" src="${esc(at.image)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span class="ip-tile-icon" style="display:none">${_ipEmoji(item.name)}</span>`
       : `<span class="ip-tile-icon">${_ipEmoji(item.name)}</span>`;
     ipTile = `<div class="ip-tile-wrap">
-      <button class="ip-tile has-product" onclick="openBrandPicker('attach','${item.id}','${encodeURIComponent(item.name||'')}')" title="${label}">
+      <button class="ip-tile has-product" onclick="openBrandPicker('attach','${item.id}','${encodeURIComponent(item.name||'').replace(/'/g,'%27')}')" title="${label}">
         ${iconHtml}
         <span class="ip-tile-label">${label}</span>
         ${sub ? `<span class="ip-tile-sub">${sub}</span>` : ''}
@@ -2223,7 +2223,7 @@ function itemHTML(item) {
       <button class="ip-clear-btn" onclick="clearItemProduct('${item.id}',event)" title="הסר מוצר">✕</button>
     </div>`;
   } else if (!isFavTab) {
-    ipTile = `<button class="ip-tile" onclick="openBrandPicker('attach','${item.id}','${encodeURIComponent(item.name||'')}')" title="בחר מוצר ספציפי">
+    ipTile = `<button class="ip-tile" onclick="openBrandPicker('attach','${item.id}','${encodeURIComponent(item.name||'').replace(/'/g,'%27')}')" title="בחר מוצר ספציפי">
       <span class="ip-tile-icon">${_ipEmoji(item.name)}</span>
       <span class="ip-tile-label" style="color:var(--muted)">בחר מוצר</span>
     </button>`;
@@ -2454,11 +2454,144 @@ const _BP_HE_EN = {
   'עוף':'chicken','בשר':'beef','דג':'fish','עגבניות':'tomatoes',
   'מלפפון':'cucumber','בצל':'onion','שום':'garlic','גזר':'carrot',
   'תפוח אדמה':'potato','ברוקולי':'broccoli','תפוח':'apple','בננה':'banana',
+  // household & hygiene
+  'נייר טואלט':'toilet paper','נייר אסלה':'toilet paper',
+  'נייר מגבת':'paper towel','מגבת נייר':'paper towel',
+  'מגבונים':'wet wipes','מגבון':'wet wipe',
+  'סבון':'soap','סבון ידיים':'hand soap','סבון כלים':'dish soap',
+  'שמפו':'shampoo','מרכך':'conditioner','מרכך שיער':'hair conditioner',
+  'אבקת כביסה':'laundry detergent','נוזל כביסה':'liquid detergent',
+  'מרכך כביסה':'fabric softener','ממיס שומן':'degreaser',
+  'חומר ניקוי':'cleaning product','נוזל ניקוי':'cleaning liquid',
+  'אקונומיקה':'bleach','מי ברז':'water',
+  'תחתיות':'diapers','חיתולים':'diapers','טיטולים':'diapers',
+  'פד':'pad','תחבושת':'sanitary pad',
+  'קרם שיניים':'toothpaste','מברשת שיניים':'toothbrush',
+  'דאודורנט':'deodorant','קרם גוף':'body lotion','קרם פנים':'face cream',
+  'תחבושת פלסטר':'bandage','כדורים':'pills',
+  // kitchen & misc
+  'שקיות זבל':'garbage bags','שקית זבל':'garbage bag',
+  'ניילון נצמד':'cling film','נייר אלומיניום':'aluminum foil',
+  'נייר אפייה':'baking paper','נייר לאפייה':'baking paper',
+  'ספריי ניקוי':'cleaning spray','ספריי':'spray',
+  'נוזל כלים':'dish soap',
+  'כלי חד פעמי':'disposable','צלחת חד פעמית':'disposable plate',
+  'כוס חד פעמית':'disposable cup',
+  'מרק':'soup','מרק עוף':'chicken soup','מרק ירקות':'vegetable soup',
+  'שימורים':'canned food','קופסת שימורים':'canned goods',
+  'חטיפים':'snacks','חטיף':'snack',
+  'מים':'water','מים מינרליים':'mineral water','סודה':'soda water',
 };
+
+// Canonical synonym map — variant phrasings → canonical _BP_HE_EN key.
+// Add entries here to cover misspellings, alternative phrasing, singular/plural.
+const _BP_SYNONYMS = {
+  // toilet paper variants & typos
+  'נייר שירותים':  'נייר טואלט',
+  'טישו טואלט':    'נייר טואלט',
+  'נייר טואלת':    'נייר טואלט',
+  'ניר טואלט':     'נייר טואלט',   // missing yod
+  'ניר טואלת':     'נייר טואלט',
+  // paper towel
+  'נייר מגבות':    'נייר מגבת',
+  'ניר מגבת':      'נייר מגבת',
+  // other
+  'מגבונים לחים':  'מגבונים',
+  'משחת שיניים':   'קרם שיניים',
+  'משחה לשיניים':  'קרם שיניים',
+  'סבון כלים':     'נוזל כלים',
+  'ג\'ל רחצה':     'סבון',
+  'חיתול':         'חיתולים',
+  'טיטול':         'טיטולים',
+  'שמפו לשיניים':  'קרם שיניים',
+  // common Hebrew typos
+  "קוטץ":          "קוטג'",         // ץ/ג final-letter confusion
+};
+
+// Full text normalization — Unicode, punctuation, separators, whitespace.
+// Applied before ALL matching: translation, synonym, scoring, API queries.
+// Raw query is preserved separately for display only.
+function normalizeProductQuery(q) {
+  if (!q) return ‘’;
+  let s = String(q).normalize(‘NFKC’);
+  // Remove emoji and pictographic symbols (common in WhatsApp messages: 🛒 ✅ 🔥 ❤️)
+  s = s.replace(/\p{Extended_Pictographic}/gu, ‘’);
+  // Strip leading NL action prefixes (may survive from WhatsApp import item names)
+  s = s.replace(/^(לקנות|צריך|תוסיף|להוסיף|קנה|קני|נצטרך|צריכים|תקני|תקנה|מחק|תמחק|קניתי|כבר יש)\s*:?\s*/u, ‘’);
+  // Normalize apostrophe/geresh variants → straight apostrophe U+0027
+  s = s.replace(/[‘’׳`ʼ’]/g, "’");
+  // Normalize quote/gershayim variants → straight double-quote, then strip wrapping quotes
+  s = s.replace(/[""״]/g, ‘"’).replace(/^"(.+)"$/, ‘$1’).replace(/^’(.+)’$/, ‘$1’);
+  // Replace separator characters with spaces
+  s = s.replace(/[-–—,;:/\\|_]/g, ‘ ‘);
+  // Replace bracket/parenthesis chars with spaces (keep inner content)
+  s = s.replace(/[()[\]{}]/g, ‘ ‘);
+  // Remove trailing dots and ellipsis
+  s = s.replace(/[.…]+$/, ‘’).replace(/^[.…]+/, ‘’);
+  // Remove internal dots (Hebrew product queries never use decimal notation)
+  s = s.replace(/\.+/g, ‘ ‘);
+  // Collapse whitespace
+  return s.replace(/\s+/g, ‘ ‘).trim();
+}
+
+// Apply synonym map after full normalization.
+function _bpNormalizeQuery(q) {
+  const s = normalizeProductQuery(q);
+  return _BP_SYNONYMS[s] || s;
+}
+
+// Extract quantity and brand from a normalized query.
+// qty and brand are stored for future use; product is the search term.
+// "2 קוטג' תנובה" → { product: "קוטג'", qty: 2, brand: "תנובה" }
+function _bpParseQueryMeta(normQ) {
+  let s = normQ;
+  let qty = null, brand = null, m;
+  if ((m = s.match(/^(\d+)\s*x?\s+/i))     && +m[1] > 0) { qty = +m[1]; s = s.slice(m[0].length).trim(); }
+  else if ((m = s.match(/\s+x?(\d+)$/i))   && +m[1] > 0) { qty = +m[1]; s = s.slice(0, -m[0].length).trim(); }
+  const sLow = s.toLowerCase();
+  for (const br of _IL_BRANDS_SET) {
+    if (sLow.endsWith(' ' + br)) { brand = br; s = s.slice(0, -(br.length + 1)).trim(); break; }
+    else if (sLow === br)        { brand = br; s = '';                                   break; }
+  }
+  return { product: s || normQ, qty, brand };
+}
+
+// Levenshtein distance for short tokens — used in fuzzy scoring.
+// Fast-exits when string lengths differ by more than 3 (tokens are short).
+function _levenshtein(a, b) {
+  if (!a) return b.length; if (!b) return a.length;
+  if (Math.abs(a.length - b.length) > 3) return Math.max(a.length, b.length);
+  const dp = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++)
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+  return dp[a.length][b.length];
+}
+
 function _bpTranslate(q) {
-  const l = q.trim();
-  if (_BP_HE_EN[l]) return _BP_HE_EN[l];
-  for (const [h, e] of Object.entries(_BP_HE_EN)) if (l.includes(h)) return e;
+  // q arrives already normalized; apostrophe guard kept as defense-in-depth
+  const l     = q.trim();
+  const lNorm = l.replace(/[‘’׳`’ʼ]/g, "’");
+  if (_BP_HE_EN[l])     return _BP_HE_EN[l];
+  if (_BP_HE_EN[lNorm]) return _BP_HE_EN[lNorm];
+  // Exact substring match
+  for (const [h, e] of Object.entries(_BP_HE_EN)) {
+    if (l.includes(h) || lNorm.includes(h)) return e;
+  }
+  // Fuzzy token match — catches typos like "ניר" (missing yod) vs "נייר".
+  // Only fires when exact/substring both failed.
+  // Requires ALL query tokens to find a match (exact or dist≤1) within the SAME dict key.
+  // This prevents "ניר מגבת" from falsely matching "נייר טואלט" via the "ניר"≈"נייר" hit alone.
+  const lTokens = lNorm.split(/\s+/).filter(w => w.length >= 3);
+  if (lTokens.length) {
+    for (const [h, e] of Object.entries(_BP_HE_EN)) {
+      const hTokens = h.replace(/[‘’׳`’ʼ]/g, ‘’).split(/\s+/).filter(w => w.length >= 3);
+      if (!hTokens.length) continue;
+      const allMatch = lTokens.every(lt => hTokens.some(ht => _levenshtein(lt, ht) <= 1));
+      if (allMatch) return e;
+    }
+  }
   return null;
 }
 
@@ -2488,7 +2621,8 @@ function _bpSelectName(p, queryLang) {
 
 // Score a candidate product for a given query.
 // Higher = more relevant. Negative = should be filtered out.
-function _bpScore(p, query, queryLang, enQuery) {
+// queryBrand (optional): extracted brand token — gives a ranking boost.
+function _bpScore(p, query, queryLang, enQuery, queryBrand) {
   let score = 0;
   const nameLang = _bpDetectLang(p.name);
   const nLow     = p.name.toLowerCase();
@@ -2525,6 +2659,28 @@ function _bpScore(p, query, queryLang, enQuery) {
     if (nLow.includes(eLow)) score += 10;
   }
 
+  // ── 5. Extracted query brand match ───────────────────────────────────────
+  if (queryBrand) {
+    const qbLow = queryBrand.toLowerCase();
+    if (bLow.split(/[\s,/]+/).some(w => w === qbLow) || nLow.includes(qbLow)) score += 20;
+  }
+
+  // ── 6. Fuzzy token match — Levenshtein distance (typo tolerance) ─────────
+  // Adds score for tokens that are close but not exact (edit distance 1-2).
+  // Handles: "ניר" vs "נייר", "קוטץ" vs "קוטג", "טואלת" vs "טואלט"
+  const qTokens = qLow.split(/\s+/).filter(w => w.length >= 3);
+  const nTokens = nLow.split(/\s+/).filter(w => w.length >= 3);
+  if (qTokens.length && nTokens.length) {
+    let fuzzyHits = 0;
+    for (const qt of qTokens) {
+      if (nLow.includes(qt)) continue; // exact already scored in component 3
+      const bestDist = Math.min(...nTokens.map(nt => _levenshtein(qt, nt)));
+      if (bestDist === 1) fuzzyHits += 1;
+      else if (bestDist === 2 && qt.length >= 5) fuzzyHits += 0.5;
+    }
+    if (fuzzyHits > 0) score += (fuzzyHits / qTokens.length) * 12;
+  }
+
   return score;
 }
 // ────────────────────────────────────────────────────────────────────────────
@@ -2535,10 +2691,15 @@ async function _bpRunSearch(query, signal) {
   if (queryEl)   queryEl.textContent = `מחפש "${query}"...`;
   if (resultsEl) resultsEl.innerHTML = '<div class="bp-loading">🔍 מחפש מוצרים...</div>';
   try {
-    const queryLang = _bpDetectLang(query);
-    const enQuery   = queryLang === 'he' ? (_bpTranslate(query) || query) : query;
+    const rawQuery  = query;                           // preserved for display only
+    const normQ     = _bpNormalizeQuery(rawQuery);     // normalized + synonym-resolved
+    const meta      = _bpParseQueryMeta(normQ);        // extract qty, brand, clean product
+    const queryBrand = meta.brand;                     // null or extracted brand token
+    const productQ  = meta.product;                    // query with qty/brand stripped
+    const queryLang = _bpDetectLang(normQ);            // lang detection on clean text
+    const enQuery   = queryLang === 'he' ? (_bpTranslate(productQ) || normQ) : normQ;
     const enc       = encodeURIComponent(enQuery);
-    const encOrig   = encodeURIComponent(query);
+    const encOrig   = encodeURIComponent(normQ);       // normalized (not raw) for URL 1
 
     const BASE   = 'https://world.openfoodfacts.org/cgi/search.pl';
     // Added product_name_ar so Arabic product names are available for ranking
@@ -2546,10 +2707,10 @@ async function _bpRunSearch(query, signal) {
     const IL     = '&tagtype_0=countries&tag_contains_0=contains&tag_0=israel';
 
     const urls = [
-      // 1. Israel-filtered + original query (finds Hebrew/Arabic named products in Israel)
+      // 1. Israel-filtered + original normalized query
       `${BASE}?search_terms=${encOrig}&search_simple=1&action=process&json=1&page_size=20&fields=${FIELDS}${IL}`,
-      // 2. Israel-filtered + translated query (finds Latin-named products sold in Israel)
-      enQuery !== query
+      // 2. Israel-filtered + translated query (only when translation differs from normalized query)
+      enQuery !== normQ
         ? `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=15&fields=${FIELDS}${IL}`
         : null,
       // 3. Broad fallback — no country filter; low-scored items get filtered by _bpScore
@@ -2587,23 +2748,34 @@ async function _bpRunSearch(query, signal) {
 
     // Score every candidate, filter irrelevant ones, sort by relevance
     const MIN_SCORE = queryLang !== 'latin' ? -10 : -20;
-    _bpProducts = raw
-      .map(p => ({ ...p, _s: _bpScore(p, query, queryLang, enQuery) }))
+    const _scored = raw.map(p => ({ ...p, _s: _bpScore(p, normQ, queryLang, enQuery, queryBrand) }));
+    const topScore = _scored.length ? Math.max(..._scored.map(p => p._s)) : 0;
+    _bpProducts = _scored
       .filter(p => p._s > MIN_SCORE)
       .sort((a, b) => b._s - a._s)
       .map(({ _s, ...p }) => p)
       .slice(0, 20);
+    // Layer 5: if strict filter removed everything, show best candidates anyway
+    let _bpFallback = false;
+    if (!_bpProducts.length && raw.length > 0) {
+      _bpFallback = true;
+      _bpProducts = [..._scored].sort((a, b) => b._s - a._s).slice(0, 8).map(({ _s, ...p }) => p);
+    }
+    console.log('[search-quality]', { rawQuery, normalizedQuery: normQ, translatedQuery: enQuery, topScore, resultCount: _bpProducts.length, candidateCount: raw.length, fallback: _bpFallback });
 
     if (queryEl) queryEl.textContent = _bpProducts.length
-      ? `${_bpProducts.length} תוצאות עבור "${query}"`
+      ? `מצאנו ${_bpProducts.length} מוצרים עבור "${query}"`
       : `לא נמצאו תוצאות עבור "${query}"`;
     if (!_bpProducts.length) {
       if (resultsEl) resultsEl.innerHTML = '<div class="bp-loading">😕 לא נמצאו מוצרים<br><small>נסה מילה אחרת</small></div>';
       return;
     }
     const isAttach = _bpMode === 'attach' || _bpMode === 'fav-attach';
-    if (resultsEl) resultsEl.innerHTML = _bpProducts.slice(0, 14).map((p, i) => {
-      const nameHtml = _boldKeyword(p.name, query);
+    const _fallbackNotice = _bpFallback
+      ? '<div class="bp-fallback-note">לא נמצאה התאמה מדויקת — מציגים תוצאות דומות</div>'
+      : '';
+    if (resultsEl) resultsEl.innerHTML = _fallbackNotice + _bpProducts.slice(0, 14).map((p, i) => {
+      const nameHtml = _boldKeyword(p.name, normQ);
       const sub = [p.brand, p.size].filter(Boolean).join(' · ');
       const imgTag = p.image
         ? `<img class="bp-item-img" src="${esc(p.image)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
@@ -4263,14 +4435,14 @@ function renderFavoritesPanel() {
         ? `<img class="ip-tile-img" src="${esc(at.image)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span class="ip-tile-icon" style="display:none">${_ipEmoji(fav.name)}</span>`
         : `<span class="ip-tile-icon">${_ipEmoji(fav.name)}</span>`;
       ipTile = `<div class="ip-tile-wrap">
-        <button class="ip-tile has-product" onclick="openBrandPicker('fav-attach','${fav._id}','${encodeURIComponent(fav.name||'')}')" title="${label}">
+        <button class="ip-tile has-product" onclick="openBrandPicker('fav-attach','${fav._id}','${encodeURIComponent(fav.name||'').replace(/'/g,'%27')}')" title="${label}">
           ${iconHtml}
           <span class="ip-tile-label">${label}</span>
         </button>
         <button class="ip-clear-btn" onclick="clearFavProduct('${fav._id}',event)" title="הסר מוצר">✕</button>
       </div>`;
     } else {
-      ipTile = `<button class="ip-tile" onclick="openBrandPicker('fav-attach','${fav._id}','${encodeURIComponent(fav.name||'')}')" title="בחר מוצר ספציפי">
+      ipTile = `<button class="ip-tile" onclick="openBrandPicker('fav-attach','${fav._id}','${encodeURIComponent(fav.name||'').replace(/'/g,'%27')}')" title="בחר מוצר ספציפי">
         <span class="ip-tile-icon">${_ipEmoji(fav.name)}</span>
         <span class="ip-tile-label" style="color:var(--muted)">בחר מוצר</span>
       </button>`;
@@ -6940,3 +7112,169 @@ window.applyTheme = function(theme) {
   applyTheme(saved);
 })();
 // ══════════════════════════════════════════════════════════════════════════════
+
+// ═══ TEXT IMPORT (WhatsApp / SMS) ═══
+// V1 scope: line-based parser only. Each line = one item.
+// Multi-item lines are treated as a single item name.
+// Bulk-bought triggers one notification per item (same as manual toggle — by design).
+// Bulk-duplicate qty race under rapid import (same as rapid manual adds — V2 item).
+
+let _importParsed = [];
+
+function _parseImportLines(raw) {
+  const CHECKBOX_RE  = /^[✅☑✔]\s*/u;
+  const NOISE_RE     = /^[-–—•*#\s]*$/u;
+  const BULLET_RE    = /^[*\-–—•]\s+/u;
+  const NL_REMOVE_RE = /^(מחק|תמחק|תוריד|להוריד|הסר|לא צריך|אין צורך ב|בלי)\s+/u;
+  const NL_BOUGHT_RE = /^(קניתי|כבר קניתי|סיימתי לקנות|כבר יש|נקנה|כבר קנינו)\s+/u;
+  const NL_ADD_RE    = /^(לקנות|צריך|תוסיף|להוסיף|קנה|קני|נצטרך|צריכים|תקני|תקנה)\s+/u;
+  const result = [];
+  for (const line of raw.split('\n')) {
+    const t = line.trim();
+    if (!t || NOISE_RE.test(t)) continue;
+    if (CHECKBOX_RE.test(t)) {
+      const n = t.replace(CHECKBOX_RE, '').trim();
+      if (n) result.push({ name: n, action: 'bought' });
+    } else if (NL_REMOVE_RE.test(t)) {
+      const n = t.replace(NL_REMOVE_RE, '').trim();
+      if (n) result.push({ name: n, action: 'remove' });
+    } else if (NL_BOUGHT_RE.test(t)) {
+      const n = t.replace(NL_BOUGHT_RE, '').trim();
+      if (n) result.push({ name: n, action: 'bought' });
+    } else if (NL_ADD_RE.test(t)) {
+      const n = t.replace(NL_ADD_RE, '').trim();
+      if (n) result.push({ name: n, action: 'add' });
+    } else {
+      const n = t.replace(BULLET_RE, '').trim();
+      if (n) result.push({ name: n, action: 'add' });
+    }
+  }
+  return result;
+}
+
+window.openImportModal = function() {
+  const el = document.getElementById('import-overlay');
+  if (el) el.style.display = 'flex';
+  _importShowTextarea();
+  const ta = document.getElementById('import-textarea');
+  if (ta) { ta.value = ''; setTimeout(() => ta.focus(), 50); }
+};
+
+window.closeImportModal = function() {
+  const el = document.getElementById('import-overlay');
+  if (el) el.style.display = 'none';
+  _importParsed = [];
+};
+
+function _importShowTextarea() {
+  const tv = document.getElementById('import-textarea-view');
+  const pv = document.getElementById('import-preview-view');
+  if (tv) tv.style.display = 'flex';
+  if (pv) pv.style.display = 'none';
+}
+
+function _importShowPreview(parsed) {
+  const tv = document.getElementById('import-textarea-view');
+  const pv = document.getElementById('import-preview-view');
+  if (tv) tv.style.display = 'none';
+  if (!pv) return;
+  pv.style.display = 'flex';
+  const ICON = { add: '➕', bought: '✅', remove: '🗑' };
+  const html = parsed.map(({ name, action }) => {
+    const norm = normalizeName(name);
+    const missing = action === 'remove' &&
+      !Object.values(items).some(i => normalizeName(i.name) === norm);
+    return '<div class="import-preview-row' + (missing ? ' import-preview-missing' : '') + '">' +
+      '<span class="import-preview-icon">' + ICON[action] + '</span>' +
+      '<span class="import-preview-name">' + esc(name) + '</span>' +
+      (missing ? '<span class="import-preview-note">לא ברשימה</span>' : '') +
+      '</div>';
+  }).join('');
+  document.getElementById('import-preview-list').innerHTML =
+    html || '<div style="color:var(--muted);text-align:center;padding:16px">לא נמצאו פריטים</div>';
+  _importParsed = parsed;
+}
+
+window.runImport = function() {
+  const raw = document.getElementById('import-textarea')?.value || '';
+  const parsed = _parseImportLines(raw);
+  if (!parsed.length) { toast('⚠️ לא נמצאו פריטים לייבוא'); return; }
+  _importShowPreview(parsed);
+};
+
+window.backToImportEdit = function() { _importShowTextarea(); };
+
+window.executeImport = async function() {
+  if (!_importParsed.length) return;
+  const m = myProfile || {};
+  let added = 0, bought = 0, removed = 0;
+
+  for (const { name, action } of _importParsed) {
+
+    if (action === 'bought') {
+      const existing = findExistingListItem(name, null);
+      if (existing) {
+        await toggleBought(existing.id);
+      } else {
+        const newRef = push(ref(db, `groups/${groupId}/items`));
+        await set(newRef, {
+          name, qty: 1, bought: false, fav: false, barcode: null,
+          addedByUserId: myId, addedByDisplayName: myName,
+          addedByAvatarType:  m.avatarType  || 'emoji',
+          addedByAvatarValue: m.avatarValue || '👤',
+          addedByAvatarEmoji: m.avatarEmoji || null,
+          addedAt: Date.now(), ts: Date.now(),
+        });
+        logActivity('item_added', newRef.key, name);
+        await toggleBought(newRef.key);
+      }
+      bought++;
+
+    } else if (action === 'remove') {
+      const norm = normalizeName(name);
+      const id = Object.keys(items).find(k => normalizeName(items[k].name) === norm);
+      if (id) {
+        const item = items[id];
+        try {
+          await remove(ref(db, `groups/${groupId}/items/${id}`));
+          if (item.addedByUserId && item.addedByUserId !== myId) {
+            const targets = {};
+            targets[item.addedByUserId] = true;
+            await createNotification({
+              type: 'item_deleted', itemId: id, itemName: item.name, targetUsersObj: targets,
+            });
+          }
+          logActivity('item_removed', id, name);
+          removed++;
+        } catch(e) {
+          console.error('[import] delete failed:', e.message);
+        }
+      }
+
+    } else {
+      const existing = findExistingListItem(name, null);
+      if (existing) {
+        await update(ref(db, `groups/${groupId}/items/${existing.id}`), { qty: (existing.qty || 1) + 1 });
+      } else {
+        const newRef = push(ref(db, `groups/${groupId}/items`));
+        set(newRef, {
+          name, qty: 1, bought: false, fav: false, barcode: null,
+          addedByUserId: myId, addedByDisplayName: myName,
+          addedByAvatarType:  m.avatarType  || 'emoji',
+          addedByAvatarValue: m.avatarValue || '👤',
+          addedByAvatarEmoji: m.avatarEmoji || null,
+          addedAt: Date.now(), ts: Date.now(),
+        });
+        logActivity('item_added', newRef.key, name);
+      }
+      added++;
+    }
+  }
+
+  closeImportModal();
+  const parts = [];
+  if (added)   parts.push('➕ ' + added);
+  if (bought)  parts.push('✅ ' + bought);
+  if (removed) parts.push('🗑 ' + removed);
+  toast(parts.length ? '📋 יובאו: ' + parts.join(' · ') : '⚠️ לא בוצעו פעולות');
+};
