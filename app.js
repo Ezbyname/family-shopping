@@ -2479,10 +2479,38 @@ const _BP_HE_EN = {
   'חטיפים':'snacks','חטיף':'snack',
   'מים':'water','מים מינרליים':'mineral water','סודה':'soda water',
 };
+
+// Canonical synonym map — variant phrasings → canonical _BP_HE_EN key.
+// Add entries here to cover misspellings, alternative phrasing, singular/plural.
+const _BP_SYNONYMS = {
+  'נייר שירותים':  'נייר טואלט',
+  'טישו טואלט':    'נייר טואלט',
+  'נייר טואלת':    'נייר טואלט',   // common misspelling
+  'נייר מגבות':    'נייר מגבת',
+  'מגבונים לחים':  'מגבונים',
+  'משחת שיניים':   'קרם שיניים',
+  'משחה לשיניים':  'קרם שיניים',
+  'סבון כלים':     'נוזל כלים',
+  'ג\'ל רחצה':     'סבון',
+  'חיתול':         'חיתולים',
+  'טיטול':         'טיטולים',
+  'שמפו לשיניים':  'קרם שיניים',
+};
+
+// Normalize apostrophe variants and apply synonym map before translation.
+function _bpNormalizeQuery(q) {
+  const s = q.trim().replace(/[''׳`’ʼ]/g, "'").replace(/\s+/g, ' ');
+  return _BP_SYNONYMS[s] || s;
+}
+
 function _bpTranslate(q) {
-  const l = q.trim();
-  if (_BP_HE_EN[l]) return _BP_HE_EN[l];
-  for (const [h, e] of Object.entries(_BP_HE_EN)) if (l.includes(h)) return e;
+  const l     = q.trim();
+  const lNorm = l.replace(/[''׳`’ʼ]/g, "'");
+  if (_BP_HE_EN[l])     return _BP_HE_EN[l];
+  if (_BP_HE_EN[lNorm]) return _BP_HE_EN[lNorm];
+  for (const [h, e] of Object.entries(_BP_HE_EN)) {
+    if (l.includes(h) || lNorm.includes(h)) return e;
+  }
   return null;
 }
 
@@ -2560,7 +2588,8 @@ async function _bpRunSearch(query, signal) {
   if (resultsEl) resultsEl.innerHTML = '<div class="bp-loading">🔍 מחפש מוצרים...</div>';
   try {
     const queryLang = _bpDetectLang(query);
-    const enQuery   = queryLang === 'he' ? (_bpTranslate(query) || query) : query;
+    const normQ     = _bpNormalizeQuery(query);
+    const enQuery   = queryLang === 'he' ? (_bpTranslate(normQ) || query) : query;
     const enc       = encodeURIComponent(enQuery);
     const encOrig   = encodeURIComponent(query);
 
@@ -2611,22 +2640,32 @@ async function _bpRunSearch(query, signal) {
 
     // Score every candidate, filter irrelevant ones, sort by relevance
     const MIN_SCORE = queryLang !== 'latin' ? -10 : -20;
-    _bpProducts = raw
-      .map(p => ({ ...p, _s: _bpScore(p, query, queryLang, enQuery) }))
+    const _scored = raw.map(p => ({ ...p, _s: _bpScore(p, query, queryLang, enQuery) }));
+    _bpProducts = _scored
       .filter(p => p._s > MIN_SCORE)
       .sort((a, b) => b._s - a._s)
       .map(({ _s, ...p }) => p)
       .slice(0, 20);
+    // Layer 5: if strict filter removed everything, show best candidates anyway
+    let _bpFallback = false;
+    if (!_bpProducts.length && raw.length > 0) {
+      _bpFallback = true;
+      _bpProducts = [..._scored].sort((a, b) => b._s - a._s).slice(0, 8).map(({ _s, ...p }) => p);
+    }
+    console.log('[picker]', { query, normQ, enQuery, rawCount: raw.length, filteredCount: _bpProducts.length, fallback: _bpFallback });
 
     if (queryEl) queryEl.textContent = _bpProducts.length
-      ? `${_bpProducts.length} תוצאות עבור "${query}"`
+      ? `מצאנו ${_bpProducts.length} מוצרים עבור "${query}"`
       : `לא נמצאו תוצאות עבור "${query}"`;
     if (!_bpProducts.length) {
       if (resultsEl) resultsEl.innerHTML = '<div class="bp-loading">😕 לא נמצאו מוצרים<br><small>נסה מילה אחרת</small></div>';
       return;
     }
     const isAttach = _bpMode === 'attach' || _bpMode === 'fav-attach';
-    if (resultsEl) resultsEl.innerHTML = _bpProducts.slice(0, 14).map((p, i) => {
+    const _fallbackNotice = _bpFallback
+      ? '<div class="bp-fallback-note">לא נמצאה התאמה מדויקת — מציג מוצרים דומים</div>'
+      : '';
+    if (resultsEl) resultsEl.innerHTML = _fallbackNotice + _bpProducts.slice(0, 14).map((p, i) => {
       const nameHtml = _boldKeyword(p.name, query);
       const sub = [p.brand, p.size].filter(Boolean).join(' · ');
       const imgTag = p.image
