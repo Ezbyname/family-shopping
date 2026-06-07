@@ -639,7 +639,7 @@ window.searchPrices = async function(){
       : ' בכל הסופרמרקטים';
     wrap.innerHTML = `<div class="price-loading"><div class="spin"></div><p>מחפש "${esc(q)}"${locationLabel}...</p></div>`;
     try {
-      let _apiUrl = `/api/prices?q=${encodeURIComponent(resolvedQuery)}`;
+      let _apiUrl = `/api/prices?q=${encodeURIComponent(resolvedQuery)}&detail=1`;
       if (_hasLoc()) {
         _apiUrl += `&lat=${_locLat()}&lng=${_locLng()}&radiusKm=${_nearbyRadius}`;
       }
@@ -1090,7 +1090,7 @@ window.submitManualAddress = async function() {
 async function _fetchNearby(barcode) {
   if (!barcode || !_hasLoc()) return null;
   try {
-    const url = `/api/prices?barcode=${encodeURIComponent(barcode)}&lat=${_locLat()}&lng=${_locLng()}&radiusKm=${_nearbyRadius}`;
+    const url = `/api/prices?barcode=${encodeURIComponent(barcode)}&lat=${_locLat()}&lng=${_locLng()}&radiusKm=${_nearbyRadius}&detail=1`;
     const res = await fetch(url);
     if (!res.ok) return null;
     const data = await res.json();
@@ -1644,11 +1644,11 @@ window.closeProductModal = function() {
   sheet.removeEventListener('touchend',   _pmTouchEnd);
 };
 
-const _PM_PAGE_SIZE = 10;
+const _PM_PAGE_SIZE    = 10;
+const _pmVisibleStores = new Map(); // keyed by barcode+':'+viewMode; module-scoped, no window pollution
 
-window._pmShowMore = function(barcode) {
-  if (!window._pmVisibleStores) window._pmVisibleStores = {};
-  window._pmVisibleStores[barcode] = (window._pmVisibleStores[barcode] || _PM_PAGE_SIZE) + _PM_PAGE_SIZE;
+window._pmShowMore = function(key) {
+  _pmVisibleStores.set(key, (_pmVisibleStores.get(key) || _PM_PAGE_SIZE) + _PM_PAGE_SIZE);
   window._pmRenderStoreList?.();
 };
 
@@ -1772,13 +1772,13 @@ function _renderProductModal() {
 
   // Pagination state per barcode — preserved across swipe-navigation between products
   const barcode = product.barcode || product.name; // fallback key for products without barcode
-  if (!window._pmVisibleStores) window._pmVisibleStores = {};
-  if (!(barcode in window._pmVisibleStores)) {
-    window._pmVisibleStores[barcode] = _PM_PAGE_SIZE;
+  const pmKey   = barcode + ':' + 'list';
+  if (!_pmVisibleStores.has(pmKey)) {
+    _pmVisibleStores.set(pmKey, _PM_PAGE_SIZE);
   }
 
   const _renderStoreList = () => {
-    const vis   = window._pmVisibleStores[barcode];
+    const vis   = _pmVisibleStores.get(pmKey);
     const shown = allPrices.slice(0, vis);
     const total = allPrices.length;
     const el    = document.getElementById('pm-store-list');
@@ -1788,11 +1788,13 @@ function _renderProductModal() {
       const meta       = CHAIN_META[s.store] || { color: '#7d8590' };
       const location   = [s.address, s.city].filter(Boolean).join(', ');
       const distLine   = s.distanceKm != null ? `${s.distanceKm} ק"מ` : null;
-      const mapsQuery  = (s.latitude && s.longitude)
-        ? `${s.latitude},${s.longitude}`
+      const _lat = Number(s.latitude); const _lng = Number(s.longitude);
+      const hasCoords  = Number.isFinite(_lat) && Number.isFinite(_lng);
+      const mapsQuery  = hasCoords
+        ? `${_lat},${_lng}`
         : encodeURIComponent([(s.storeName || s.store), s.address, s.city].filter(Boolean).join(' '));
       const mapsUrl    = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
-      const hasNav     = !!(s.latitude && s.longitude) || !!(s.address || s.city);
+      const hasNav     = hasCoords || !!(s.address || s.city);
       const ageHours   = s.syncedAt
         ? Math.round((Date.now() - new Date(s.syncedAt).getTime()) / 3_600_000) : null;
       const ageTxt     = ageHours != null
@@ -1842,7 +1844,7 @@ function _renderProductModal() {
       const remaining = Math.min(_PM_PAGE_SIZE, total - vis);
       footer.innerHTML = `
         <div class="pm-store-counter">מציג ${vis} מתוך ${total} חנויות</div>
-        <button class="pm-show-more" onclick="_pmShowMore(${JSON.stringify(barcode)})">
+        <button class="pm-show-more" onclick="_pmShowMore(${JSON.stringify(pmKey)})">
           הצג עוד ${remaining} חנויות
         </button>`;
     }

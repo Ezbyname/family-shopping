@@ -112,17 +112,17 @@ async function syncChainStores(chain, writer, config) {
               updatedAt:    new Date().toISOString(),
               source:       'official',
             });
-            // storeCoords/{storeKey} = lightweight index read by prices.js and basket-compare.js
-            // to avoid loading the full stores node (~141 KB).
-            // Includes address and storeName so the API can render full store details
-            // without falling back to the heavier stores/ node.
+            // storeCoords/{storeKey} — derived read-model written each sync.
+            // NEVER a source of truth — always rebuilt fully from stores/ data.
+            // Kept small (~40–50 KB total) so prices.js avoids loading the full
+            // stores/ node (~141 KB) on every API request.
             if (store.hasCoords) {
               await writer.queue(`storeCoords/${storeKey}`, {
-                lat:     store.latitude,
-                lng:     store.longitude,
-                city:    store.city     || '',
-                address: store.address  || '',
-                name:    store.storeName || '',
+                lat:       store.latitude,
+                lng:       store.longitude,
+                city:      store.city      || '',
+                address:   store.address   || '',
+                storeName: store.storeName || '',
               });
             }
           }

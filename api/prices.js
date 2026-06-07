@@ -35,8 +35,8 @@ function withTimeout(promise, ms, label = '') {
 }
 
 // ── Store index cache (module-level, reused across requests) ─────────────────
-// Prefers lightweight storeCoords/{key}={lat,lng,city} (~28 KB) over full
-// stores node (~141 KB). Falls back to stores/ if storeCoords doesn't exist yet.
+// Reads storeCoords/ (derived read-model, ~40-50 KB) in preference to the full
+// stores/ node (~141 KB). Only loaded when detail=1 or hasLoc is set.
 let _storeCache    = null;
 let _storeCacheExp = 0;
 
@@ -44,19 +44,18 @@ async function getStoreIndex(dbUrl) {
   const now = Date.now();
   if (_storeCache && _storeCacheExp > now) return _storeCache;
 
-  // Try storeCoords first (lightweight index written by price sync worker)
+  // Try storeCoords first (derived read-model written by price sync worker)
   try {
     const coordsData = await restGet(dbUrl, 'storeCoords', READ_TIMEOUT_MS);
     if (coordsData && typeof coordsData === 'object' && Object.keys(coordsData).length > 0) {
-      // Normalize storeCoords {lat,lng,city} → stores-compatible shape
       _storeCache = Object.fromEntries(
         Object.entries(coordsData).map(([k, v]) => [k, {
           hasCoords:  true,
-          latitude:   v.lat ?? v.latitude ?? null,
-          longitude:  v.lng ?? v.longitude ?? null,
+          latitude:   v.lat      ?? v.latitude ?? null,
+          longitude:  v.lng      ?? v.longitude ?? null,
           city:       v.city     || '',
           address:    v.address  || '',
-          storeName:  v.name     || '',
+          storeName:  v.storeName || '',
         }])
       );
       _storeCacheExp = now + STORE_CACHE_MS;
@@ -179,9 +178,10 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
 
-  const { barcode, q, lat, lng, radiusKm, groupId, userId, debug } = req.query || {};
-  const isDebug = debug === '1' || debug === 'true';
-  const timings = { initMs: 0, priceReadMs: 0, storeReadMs: 0, totalMs: 0 };
+  const { barcode, q, lat, lng, radiusKm, groupId, userId, debug, detail } = req.query || {};
+  const isDebug  = debug  === '1' || debug  === 'true';
+  const isDetail = detail === '1' || detail === 'true'; // enables store metadata enrichment
+  const timings  = { initMs: 0, priceReadMs: 0, storeReadMs: 0, totalMs: 0 };
 
   const userLat = parseFloat(lat  || '');
   const userLng = parseFloat(lng  || '');
@@ -211,7 +211,7 @@ export default async function handler(req, res) {
     // Build prices with hard total budget
     try {
       const result = await withTimeout(
-        buildLayeredPrices(dbUrl, clean, userId, groupId, hasLoc, userLat, userLng, radius, timings),
+        buildLayeredPrices(dbUrl, clean, userId, groupId, hasLoc, userLat, userLng, radius, timings, undefined, isDetail),
         BUILD_TIMEOUT_MS,
         'buildLayeredPrices'
       );
@@ -280,7 +280,7 @@ export default async function handler(req, res) {
       const layered = await buildLayeredPrices(
         dbUrl, p.barcode, userId, groupId,
         hasLoc, userLat, userLng, radius, {},
-        storeIndex
+        storeIndex, isDetail
       ).catch(() => ({ prices: [], source: 'none', communityWarning: null }));
       return { ...p, ...layered };
     }));
@@ -345,8 +345,9 @@ export default async function handler(req, res) {
 async function buildLayeredPrices(
   dbUrl, barcode, userId, groupId,
   hasLoc, lat, lng, radius,
-  timings = {},           // filled by barcode-mode caller
-  storeIndex = undefined  // undefined = lazy-load if hasLoc; object = already loaded
+  timings = {},            // filled by barcode-mode caller
+  storeIndex = undefined,  // undefined = lazy-load when needed; object = pre-loaded (search mode)
+  isDetail   = false       // true = enrich with address/storeName (modal/compare UI)
 ) {
   if (!dbUrl) return { prices: [], source: 'none', communityWarning: null };
 
@@ -373,9 +374,11 @@ async function buildLayeredPrices(
         override:     overrides[key] ?? null,
       }));
 
-    // Load store index (needed for radius filter and/or address enrichment)
+    // Load store index only when needed: radius filter (hasLoc) or store detail UI (isDetail).
+    // Plain list/barcode lookups skip this to avoid an unnecessary Firebase read.
+    const needsStoreIndex = (hasLoc || isDetail) && official.length > 0;
     let idx = storeIndex;
-    if (idx === undefined && official.length > 0) {
+    if (idx === undefined && needsStoreIndex) {
       const tStore = Date.now();
       try {
         idx = await getStoreIndex(dbUrl);
@@ -389,8 +392,8 @@ async function buildLayeredPrices(
       if (hasLoc) {
         // Radius filter (also enriches address/city/lat/lng/storeName inside filterByRadius)
         official = filterByRadius(official, lat, lng, radius, idx);
-      } else {
-        // No location filter — still enrich address/city/storeName from store index
+      } else if (isDetail) {
+        // detail=1 without location — enrich address/city/storeName for modal UI
         enrichFromStoreIndex(official, idx);
       }
     }
