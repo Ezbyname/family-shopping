@@ -1365,22 +1365,43 @@ function _normalizeResults(results) {
   return deduped;
 }
 
-// Minimum relevance score for a product to appear in results.
-// Prevents unrelated products (e.g. Kinder Chocolate for "חלב" query)
-// from polluting the result list. Score scale: 100=exact, 88=first-word,
-// 75=any-word, 60=substring, 40=multi-word partial, 10=no match.
+// Score threshold for relevance filtering.
+// Applied adaptively: if any product meets the threshold, only threshold-passing
+// products are shown. If none meet it (niche query), top-N are shown with a
+// "תוצאות פחות מדויקות" banner instead of a false "no results" message.
 const _SCORE_THRESHOLD = 40;
+const _SCORE_FALLBACK_N = 5; // max products to show in low-relevance fallback mode
+
+// Set by _buildChainGroups, read by renderSearchResults to show the banner.
+let _lastSearchLowRelevance = false;
 
 function _buildChainGroups(deduped, query) {
-  const map = new Map();
   const _debug = window.__debug_prices === true;
-  deduped.forEach(product => {
-    const score = matchScore(product.name, query);
-    if (score < _SCORE_THRESHOLD) {
-      if (_debug) console.log(`[prices] filtered (score ${score} < ${_SCORE_THRESHOLD}): "${product.name}"`);
-      return; // skip irrelevant products
-    }
-    if (_debug) console.log(`[prices] kept    (score ${score}): "${product.name}"`);
+
+  // Score all products first so we can make an adaptive threshold decision.
+  const scored = deduped.map(product => ({
+    product,
+    score: matchScore(product.name, query),
+  }));
+
+  const bestScore = scored.length ? Math.max(...scored.map(s => s.score)) : 0;
+  const useThreshold = bestScore >= _SCORE_THRESHOLD;
+  _lastSearchLowRelevance = !useThreshold && scored.length > 0;
+
+  if (_debug) {
+    console.log(`[prices] query="${query}" bestScore=${bestScore} threshold=${_SCORE_THRESHOLD} mode=${useThreshold ? 'strict' : 'fallback(top-'+_SCORE_FALLBACK_N+')'}`);
+    scored.forEach(({ product, score }) =>
+      console.log(`[prices]   ${score >= _SCORE_THRESHOLD ? 'kept    ' : 'low-rel '} (${score}): "${product.name}"`)
+    );
+  }
+
+  // In fallback mode, show top-N by score; in strict mode, apply threshold.
+  const eligible = useThreshold
+    ? scored.filter(s => s.score >= _SCORE_THRESHOLD)
+    : scored.sort((a, b) => b.score - a.score).slice(0, _SCORE_FALLBACK_N);
+
+  const map = new Map();
+  eligible.forEach(({ product, score }) => {
     product.stores.forEach(sp => {
       const chain = sp.store;
       if (!map.has(chain)) map.set(chain, { name: chain, products: [] });
@@ -1414,8 +1435,19 @@ function _applyFilter(groups) {
 
 function renderSearchResults(results, query) {
   const deduped = _normalizeResults(results);
-  _chainGroups = _buildChainGroups(deduped, query);
+  _chainGroups = _buildChainGroups(deduped, query); // also sets _lastSearchLowRelevance
   _filterState = { chains: new Set(), officialOnly: false, matchQuality: 'all' };
+
+  // Debug instrumentation — enable with: window.__debug_prices = true
+  if (window.__debug_prices === true) {
+    const allScores = deduped.map(p => ({ name: p.name, score: matchScore(p.name, query) }))
+                              .sort((a, b) => b.score - a.score);
+    const best = allScores[0]?.score ?? 0;
+    const kept = allScores.filter(p => p.score >= _SCORE_THRESHOLD).length;
+    console.groupCollapsed(`[prices] renderSearchResults — query="${query}" resolvedQuery="${query}" apiCount=${results.length} filteredCount=${kept} bestScore=${best}`);
+    allScores.forEach(p => console.log(`  ${p.score >= _SCORE_THRESHOLD ? '✅' : '⬇️ '} score=${p.score} "${p.name}"`));
+    console.groupEnd();
+  }
 
   const filterRow = document.getElementById('sr-filter-row');
   if (filterRow) filterRow.style.display = '';
@@ -1447,7 +1479,12 @@ function _renderChainGroups() {
     return;
   }
 
-  let html = '';
+  // Low-relevance fallback banner — shown when no product met the score threshold
+  // and we're displaying best-available results instead of "no results".
+  let html = _lastSearchLowRelevance
+    ? `<div style="margin:8px 12px 4px;padding:8px 12px;border-radius:10px;background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);font-size:12px;color:#d97706;direction:rtl">
+        ⚠️ תוצאות פחות מדויקות — נסה שם מוצר אחר</div>`
+    : '';
   filtered.forEach(group => {
     const meta = CHAIN_META[group.name] || { color: '#7d8590', bg: '#161b22' };
     const prices = group.products.map(p => p.chainPrice).filter(Boolean);
