@@ -20,3 +20,9 @@ Thumbs.db
 # Store snapshot — generated file, updated monthly on VPS
 workers/prices/data/stores-geocoded.json
 apply-import.py
+
+# ── Playwright test artifacts ─────────────────────────────────────────────────
+tests/playwright-report/
+tests/test-results/
+playwright-report/
+test-results/
