@@ -99,17 +99,18 @@ export const CHAINS = [
     indexType: 'html',
   },
   {
-    id:       'mahsanei-lahav',
-    name:     'מחסני להב',
-    chainId:  '7290055755557',
-    enabled:  false,
-    status:   'dead',
+    id:         'mahsanei-lahav',
+    name:       'מחסני להב',
+    chainId:    '7290055755557',
+    enabled:    false,
+    deprecated: true,
+    status:     'deprecated',
     sanityRequired: false,
     // Verified 2026-06-07: brand absorbed into Carrefour IL. No active price feed.
-    // Mega stores (same operator) now publish under prices.carrefour.co.il.
+    // Mega stores (same operator) now publish under prices.carrefour.co.il (chainId 7290055700007).
     // The OpenIsraeliSupermarkets Mega scraper was commented out as of mid-2025.
-    knownIssue: 'Brand no longer exists. Former Mega/Lahav stores now operate as Carrefour and publish under prices.carrefour.co.il. This entry can be removed.',
-    indexUrl: 'https://prices.carrefour.co.il/',  // redirect to Carrefour for reference
+    knownIssue: 'Brand no longer exists. Former Mega/Lahav stores now operate as Carrefour and publish under prices.carrefour.co.il. Kept for history — do not enable.',
+    indexUrl: 'https://prices.carrefour.co.il/',
     baseUrl:  'https://prices.carrefour.co.il',
     indexType: 'html',
   },

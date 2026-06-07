@@ -1,15 +1,20 @@
-// scripts/chains.js — v5.0.0
+// scripts/chains.js — v5.1.0
 // Israeli supermarket price transparency feeds
 // Source: Israeli Consumer Protection Authority / OpenIsraeliSupermarkets
 //
 // CHAIN STATUS LIFECYCLE:
-//   pending      → URL not yet verified on Israeli VM
-//   url-ok       → index URL resolves and returns price file links
-//   dry-run-ok   → test-chain-source.js passes (download + parse + storeId)
-//   enabled      → writing to Firebase production
+//   pending          → URL not yet verified on Israeli VM
+//   needs-ftp        → domain alive but requires FTP client support (not yet implemented)
+//   needs-json-parser → domain alive but uses JSON API index (not yet implemented)
+//   ready-to-test    → URL confirmed alive; run test-chain-source.js from Israeli VM
+//   url-ok           → index URL resolves and returns price file links
+//   dry-run-ok       → test-chain-source.js passes (download + parse + storeId)
+//   enabled          → writing to Firebase production
+//   deprecated       → brand defunct; do not enable
 //
-// To enable a chain: status must be 'dry-run-ok' and all acceptance criteria met.
-// Run: node test-chain-source.js <chain-id>
+// To test a chain from the Israeli VM:
+//   node test-chain-source.js <chain-id>
+//   node test-chain-source.js --list
 
 export const CHAINS = [
   {
@@ -34,11 +39,16 @@ export const CHAINS = [
     name: 'רמי לוי',
     chainId: '7290058140886',
     enabled: false,
-    status: 'pending',
-    lastVerified: null,
-    knownIssue: 'Old URL (url.retail.pe.il) is ENOTFOUND. Chain uses FTP host url.retail.publishedprices.co.il — no confirmed HTTP index URL yet.',
-    indexUrl: 'https://url.retail.publishedprices.co.il/MF/latest/7290058140886/',
-    baseUrl: 'https://url.retail.publishedprices.co.il',
+    status: 'needs-ftp',
+    lastVerified: '2026-06-07',
+    // Verified 2026-06-07: domain resolves (194.90.26.22), geo-blocked from non-IL IPs.
+    // Primary access is FTP port 21 (Cerberus engine). HTTP index also available from IL IP.
+    // Requires FTP client support in downloader.js before this can be enabled.
+    knownIssue: 'Requires FTP (port 21). Domain url.retail.publishedprices.co.il is alive and geo-blocked. Enable together with osher-ad once FTP support is added.',
+    indexUrl: 'https://url.retail.publishedprices.co.il/RamiLevi/',
+    ftpHost:  'url.retail.publishedprices.co.il',
+    ftpUser:  'RamiLevi',
+    baseUrl:  'https://url.retail.publishedprices.co.il',
     indexType: 'html',
   },
   {
@@ -46,35 +56,50 @@ export const CHAINS = [
     name: 'ויקטורי',
     chainId: '7290696200003',
     enabled: false,
-    status: 'pending',
-    lastVerified: null,
-    knownIssue: 'matrixcatalog.co.il times out. Candidate URL: laibcatalog.co.il/NBCompetitionRegulations.aspx — not yet verified on VM.',
-    indexUrl: 'https://laibcatalog.co.il/NBCompetitionRegulations.aspx',
-    baseUrl: 'https://laibcatalog.co.il',
-    indexType: 'html',
+    status: 'needs-json-parser',
+    lastVerified: '2026-06-07',
+    // Verified 2026-06-07: matrixcatalog.co.il is dead. laibcatalog.co.il is the new source.
+    // Uses JSON REST API — GET /webapi/api/getfiles?edi=7290696200003 returns file list.
+    // File download: GET /webapi/{chainId}/{filename}
+    // Requires new indexType: 'json-api' handler. Domain is alive, geo-blocked.
+    knownIssue: 'Uses JSON REST API (not HTML listing). Needs new indexType handler. GET /webapi/api/getfiles?edi=7290696200003 returns file list.',
+    indexUrl: 'https://laibcatalog.co.il/webapi/api/getfiles?edi=7290696200003',
+    baseUrl:  'https://laibcatalog.co.il',
+    indexType: 'json-api',  // not yet implemented in downloader.js
   },
   {
-    id: 'yeinot-bitan',
-    name: 'יינות ביתן / קרפור',
-    chainId: '7290873255550',
+    id: 'carrefour',
+    name: 'קרפור / יינות ביתן',
+    chainId: '7290055700007',  // corrected from 7290873255550 — verified via OpenIsraeliSupermarkets
     enabled: false,
-    status: 'pending',
-    lastVerified: null,
-    knownIssue: 'Chain rebranded as Carrefour IL. Old URL (publishprice/prices.ybitan.co.il) ENOTFOUND. Candidate: prices.carrefour.co.il — not yet verified on VM.',
+    status: 'ready-to-test',
+    lastVerified: '2026-06-07',
+    // Verified 2026-06-07: Yeinot Bitan and Mega rebranded to Carrefour IL ~2022-2023.
+    // prices.carrefour.co.il is alive (HTTP 403 from non-IL — geo-blocked, not dead).
+    // Standard HTML directory listing (PublishPrice engine) — existing parser should work.
+    // Covers all former Yeinot Bitan AND Mega branches.
+    // NEXT STEP: run from Israeli VM: node test-chain-source.js carrefour
+    // Verify: chainId in downloaded XML matches 7290055700007.
+    knownIssue: null,
     indexUrl: 'https://prices.carrefour.co.il/',
-    baseUrl: 'https://prices.carrefour.co.il',
+    baseUrl:  'https://prices.carrefour.co.il',
     indexType: 'html',
   },
   {
     id: 'osher-ad',
     name: 'אושר עד',
-    chainId: '7290058179504',
+    chainId: '7290103152017',  // corrected from 7290058179504 — verified via OpenIsraeliSupermarkets
     enabled: false,
-    status: 'pending',
-    lastVerified: null,
-    knownIssue: 'osherad.co.il/prices/ returns HTTP 403. New URL unknown.',
-    indexUrl: 'https://osherad.co.il/prices/',
-    baseUrl: 'https://osherad.co.il',
+    status: 'needs-ftp',
+    lastVerified: '2026-06-07',
+    // Verified 2026-06-07: same Cerberus FTP server as Rami Levy.
+    // HTTP index at /osherad/ also available from IL IP.
+    // Enable together with rami-levy once FTP support is added.
+    knownIssue: 'Same FTP server as rami-levy. Enable both when FTP support lands.',
+    indexUrl: 'https://url.retail.publishedprices.co.il/osherad/',
+    ftpHost:  'url.retail.publishedprices.co.il',
+    ftpUser:  'osherad',
+    baseUrl:  'https://url.retail.publishedprices.co.il',
     indexType: 'html',
   },
   {
@@ -82,11 +107,15 @@ export const CHAINS = [
     name: 'מחסני להב',
     chainId: '7290055755557',
     enabled: false,
-    status: 'pending',
-    lastVerified: null,
-    knownIssue: 'mega-market.co.il is ENOTFOUND. Chain may have merged with Carrefour. New URL unknown.',
-    indexUrl: 'https://prices.mega.co.il/',
-    baseUrl: 'https://prices.mega.co.il',
+    deprecated: true,
+    status: 'deprecated',
+    lastVerified: '2026-06-07',
+    // Verified 2026-06-07: brand absorbed into Carrefour IL. No active price feed.
+    // Former Mega/Lahav stores now publish under prices.carrefour.co.il (chainId 7290055700007).
+    // OpenIsraeliSupermarkets Mega scraper commented out since mid-2025.
+    knownIssue: 'Brand defunct. Stores now operate as Carrefour. Do not enable.',
+    indexUrl: 'https://prices.carrefour.co.il/',
+    baseUrl:  'https://prices.carrefour.co.il',
     indexType: 'html',
   },
 ];
