@@ -617,6 +617,13 @@ window.searchPrices = async function(){
   const q = document.getElementById('price-search-input').value.trim();
   if(!q || q.length < 2){toast('⚠️ הכנס שם מוצר לחיפוש');return;}
 
+  // Tap-lock: disable search button immediately and show spinner so the
+  // user gets instant feedback and accidental re-taps are ignored.
+  const _btn = document.querySelector('.price-search-btn');
+  if (_btn?._searching) return;           // already in flight — ignore tap
+  if (_btn) { _btn._searching = true; _btn.textContent = '⏳'; _btn.disabled = true; }
+  const _unlock = () => { if (_btn) { _btn._searching = false; _btn.textContent = '🔍'; _btn.disabled = false; } };
+
   // Wait for translation modules to load (up to 3s) before firing so
   // first-tap searches get Hebrew→English resolution, not raw Hebrew.
   await _resolverReadyPromise;
@@ -645,25 +652,25 @@ window.searchPrices = async function(){
         data = await res.json();
       } finally { clearTimeout(tmo); }
 
-      if (mySeq !== _searchSeq) return;  // a newer search superseded this one
+      if (mySeq !== _searchSeq) { _unlock(); return; }  // a newer search superseded this one
 
       if (data.version) window._lastApiVersion = data.version;  // track deployed API build
 
       // Server timeout / error (504/503) → offer RETRY, never a false "no results"
       if (!res.ok || data.error) {
         wrap.innerHTML = _renderSearchRetry(q);
-        return;
+        _unlock(); return;
       }
 
       if (!data.results || !data.results.length) {
         wrap.innerHTML = `<div class="search-hint"><div class="sh-icon">🔍</div><p>לא נמצאו תוצאות עבור "${esc(q)}"</p><small>נסה שם שונה</small></div>`;
-        return;
+        _unlock(); return;
       }
 
       // Products exist but radius filtered ALL prices — show friendly no-nearby UI
       if (data.hasProductsButNoNearbyPrices) {
         wrap.innerHTML = _renderNearbyNoResults(q, data);
-        return;
+        _unlock(); return;
       }
 
       searchResults = data.results;
@@ -675,12 +682,15 @@ window.searchPrices = async function(){
       } else {
         renderSearchResults(data.results, q);
       }
+      _unlock();
     } catch(e) {
-      if (mySeq !== _searchSeq) return;  // superseded — stay silent
+      if (mySeq !== _searchSeq) { _unlock(); return; }  // superseded — stay silent
       // Network failure / abort → RETRY affordance, not a fake empty/manual state
       wrap.innerHTML = _renderSearchRetry(q);
+      _unlock();
     }
   });
+  _unlock(); // fallback — if resolveAndSearch exits without calling callback
 };
 
 // Retry card shown on network error / timeout (never a false "no prices")
@@ -1355,10 +1365,22 @@ function _normalizeResults(results) {
   return deduped;
 }
 
+// Minimum relevance score for a product to appear in results.
+// Prevents unrelated products (e.g. Kinder Chocolate for "חלב" query)
+// from polluting the result list. Score scale: 100=exact, 88=first-word,
+// 75=any-word, 60=substring, 40=multi-word partial, 10=no match.
+const _SCORE_THRESHOLD = 40;
+
 function _buildChainGroups(deduped, query) {
   const map = new Map();
+  const _debug = window.__debug_prices === true;
   deduped.forEach(product => {
     const score = matchScore(product.name, query);
+    if (score < _SCORE_THRESHOLD) {
+      if (_debug) console.log(`[prices] filtered (score ${score} < ${_SCORE_THRESHOLD}): "${product.name}"`);
+      return; // skip irrelevant products
+    }
+    if (_debug) console.log(`[prices] kept    (score ${score}): "${product.name}"`);
     product.stores.forEach(sp => {
       const chain = sp.store;
       if (!map.has(chain)) map.set(chain, { name: chain, products: [] });
@@ -1415,8 +1437,12 @@ function _renderChainGroups() {
   if (countEl) countEl.textContent = total > 0 ? `${total} מוצרים` : '';
 
   if (!filtered.length) {
+    // Distinguish: active user filters vs. score threshold removed all results
+    const hasUserFilters = _filterState.chains.size > 0 || _filterState.officialOnly ||
+                           _filterState.matchQuality !== 'all';
     wrap.innerHTML = `<div class="search-hint"><div class="sh-icon">🔍</div>
-      <p>לא נמצאו תוצאות</p><small>נסה להסיר פילטרים</small></div>`;
+      <p>${hasUserFilters ? 'לא נמצאו תוצאות' : 'לא נמצאו מוצרים רלוונטיים'}</p>
+      <small>${hasUserFilters ? 'נסה להסיר פילטרים' : 'נסה שם שונה או ביטוי קצר יותר'}</small></div>`;
     wrap._groups = null;
     return;
   }
@@ -7452,7 +7478,9 @@ window.executeImport = async function() {
   }
 
   function _closeTopOverlay() {
-    // Close in priority order: brand picker → store detail → product modal → import → group sheet → others
+    // Close in priority order: dialogs first, then modals, then sheets
+    if (document.querySelector('#exit-dlg'))             { document.getElementById('exit-dlg')?.remove();        return true; }
+    if (document.querySelector('#dup-member-dlg'))       { document.getElementById('dup-member-dlg')?.remove();  return true; }
     if (document.querySelector('#bp-overlay.show'))      { window.closeBrandPicker?.();    return true; }
     if (document.querySelector('#sd-overlay.show'))      { window.closeStoreDetail?.();    return true; }
     if (document.querySelector('#pm-overlay.show'))      { window.closeProductModal?.();   return true; }
