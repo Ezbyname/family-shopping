@@ -5,16 +5,16 @@
   "description": "E2E + smoke tests for Family Shopping PWA",
   "type": "module",
   "scripts": {
-    "test:e2e": "playwright test",
+    "test:e2e":        "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:debug": "playwright test --debug",
-    "test:smoke": "node smoke/firebase-health.js",
+    "test:e2e:debug":  "playwright test --debug",
+    "test:smoke":      "node smoke/firebase-health.js",
     "test:smoke:vercel": "node smoke/vercel-health.js",
-    "test:all": "npm run test:smoke && npm run test:e2e",
-    "report": "playwright show-report"
+    "test:all":        "npm run test:smoke && npm run test:e2e",
+    "report":          "playwright show-report"
   },
   "dependencies": {
-    "@playwright/test": "1.60.0",
+    "@playwright/test": "^1.44.0",
     "node-fetch": "^3.3.2"
   },
   "engines": {
