@@ -639,7 +639,7 @@ window.searchPrices = async function(){
       : ' בכל הסופרמרקטים';
     wrap.innerHTML = `<div class="price-loading"><div class="spin"></div><p>מחפש "${esc(q)}"${locationLabel}...</p></div>`;
     try {
-      let _apiUrl = `/api/prices?q=${encodeURIComponent(resolvedQuery)}&detail=1`;
+      let _apiUrl = `/api/prices?q=${encodeURIComponent(resolvedQuery)}`;
       if (_hasLoc()) {
         _apiUrl += `&lat=${_locLat()}&lng=${_locLng()}&radiusKm=${_nearbyRadius}`;
       }
@@ -1090,7 +1090,7 @@ window.submitManualAddress = async function() {
 async function _fetchNearby(barcode) {
   if (!barcode || !_hasLoc()) return null;
   try {
-    const url = `/api/prices?barcode=${encodeURIComponent(barcode)}&lat=${_locLat()}&lng=${_locLng()}&radiusKm=${_nearbyRadius}&detail=1`;
+    const url = `/api/prices?barcode=${encodeURIComponent(barcode)}&lat=${_locLat()}&lng=${_locLng()}&radiusKm=${_nearbyRadius}`;
     const res = await fetch(url);
     if (!res.ok) return null;
     const data = await res.json();
@@ -1629,7 +1629,7 @@ window.openProductModal = function(chainName, productIndex) {
   overlay.classList.add('show');
   document.body.classList.add('sheet-open');
   sheet.scrollTop = 0;
-  _renderProductModal();
+  _pmEnrichAndRender();
 
   sheet.addEventListener('touchstart', _pmTouchStart, { passive: true });
   sheet.addEventListener('touchend',   _pmTouchEnd,   { passive: true });
@@ -1644,8 +1644,48 @@ window.closeProductModal = function() {
   sheet.removeEventListener('touchend',   _pmTouchEnd);
 };
 
-const _PM_PAGE_SIZE    = 10;
-const _pmVisibleStores = new Map(); // keyed by barcode+':'+viewMode; module-scoped, no window pollution
+const _PM_PAGE_SIZE      = 10;
+const _pmVisibleStores   = new Map(); // keyed by barcode+':'+viewMode; module-scoped, no window pollution
+const _productDetailCache = new Map(); // barcode → enriched prices array; avoids repeat modal fetches
+
+// Merge enriched store fields (address/city/storeName/lat/lng) into existing product.stores in-place.
+// Only fills missing fields — never overwrites data the lightweight result already provided.
+function _mergeEnrichedStores(product, enrichedPrices) {
+  for (const e of enrichedPrices) {
+    const key = `${e.chainId || ''}_${e.storeId || ''}`;
+    const s   = product.stores.find(s => `${s.chainId || ''}_${s.storeId || ''}` === key);
+    if (!s) continue;
+    if (!s.address   && e.address)   s.address   = e.address;
+    if (!s.city      && e.city)      s.city      = e.city;
+    if (!s.storeName && e.storeName) s.storeName = e.storeName;
+    if (s.latitude  == null && e.latitude  != null) s.latitude  = e.latitude;
+    if (s.longitude == null && e.longitude != null) s.longitude = e.longitude;
+  }
+}
+
+// Render the modal immediately (lightweight), then fetch enriched store data and silently re-render.
+// Skipped when: no barcode (can't do barcode lookup), or cache already populated.
+async function _pmEnrichAndRender() {
+  _renderProductModal();
+  const item    = _pmProducts[_pmIndex];
+  if (!item) return;
+  const barcode = item.product.barcode;
+  if (!barcode) return;                              // no barcode → can't enrich, show as-is
+  if (_productDetailCache.has(barcode)) {
+    _mergeEnrichedStores(item.product, _productDetailCache.get(barcode));
+    _renderProductModal();
+    return;
+  }
+  try {
+    const res = await fetch(`/api/prices?barcode=${encodeURIComponent(barcode)}&detail=1`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const prices = Array.isArray(data.prices) ? data.prices : [];
+    _productDetailCache.set(barcode, prices);
+    _mergeEnrichedStores(item.product, prices);
+    _renderProductModal();
+  } catch { /* enrichment is best-effort; plain price data already visible */ }
+}
 
 window._pmShowMore = function(key) {
   _pmVisibleStores.set(key, (_pmVisibleStores.get(key) || _PM_PAGE_SIZE) + _PM_PAGE_SIZE);
@@ -1676,8 +1716,8 @@ function _pmTouchEnd(e) {
   const dy = e.changedTouches[0].clientY - _pmSwipeStartY;
   if (Math.abs(dy) > Math.abs(dx) || Math.abs(dx) < 45) return;
   // RTL: swipe right → previous (higher index in visual RTL), swipe left → next
-  if (dx < -45 && _pmIndex < _pmProducts.length - 1) { _pmIndex++; _renderProductModal(); }
-  else if (dx > 45 && _pmIndex > 0)                   { _pmIndex--; _renderProductModal(); }
+  if (dx < -45 && _pmIndex < _pmProducts.length - 1) { _pmIndex++; _pmEnrichAndRender(); }
+  else if (dx > 45 && _pmIndex > 0)                   { _pmIndex--; _pmEnrichAndRender(); }
 }
 
 function _renderProductModal() {
