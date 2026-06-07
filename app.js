@@ -1391,18 +1391,26 @@ function _buildChainGroups(deduped, query) {
 
   const bestScore = scored.length ? Math.max(...scored.map(s => s.score)) : 0;
   const useThreshold = bestScore >= _SCORE_THRESHOLD;
+
+  // Relative threshold: when strong matches exist, raise the bar so that
+  // weak word-anywhere matches (e.g. "שוקולד חלב" for query "חלב") are filtered
+  // while all legitimate variants still pass (e.g. "חלב שקדים", "חלב עמיד").
+  const threshold = bestScore >= 90 ? bestScore - 15
+                  : bestScore >= 80 ? bestScore - 20
+                  : _SCORE_THRESHOLD;
+
   _lastSearchLowRelevance = !useThreshold && scored.length > 0;
 
   if (_debug) {
-    console.log(`[prices] query="${query}" bestScore=${bestScore} threshold=${_SCORE_THRESHOLD} mode=${useThreshold ? 'strict' : 'fallback(top-'+_SCORE_FALLBACK_N+')'}`);
+    console.log(`[prices] query="${query}" bestScore=${bestScore} threshold=${threshold} mode=${useThreshold ? 'strict' : 'fallback(top-'+_SCORE_FALLBACK_N+')'}`);
     scored.forEach(({ product, score }) =>
-      console.log(`[prices]   ${score >= _SCORE_THRESHOLD ? 'kept    ' : 'low-rel '} (${score}): "${product.name}"`)
+      console.log(`[prices]   ${score >= threshold ? 'kept    ' : 'low-rel '} (${score}): "${product.name}"`)
     );
   }
 
-  // In fallback mode, show top-N by score; in strict mode, apply threshold.
+  // In fallback mode, show top-N by score; in strict mode, apply relative threshold.
   const eligible = useThreshold
-    ? scored.filter(s => s.score >= _SCORE_THRESHOLD)
+    ? scored.filter(s => s.score >= threshold)
     : scored.sort((a, b) => b.score - a.score).slice(0, _SCORE_FALLBACK_N);
 
   const map = new Map();
@@ -1636,6 +1644,14 @@ window.closeProductModal = function() {
   sheet.removeEventListener('touchend',   _pmTouchEnd);
 };
 
+const _PM_PAGE_SIZE = 10;
+
+window._pmShowMore = function(barcode) {
+  if (!window._pmVisibleStores) window._pmVisibleStores = {};
+  window._pmVisibleStores[barcode] = (window._pmVisibleStores[barcode] || _PM_PAGE_SIZE) + _PM_PAGE_SIZE;
+  window._pmRenderStoreList?.();
+};
+
 window._pmToggleStore = function(row) {
   const detail = row.querySelector('.sr2-detail');
   if (!detail) return;
@@ -1732,9 +1748,7 @@ function _renderProductModal() {
               ${s.isStale ? `<span class="sr2-stale">⚠ ישן</span>` : ''}
             </div>
             <div class="sr2-meta">
-              ${location
-                ? `<span class="sr2-addr">${esc(location)}</span>`
-                : `<span class="sr2-addr muted">כתובת לא זמינה</span>`}
+              ${location ? `<span class="sr2-addr">${esc(location)}</span>` : ''}
               ${distLine
                 ? `<span class="sr2-dist">📍 ${distLine}</span>`
                 : ''}
@@ -1756,6 +1770,84 @@ function _renderProductModal() {
       }).join('')
     : `<div class="spr no-data" style="justify-content:center;font-size:12px">אין מחירים רשמיים</div>`;
 
+  // Pagination state per barcode — preserved across swipe-navigation between products
+  const barcode = product.barcode || product.name; // fallback key for products without barcode
+  if (!window._pmVisibleStores) window._pmVisibleStores = {};
+  if (!(barcode in window._pmVisibleStores)) {
+    window._pmVisibleStores[barcode] = _PM_PAGE_SIZE;
+  }
+
+  const _renderStoreList = () => {
+    const vis   = window._pmVisibleStores[barcode];
+    const shown = allPrices.slice(0, vis);
+    const total = allPrices.length;
+    const el    = document.getElementById('pm-store-list');
+    if (!el) return;
+    el.innerHTML = shown.map((s, idx) => {
+      const isBest     = s.price === minPrice;
+      const meta       = CHAIN_META[s.store] || { color: '#7d8590' };
+      const location   = [s.address, s.city].filter(Boolean).join(', ');
+      const distLine   = s.distanceKm != null ? `${s.distanceKm} ק"מ` : null;
+      const mapsQuery  = (s.latitude && s.longitude)
+        ? `${s.latitude},${s.longitude}`
+        : encodeURIComponent([(s.storeName || s.store), s.address, s.city].filter(Boolean).join(' '));
+      const mapsUrl    = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
+      const hasNav     = !!(s.latitude && s.longitude) || !!(s.address || s.city);
+      const ageHours   = s.syncedAt
+        ? Math.round((Date.now() - new Date(s.syncedAt).getTime()) / 3_600_000) : null;
+      const ageTxt     = ageHours != null
+        ? (ageHours < 24 ? `לפני ${ageHours}ש'` : `לפני ${Math.round(ageHours / 24)}י'`) : null;
+
+      return `<div class="sr2${isBest ? ' sr2-best' : ''}" data-idx="${idx}"
+                   onclick="_pmToggleStore(this)">
+        <div class="sr2-left">
+          <div class="sr2-dot" style="background:${meta.color}"></div>
+        </div>
+        <div class="sr2-body">
+          <div class="sr2-top">
+            <span class="sr2-chain" style="color:${meta.color}">${esc(s.store)}</span>
+            ${s.storeName && s.storeName !== s.store
+              ? `<span class="sr2-sub">${esc(s.storeName)}</span>` : ''}
+            ${isBest ? `<span class="sr2-badge">הכי זול 🏆</span>` : ''}
+            ${s.isStale ? `<span class="sr2-stale">⚠ ישן</span>` : ''}
+          </div>
+          ${location || distLine ? `<div class="sr2-meta">
+            ${location  ? `<span class="sr2-addr">${esc(location)}</span>` : ''}
+            ${distLine  ? `<span class="sr2-dist">📍 ${distLine}</span>` : ''}
+          </div>` : ''}
+          <div class="sr2-detail" style="display:none">
+            ${ageTxt ? `<div class="sr2-age">עודכן ${ageTxt}</div>` : ''}
+            ${s.approximateLocation ? `<div class="sr2-approx">📍 מיקום משוער</div>` : ''}
+            ${hasNav
+              ? `<a class="sr2-nav" href="${mapsUrl}" target="_blank" rel="noopener"
+                    onclick="event.stopPropagation()">🗺 נווט</a>`
+              : ''}
+          </div>
+        </div>
+        <div class="sr2-price">
+          <span class="sr2-amt">₪${s.price.toFixed(2)}</span>
+          ${s.unit ? `<span class="sr2-unit">${esc(s.unit)}</span>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+
+    // Counter + show-more button
+    const footer = document.getElementById('pm-store-footer');
+    if (!footer) return;
+    if (total <= _PM_PAGE_SIZE && vis >= total) {
+      footer.innerHTML = '';
+    } else if (vis >= total) {
+      footer.innerHTML = `<div class="pm-store-counter">כל ${total} החנויות מוצגות</div>`;
+    } else {
+      const remaining = Math.min(_PM_PAGE_SIZE, total - vis);
+      footer.innerHTML = `
+        <div class="pm-store-counter">מציג ${vis} מתוך ${total} חנויות</div>
+        <button class="pm-show-more" onclick="_pmShowMore(${JSON.stringify(barcode)})">
+          הצג עוד ${remaining} חנויות
+        </button>`;
+    }
+  };
+
   document.getElementById('pm-body').innerHTML = `
     <div class="pm-img-row">
       ${product.image
@@ -1766,88 +1858,16 @@ function _renderProductModal() {
     <div class="pm-sub">${[product.brand, product.size].filter(Boolean).map(esc).join(' · ')}</div>
     ${modalSpread}
     <div class="pm-sec-label">מחירים לפי סניף</div>
-    <div class="store-prices">${storeRows}</div>
+    <div id="pm-store-list" class="store-prices"></div>
+    <div id="pm-store-footer" class="pm-store-footer"></div>
     <button class="pm-add-btn" onclick="_pmAddToList()">➕ הוסף לרשימה</button>
     <button class="pm-detail-btn" onclick="_pmShowDetail()">השוואה מפורטת ←</button>
     ${_pmProducts.length > 1 ? `<div class="pm-swipe-hint">← החלק לניווט בין מוצרים →</div>` : ''}
   `;
 
-  // Async-populate city filter section
-  if (_selectedCities.length > 0 && product.barcode) {
-    _fetchByCity(product.barcode).then(data => {
-      const el = document.getElementById('pm-city');
-      if (!el) return;
-      if (!data || !data.results || !data.results.length) {
-        el.innerHTML = `<div style="text-align:center;padding:12px;color:var(--muted);font-size:12px">
-          אין מחירים זמינים בערים שנבחרו</div>`;
-        return;
-      }
-      el.innerHTML = data.results.slice(0, 12).map((r, i) => {
-        const meta      = CHAIN_META[r.chainName] || { color: '#7d8590' };
-        const isBest    = i === 0;
-        const name      = r.storeName || `סניף ${r.storeId}`;
-        const subName   = r.subChainName && r.subChainName !== r.chainName ? r.subChainName : '';
-        const addrLine  = [subName, r.address].filter(Boolean).join(' · ');
-        const age       = r.syncedAt
-          ? Math.round((Date.now() - new Date(r.syncedAt).getTime()) / 3600000) + 'ש׳'
-          : '';
-        return `<div class="city-row${isBest ? ' best' : ''}">
-          <div class="city-dot" style="background:${meta.color}"></div>
-          <div class="city-info">
-            ${isBest ? `<div class="city-trophy">🏆 הכי זול בעיר</div>` : ''}
-            <div class="city-chain" style="color:${meta.color}">${esc(r.chainName)}</div>
-            <div class="city-store">${esc(name)}${r.city ? ' · ' + esc(r.city) : ''}</div>
-            ${addrLine ? `<div class="city-store" style="font-size:10px">${esc(addrLine)}</div>` : ''}
-          </div>
-          <div class="city-right">
-            <div class="city-price">₪${r.price.toFixed(2)}</div>
-            <div class="city-meta">סניף ${esc(String(r.storeId))}${age ? ' · ' + age : ''}</div>
-            ${r.isStale ? `<div class="city-stale">⚠ ישן</div>` : ''}
-          </div>
-        </div>`;
-      }).join('');
-    });
-  }
-
-  // Async-populate the nearby section (skipped entirely until coordinate enrichment lands)
-  if (NEARBY_COORDS_READY && _nearbyMode && product.barcode) {
-    if (!_hasLoc()) {
-      const el = document.getElementById('pm-nearby');
-      if (el) el.innerHTML = `<div class="spr no-data" style="justify-content:center;font-size:12px">
-        יש לבחור מיקום לסינון קרוב 📍</div>`;
-    } else {
-      _fetchNearby(product.barcode).then(data => {
-        const el = document.getElementById('pm-nearby');
-        if (!el) return;
-        if (!data || !data.results || !data.results.length) {
-          el.innerHTML = `<div class="spr no-data" style="justify-content:center;font-size:12px">
-            אין סניפים עם מחיר בטווח ${_nearbyRadius} ק"מ</div>`;
-          return;
-        }
-        el.innerHTML = data.results.slice(0, 10).map((r, i) => {
-          const meta   = CHAIN_META[r.chainName] || { color: '#7d8590' };
-          const isBest = i === 0;
-          const name   = r.storeName || `סניף ${r.storeId}`;
-          const age    = r.syncedAt
-            ? Math.round((Date.now() - new Date(r.syncedAt).getTime()) / 3600000) + 'ש׳'
-            : '';
-          return `<div class="nb-row${isBest ? ' best' : ''}">
-            <div class="nb-dot" style="background:${meta.color}"></div>
-            <div class="nb-info">
-              ${isBest ? `<div class="nb-trophy">🏆 הכי זול קרוב</div>` : ''}
-              <div class="nb-chain" style="color:${meta.color}">${esc(r.chainName)}</div>
-              <div class="nb-store">${esc(name)}${r.city ? ' · ' + esc(r.city) : ''}</div>
-            </div>
-            <div class="nb-right">
-              <div class="nb-price">₪${r.price.toFixed(2)}</div>
-              <div class="nb-dist">${r.distanceKm} ק"מ${age ? ' · ' + age : ''}</div>
-              ${r.isStale ? `<div class="nb-stale">⚠ ישן</div>` : ''}
-            </div>
-          </div>`;
-        }).join('');
-      });
-    }
-  }
+  _renderStoreList();
+  // Expose re-render for show-more button
+  window._pmRenderStoreList = _renderStoreList;
 }
 
 window._pmAddToList = function() {

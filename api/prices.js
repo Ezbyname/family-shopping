@@ -51,10 +51,12 @@ async function getStoreIndex(dbUrl) {
       // Normalize storeCoords {lat,lng,city} → stores-compatible shape
       _storeCache = Object.fromEntries(
         Object.entries(coordsData).map(([k, v]) => [k, {
-          hasCoords: true,
-          latitude:  v.lat ?? v.latitude ?? null,
-          longitude: v.lng ?? v.longitude ?? null,
-          city:      v.city || '',
+          hasCoords:  true,
+          latitude:   v.lat ?? v.latitude ?? null,
+          longitude:  v.lng ?? v.longitude ?? null,
+          city:       v.city     || '',
+          address:    v.address  || '',
+          storeName:  v.name     || '',
         }])
       );
       _storeCacheExp = now + STORE_CACHE_MS;
@@ -371,19 +373,26 @@ async function buildLayeredPrices(
         override:     overrides[key] ?? null,
       }));
 
-    // Radius filter — use cached store index (prefers storeCoords, falls back to stores/)
-    if (hasLoc && official.length > 0) {
-      let idx = storeIndex;
-      if (idx === undefined) {
-        const tStore = Date.now();
-        try {
-          idx = await getStoreIndex(dbUrl);
-        } catch (_) {
-          idx = {};
-        }
-        timings.storeReadMs = Date.now() - tStore;
+    // Load store index (needed for radius filter and/or address enrichment)
+    let idx = storeIndex;
+    if (idx === undefined && official.length > 0) {
+      const tStore = Date.now();
+      try {
+        idx = await getStoreIndex(dbUrl);
+      } catch (_) {
+        idx = {};
       }
-      official = filterByRadius(official, lat, lng, radius, idx);
+      timings.storeReadMs = Date.now() - tStore;
+    }
+
+    if (idx && official.length > 0) {
+      if (hasLoc) {
+        // Radius filter (also enriches address/city/lat/lng/storeName inside filterByRadius)
+        official = filterByRadius(official, lat, lng, radius, idx);
+      } else {
+        // No location filter — still enrich address/city/storeName from store index
+        enrichFromStoreIndex(official, idx);
+      }
     }
 
     official.sort((a, b) => a.displayPrice - b.displayPrice);
@@ -461,6 +470,25 @@ async function buildLayeredPrices(
   return { prices: [], source: 'none', communityWarning: null };
 }
 
+// ── Enrich prices with store metadata (address, city, storeName) ─────────────
+// Always called when storeIndex is available, regardless of radius filter.
+// Populates fields from storeCoords so the frontend can show full store details
+// even when no location filter is active.
+function enrichFromStoreIndex(prices, storeIndex) {
+  for (const p of prices) {
+    const key   = `${p.chainId || ''}_${p.storeId || ''}`;
+    const store = storeIndex[key];
+    if (!store) continue;
+    if (!p.address   && store.address)   p.address   = store.address;
+    if (!p.city      && store.city)      p.city      = store.city;
+    if (!p.storeName && store.storeName) p.storeName = store.storeName;
+    if (store.hasCoords) {
+      if (p.latitude  == null) p.latitude  = store.latitude;
+      if (p.longitude == null) p.longitude = store.longitude;
+    }
+  }
+}
+
 // ── Filter prices to stores within radius ────────────────────────────────────
 function filterByRadius(prices, lat, lng, radius, storeIndex) {
   return prices.filter(p => {
@@ -472,8 +500,9 @@ function filterByRadius(prices, lat, lng, radius, storeIndex) {
       p.distanceKm  = Math.round(dist * 10) / 10;
       p.latitude    = store.latitude  ?? null;
       p.longitude   = store.longitude ?? null;
-      p.address     = p.address  || store.address  || '';
-      p.city        = p.city     || store.city     || '';
+      p.address     = p.address   || store.address   || '';
+      p.city        = p.city      || store.city      || '';
+      p.storeName   = p.storeName || store.storeName || '';
       return true;
     }
     return false;

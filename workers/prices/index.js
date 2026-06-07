@@ -112,13 +112,17 @@ async function syncChainStores(chain, writer, config) {
               updatedAt:    new Date().toISOString(),
               source:       'official',
             });
-            // storeCoords/{storeKey} = { lat, lng, city } — lightweight index (~28 KB total)
-            // read by basket-compare.js and prices.js to avoid loading the full stores node.
+            // storeCoords/{storeKey} = lightweight index read by prices.js and basket-compare.js
+            // to avoid loading the full stores node (~141 KB).
+            // Includes address and storeName so the API can render full store details
+            // without falling back to the heavier stores/ node.
             if (store.hasCoords) {
               await writer.queue(`storeCoords/${storeKey}`, {
-                lat:  store.latitude,
-                lng:  store.longitude,
-                city: store.city || '',
+                lat:     store.latitude,
+                lng:     store.longitude,
+                city:    store.city     || '',
+                address: store.address  || '',
+                name:    store.storeName || '',
               });
             }
           }
