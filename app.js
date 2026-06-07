@@ -500,7 +500,7 @@ window.setTab=function(tab){
   const pt = document.getElementById('price-tools');
   if (pt) pt.style.display = isPrice && pt.children.length ? 'flex' : 'none';
 
-  if (isPrice) renderPrices();
+  if (isPrice) { renderPrices(); _resolverReadyPromise; /* ensure pre-warmed */ }
   else if (isFav) renderFavoritesPanel();
   else renderList();
 };
@@ -616,6 +616,10 @@ window.quickSearch = function(name){
 window.searchPrices = async function(){
   const q = document.getElementById('price-search-input').value.trim();
   if(!q || q.length < 2){toast('⚠️ הכנס שם מוצר לחיפוש');return;}
+
+  // Wait for translation modules to load (up to 3s) before firing so
+  // first-tap searches get Hebrew→English resolution, not raw Hebrew.
+  await _resolverReadyPromise;
 
   // Run through translation resolver pipeline
   await resolveAndSearch(q, async (resolvedQuery) => {
@@ -5471,6 +5475,16 @@ async function initResolver() {
 }
 initResolver();
 
+// Promise that resolves when the translation resolver is ready (or times out at 3s).
+// Used by searchPrices to avoid firing with raw Hebrew before modules load.
+let _resolverReadyPromise = new Promise(resolve => {
+  if (resolverReady) { resolve(); return; }
+  const check = setInterval(() => {
+    if (resolverReady) { clearInterval(check); resolve(); }
+  }, 50);
+  setTimeout(() => { clearInterval(check); resolve(); }, 3000); // give up after 3s
+});
+
 // Pending resolve callback
 let _resolveCallback = null;
 
@@ -7415,3 +7429,66 @@ window.executeImport = async function() {
   if (removed) parts.push('🗑 ' + removed);
   toast(parts.length ? '📋 יובאו: ' + parts.join(' · ') : '⚠️ לא בוצעו פעולות');
 };
+
+// ── Android back-button interception ─────────────────────────────────────────
+// Push a dummy history state so the first Android back press fires popstate
+// instead of leaving the app. On popstate: if any sheet/overlay is open,
+// close it. Otherwise show a "leave app?" confirmation dialog.
+(function _initBackButton() {
+  // Push synthetic state once so there is always something to pop to
+  if (history.state === null || history.state?.appShell !== true) {
+    history.pushState({ appShell: true }, '');
+  }
+
+  function _anyOverlayOpen() {
+    const selectors = [
+      '#bp-overlay.show', '#sd-overlay.show', '#pm-overlay.show',
+      '#gs-sheet[style*="translateY(0"]', '#gs-sheet.open',
+      '.import-overlay.show', '#dup-member-dlg',
+      '#members-overlay.show', '#add-group-overlay.show',
+      '.ol2.show', '[id$="-overlay"].show',
+    ];
+    return selectors.some(s => { try { return !!document.querySelector(s); } catch(_) { return false; } });
+  }
+
+  function _closeTopOverlay() {
+    // Close in priority order: brand picker → store detail → product modal → import → group sheet → others
+    if (document.querySelector('#bp-overlay.show'))      { window.closeBrandPicker?.();    return true; }
+    if (document.querySelector('#sd-overlay.show'))      { window.closeStoreDetail?.();    return true; }
+    if (document.querySelector('#pm-overlay.show'))      { window.closeProductModal?.();   return true; }
+    if (document.querySelector('.import-overlay.show'))  { window.closeImportModal?.();    return true; }
+    if (document.querySelector('#members-overlay.show')) { document.getElementById('members-overlay')?.classList.remove('show'); return true; }
+    if (document.querySelector('#gs-sheet'))             { window.closeGroupSheet?.();     return true; }
+    // generic .ol2 overlays
+    const ol2 = document.querySelector('.ol2.show');
+    if (ol2) { ol2.classList.remove('show'); return true; }
+    return false;
+  }
+
+  window.addEventListener('popstate', (e) => {
+    // Always re-push the sentinel so the next back press also fires popstate
+    history.pushState({ appShell: true }, '');
+
+    // If any overlay is open, close it — don't prompt to leave
+    if (_closeTopOverlay()) return;
+
+    // No overlay open — confirm leaving the app
+    const dlg = document.createElement('div');
+    dlg.id = 'exit-dlg';
+    dlg.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);direction:rtl';
+    dlg.innerHTML = `
+      <div style="background:var(--surface,#fff);border-radius:20px;padding:28px 22px;max-width:300px;width:88%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.22)">
+        <div style="font-size:32px;margin-bottom:10px">🛒</div>
+        <div style="font-size:17px;font-weight:800;margin-bottom:8px">לצאת מהאפליקציה?</div>
+        <div style="font-size:13px;color:var(--muted,#888);margin-bottom:22px">הרשימה שלך תישמר</div>
+        <div style="display:flex;gap:10px;justify-content:center">
+          <button id="exit-yes" style="flex:1;padding:12px;border-radius:12px;border:none;background:var(--accent,#22c55e);color:#111;font-size:15px;font-weight:700;cursor:pointer">יציאה</button>
+          <button id="exit-no"  style="flex:1;padding:12px;border-radius:12px;border:1.5px solid var(--border,#ddd);background:transparent;font-size:15px;cursor:pointer">ביטול</button>
+        </div>
+      </div>`;
+    document.body.appendChild(dlg);
+    document.getElementById('exit-yes').onclick = () => { dlg.remove(); window.history.go(-2); };
+    document.getElementById('exit-no').onclick  = () => dlg.remove();
+    dlg.addEventListener('click', e => { if (e.target === dlg) dlg.remove(); });
+  });
+})();
