@@ -452,7 +452,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   color:var(--muted);cursor:pointer}
 .fd-apply{flex:2;background:var(--accent);border:none;border-radius:13px;
   padding:11px;font-family:'Rubik',sans-serif;font-size:13px;font-weight:800;
-  color:#111;cursor:pointer}
+  color:#fff;cursor:pointer}
 /* product modal */
 .pm-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);
   z-index:450;align-items:flex-end;justify-content:center}
@@ -478,7 +478,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px}
 .pm-add-btn{width:100%;margin-top:14px;background:var(--accent);border:none;border-radius:14px;
   padding:13px;font-family:'Rubik',sans-serif;font-size:14px;font-weight:800;
-  color:#111;cursor:pointer;transition:opacity .15s}
+  color:#fff;cursor:pointer;transition:opacity .15s}
 .pm-add-btn:active{opacity:.8}
 .pm-swipe-hint{font-size:10px;color:var(--muted);text-align:center;margin-top:10px;padding-bottom:6px}
 .pm-detail-btn{width:100%;margin-top:8px;background:transparent;
