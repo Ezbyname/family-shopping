@@ -1835,3 +1835,16 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
 .import-preview-note{font-size:11px;color:var(--muted);flex-shrink:0}
 
 .bp-fallback-note{font-size:11px;color:var(--muted);text-align:center;padding:6px 10px 2px;opacity:.8}
+
+/* ── Custom dialog modal ── */
+#app-dialog-overlay{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px}
+.app-dialog-card{background:var(--surface,#fff);border-radius:16px;padding:24px;width:100%;max-width:320px;direction:rtl;box-shadow:0 8px 32px rgba(0,0,0,.18);transform:scale(.95);opacity:0;transition:transform .18s ease,opacity .18s ease}
+.app-dialog-card.app-dialog-in{transform:scale(1);opacity:1}
+.app-dialog-msg{font-size:15px;color:var(--text,#111);line-height:1.55;white-space:pre-line;margin-bottom:20px;font-family:'Rubik',sans-serif}
+.app-dialog-input{width:100%;box-sizing:border-box;border:1.5px solid var(--border,#e2e8f0);border-radius:10px;padding:10px 12px;font-size:15px;font-family:'Rubik',sans-serif;direction:rtl;margin-bottom:16px;outline:none;color:var(--text,#111)}
+.app-dialog-input:focus{border-color:var(--accent,#46c97a)}
+.app-dialog-btns{display:flex;gap:10px;flex-direction:row-reverse}
+.app-dialog-btn{flex:1;padding:11px 0;border:none;border-radius:10px;font-size:15px;font-family:'Rubik',sans-serif;font-weight:700;cursor:pointer;transition:opacity .15s}
+.app-dialog-btn:active{opacity:.8}
+.app-dialog-btn.primary{background:var(--accent,#46c97a);color:#fff}
+.app-dialog-btn.ghost{background:var(--card2,#f1f5f9);color:var(--text,#111)}

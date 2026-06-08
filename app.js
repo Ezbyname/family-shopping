@@ -160,6 +160,83 @@ const STORES=['שופרסל','רמי לוי','ויקטורי','יינות בית
 let activeStores=new Set(STORES);
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}
+
+// ── CUSTOM MODAL DIALOGS (replaces native confirm/alert/prompt) ──
+(function() {
+  function _getOrCreateOverlay() {
+    let el = document.getElementById('app-dialog-overlay');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'app-dialog-overlay';
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+
+  function _show(html, onMounted) {
+    const overlay = _getOrCreateOverlay();
+    overlay.innerHTML = html;
+    overlay.style.display = 'flex';
+    requestAnimationFrame(() => {
+      const card = overlay.querySelector('.app-dialog-card');
+      if (card) card.classList.add('app-dialog-in');
+    });
+    if (onMounted) onMounted(overlay);
+  }
+
+  function _close() {
+    const overlay = document.getElementById('app-dialog-overlay');
+    if (overlay) overlay.style.display = 'none';
+  }
+
+  window.showConfirm = function(message, onConfirm, onCancel) {
+    _show(`
+      <div class="app-dialog-card">
+        <div class="app-dialog-msg">${esc(message)}</div>
+        <div class="app-dialog-btns">
+          <button class="app-dialog-btn primary" id="_dlg_ok">אישור</button>
+          <button class="app-dialog-btn ghost" id="_dlg_cancel">ביטול</button>
+        </div>
+      </div>`, overlay => {
+      overlay.querySelector('#_dlg_ok').onclick = () => { _close(); if (onConfirm) onConfirm(); };
+      overlay.querySelector('#_dlg_cancel').onclick = () => { _close(); if (onCancel) onCancel(); };
+    });
+  };
+
+  window.showAlert = function(message, onClose) {
+    _show(`
+      <div class="app-dialog-card">
+        <div class="app-dialog-msg">${esc(message)}</div>
+        <div class="app-dialog-btns">
+          <button class="app-dialog-btn primary" id="_dlg_ok">אישור</button>
+        </div>
+      </div>`, overlay => {
+      overlay.querySelector('#_dlg_ok').onclick = () => { _close(); if (onClose) onClose(); };
+    });
+  };
+
+  window.showPrompt = function(message, defaultValue, onConfirm, onCancel) {
+    _show(`
+      <div class="app-dialog-card">
+        <div class="app-dialog-msg">${esc(message)}</div>
+        <input class="app-dialog-input" id="_dlg_input" value="${esc(defaultValue || '')}" />
+        <div class="app-dialog-btns">
+          <button class="app-dialog-btn primary" id="_dlg_ok">אישור</button>
+          <button class="app-dialog-btn ghost" id="_dlg_cancel">ביטול</button>
+        </div>
+      </div>`, overlay => {
+      const input = overlay.querySelector('#_dlg_input');
+      setTimeout(() => { input.focus(); input.select(); }, 50);
+      overlay.querySelector('#_dlg_ok').onclick = () => { _close(); if (onConfirm) onConfirm(input.value); };
+      overlay.querySelector('#_dlg_cancel').onclick = () => { _close(); if (onCancel) onCancel(); };
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { _close(); if (onConfirm) onConfirm(input.value); }
+        if (e.key === 'Escape') { _close(); if (onCancel) onCancel(); }
+      });
+    });
+  };
+})();
+
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
 
 function saveLocal(){localStorage.setItem('fsl_v2',JSON.stringify({myName,myId,groupId,groupName}))}
@@ -5229,9 +5306,10 @@ function _renderGroupSheet() {
 
 // Leave group — confirmation before action
 window.confirmLeaveGroup = function() {
-  if (!confirm(`עזוב את "${groupName}"?\n\nתוכל להצטרף מחדש בעזרת הקוד.`)) return;
-  closeGroupSheet();
-  toast('💡 בקרוב: עזיבת קבוצה — בינתיים צור קבוצה חדשה');
+  showConfirm(`עזוב את "${groupName}"?\n\nתוכל להצטרף מחדש בעזרת הקוד.`, () => {
+    closeGroupSheet();
+    toast('💡 בקרוב: עזיבת קבוצה — בינתיים צור קבוצה חדשה');
+  });
 };
 
 // Wire: old dropdown toggle → sheet
