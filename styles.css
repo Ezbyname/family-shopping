@@ -123,7 +123,7 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
 .add-input:focus{border-color:var(--accent)}
 .add-input::placeholder{color:var(--muted)}
 .add-btn{background:var(--accent);color:#fff;border:none;border-radius:11px;
-  width:40px;height:40px;font-size:22px;cursor:pointer;font-weight:700;
+  width:40px;height:40px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;flex-shrink:0;
   transition:transform .1s,opacity .1s;}
 .add-btn:active{transform:scale(.85);opacity:.85}
@@ -1013,11 +1013,11 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   border:1px solid rgba(52,211,153,.3);border-radius:5px;
   padding:1px 6px;font-size:9px;font-weight:700}
 .fav-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
-.fav-add-btn{background:var(--accent);color:#fff;border:none;border-radius:9px;
+.fav-add-btn{background:#fff;color:var(--accent);border:1.5px solid var(--accent);border-radius:9px;
   width:32px;height:32px;font-size:16px;cursor:pointer;display:flex;
   align-items:center;justify-content:center;transition:all .15s;font-weight:700}
-.fav-add-btn:active{transform:scale(.9)}
-.fav-add-btn.in-list{background:var(--green);font-size:13px}
+.fav-add-btn:active{transform:scale(.9);opacity:.8}
+.fav-add-btn.in-list{background:var(--green);color:#fff;border-color:var(--green);font-size:13px}
 .fav-remove-btn{background:transparent;border:1.5px solid var(--border);
   border-radius:9px;width:32px;height:32px;font-size:14px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
