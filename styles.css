@@ -497,7 +497,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 
 /* MODALS */
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);
-  z-index:200;align-items:flex-end;justify-content:center;}
+  z-index:400;align-items:flex-end;justify-content:center;}
 .overlay.show{display:flex}
 .modal{background:var(--surface);border-radius:22px 22px 0 0;
   padding:18px 17px calc(18px + var(--safe-b));width:100%;max-width:480px;
@@ -1357,11 +1357,12 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
 .pt-btn:active{border-color:var(--accent);color:var(--accent)}
 /* Group sheet — danger action at bottom */
 .gs-action.gs-danger{
-  background:rgba(248,113,113,.06)!important;
-  border:1.5px solid rgba(248,113,113,.18)!important;
+  background:rgba(248,113,113,.12)!important;
+  border:1.5px solid rgba(248,113,113,.3)!important;
   margin-top:6px!important;
 }
-.gs-action.gs-danger .gs-action-lbl{color:var(--red)!important}
+.gs-action.gs-danger .gs-action-ic{filter:none!important}
+.gs-action.gs-danger .gs-action-lbl{color:var(--red)!important;font-weight:700!important}
 /* ══ GROUP BOTTOM SHEET ══ */
 .gs-overlay{
   display:none;position:fixed;inset:0;
@@ -1436,13 +1437,13 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
 .gs-actions-wrap{padding:8px 16px calc(12px + var(--safe-b))}
 .gs-action{
   display:flex;align-items:center;gap:12px;
-  padding:11px 14px;background:var(--card);border-radius:13px;
+  padding:11px 14px;background:var(--green);border-radius:13px;
   margin-bottom:7px;cursor:pointer;transition:background .1s;
   border:none;width:100%;font-family:'Rubik',sans-serif;text-align:right;
 }
-.gs-action:active{background:var(--card2)}
-.gs-action-ic{font-size:18px;width:26px;text-align:center;flex-shrink:0}
-.gs-action-lbl{font-size:13px;font-weight:600;color:var(--text)}
+.gs-action:active{background:#15803d}
+.gs-action-ic{font-size:18px;width:26px;text-align:center;flex-shrink:0;filter:brightness(10)}
+.gs-action-lbl{font-size:13px;font-weight:700;color:#fff}
 .gs-action.danger .gs-action-lbl{color:var(--red)}
 /* Separator */
 .gs-sep{height:1px;background:rgba(255,255,255,.05);margin:4px 0}

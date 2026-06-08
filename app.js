@@ -1414,7 +1414,12 @@ function _buildChainGroups(deduped, query) {
     : scored.sort((a, b) => b.score - a.score).slice(0, _SCORE_FALLBACK_N);
 
   const map = new Map();
+  const noPrice = [];
   eligible.forEach(({ product, score }) => {
+    if (!product.stores || product.stores.length === 0) {
+      noPrice.push({ product, score, chainPrice: null, unit: null });
+      return;
+    }
     product.stores.forEach(sp => {
       const chain = sp.store;
       if (!map.has(chain)) map.set(chain, { name: chain, products: [] });
@@ -1430,13 +1435,19 @@ function _buildChainGroups(deduped, query) {
     });
   });
   map.forEach(g => g.products.sort((a, b) => b.score - a.score || a.chainPrice - b.chainPrice));
-  return [...map.entries()]
+  const groups = [...map.entries()]
     .sort((a, b) => b[1].products.length - a[1].products.length)
     .map(([, g]) => g);
+  if (noPrice.length) {
+    noPrice.sort((a, b) => b.score - a.score);
+    groups.push({ name: '__no_price__', products: noPrice });
+  }
+  return groups;
 }
 
 function _applyFilter(groups) {
   return groups.map(group => {
+    if (group.name === '__no_price__') return group; // always pass through
     if (_filterState.chains.size > 0 && !_filterState.chains.has(group.name)) return null;
     let products = group.products;
     if (_filterState.matchQuality === 'good')  products = products.filter(p => p.score >= 60);
@@ -1499,6 +1510,29 @@ function _renderChainGroups() {
         ⚠️ תוצאות פחות מדויקות — נסה שם מוצר אחר</div>`
     : '';
   filtered.forEach(group => {
+    // No-price group: products found by name but not yet in Firebase price DB
+    if (group.name === '__no_price__') {
+      html += `<div class="chain-group">
+        <div class="chain-group-header" style="color:#9ca3af">
+          <div class="chain-dot" style="background:#9ca3af"></div>
+          <div class="chain-name">מוצרים נוספים</div>
+          <div class="chain-count" style="font-size:11px;opacity:.7">מחיר עדיין לא זמין</div>
+        </div>
+        <div class="chain-row">`;
+      group.products.forEach(({ product }) => {
+        html += `<div class="pc2" style="opacity:.6;border-color:#9ca3af33;cursor:default">
+          ${product.image
+            ? `<img class="pc2-img" src="${esc(product.image)}" onerror="this.style.display='none'" loading="lazy">`
+            : `<div class="pc2-img-ph">🛍</div>`}
+          <div class="pc2-name">${esc(product.name)}</div>
+          ${product.brand ? `<div class="pc2-brand">${esc(product.brand)}</div>` : ''}
+          <div class="pc2-price" style="color:#9ca3af;font-size:12px">מחיר לא זמין</div>
+        </div>`;
+      });
+      html += `</div></div>`;
+      return;
+    }
+
     const meta = CHAIN_META[group.name] || { color: '#7d8590', bg: '#161b22' };
     const prices = group.products.map(p => p.chainPrice).filter(Boolean);
     const minP = prices.length ? Math.min(...prices) : null;
@@ -1545,12 +1579,14 @@ function _renderChainGroups() {
 function _updateFdChains() {
   const container = document.getElementById('fd-chains');
   if (!container) return;
-  container.innerHTML = _chainGroups.map(g => {
-    const meta = CHAIN_META[g.name] || { color: '#7d8590' };
-    const safe = esc(g.name).replace(/'/g, "\\'");
-    return `<button class="fd-chip" data-chain="${esc(g.name)}"
-      onclick="fdToggleChain(this,'${safe}')">${esc(g.name)}</button>`;
-  }).join('');
+  container.innerHTML = _chainGroups
+    .filter(g => g.name !== '__no_price__')
+    .map(g => {
+      const meta = CHAIN_META[g.name] || { color: '#7d8590' };
+      const safe = esc(g.name).replace(/'/g, "\\'");
+      return `<button class="fd-chip" data-chain="${esc(g.name)}"
+        onclick="fdToggleChain(this,'${safe}')">${esc(g.name)}</button>`;
+    }).join('');
 }
 
 function _syncFdUI() {
