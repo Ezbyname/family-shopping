@@ -159,7 +159,7 @@ let curTab='all', priceRadius=10;
 const STORES=['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב','אושר עד'];
 let activeStores=new Set(STORES);
 
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
 
 function saveLocal(){localStorage.setItem('fsl_v2',JSON.stringify({myName,myId,groupId,groupName}))}
