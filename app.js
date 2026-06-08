@@ -1808,7 +1808,7 @@ function _renderProductModal() {
         const ageHours = s.syncedAt
           ? Math.round((Date.now() - new Date(s.syncedAt).getTime()) / 3_600_000) : null;
         const ageTxt   = ageHours != null
-          ? (ageHours < 24 ? `לפני ${ageHours}ש'` : `לפני ${Math.round(ageHours/24)}י'`) : null;
+          ? (ageHours < 24 ? `לפני ${ageHours} שעות` : `לפני ${Math.round(ageHours/24)} ימים`) : null;
 
         return `<div class="sr2${isBest ? ' sr2-best' : ''}" data-idx="${idx}"
                      onclick="_pmToggleStore(this)">
@@ -1874,7 +1874,7 @@ function _renderProductModal() {
       const ageHours   = s.syncedAt
         ? Math.round((Date.now() - new Date(s.syncedAt).getTime()) / 3_600_000) : null;
       const ageTxt     = ageHours != null
-        ? (ageHours < 24 ? `לפני ${ageHours}ש'` : `לפני ${Math.round(ageHours / 24)}י'`) : null;
+        ? (ageHours < 24 ? `לפני ${ageHours} שעות` : `לפני ${Math.round(ageHours / 24)} ימים`) : null;
 
       return `<div class="sr2${isBest ? ' sr2-best' : ''}" data-idx="${idx}"
                    onclick="_pmToggleStore(this)">
