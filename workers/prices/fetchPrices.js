@@ -42,6 +42,9 @@ async function withRetry(fn, { retries = 3, delayMs = 2000, label = '' } = {}) {
 
 // ── RESOLVE LATEST FILE URLS from chain index ──
 export async function resolveFileUrls(chain, timeoutMs = INDEX_TIMEOUT_MS) {
+  if (chain.indexType === 'json-api') {
+    return resolveFileUrlsJsonApi(chain, timeoutMs);
+  }
   return withRetry(async () => {
     logger.info(`[${chain.name}] Fetching index`, { url: chain.indexUrl });
 
@@ -55,6 +58,74 @@ export async function resolveFileUrls(chain, timeoutMs = INDEX_TIMEOUT_MS) {
     const body = await res.text();
     return extractFileUrls(body, chain);
   }, { retries: 3, delayMs: 2000, label: `[${chain.name}] index` });
+}
+
+// ── JSON-API index handler (laibcatalog.co.il — Victory and similar chains) ──
+// GET /webapi/api/getfiles?edi={chainId} returns an array of file objects.
+// Each object has a FileRef (relative filename) and FileModifyDate.
+// We prefer the latest PriceFull*.gz; fall back to the latest Price*.gz.
+async function resolveFileUrlsJsonApi(chain, timeoutMs = INDEX_TIMEOUT_MS) {
+  return withRetry(async () => {
+    logger.info(`[${chain.name}] Fetching JSON-API index`, { url: chain.indexUrl });
+
+    const res = await fetch(chain.indexUrl, {
+      headers: { ...HEADERS, Accept: 'application/json, */*' },
+      signal:  AbortSignal.timeout(timeoutMs),
+      redirect: 'follow',
+    });
+    if (!res.ok) throw new Error(`JSON-API index HTTP ${res.status}`);
+
+    let files;
+    try {
+      files = await res.json();
+    } catch (e) {
+      throw new Error(`JSON-API index parse error: ${e.message}`);
+    }
+    if (!Array.isArray(files)) {
+      files = files.files || files.items || files.data || [];
+    }
+
+    // Each entry: { FileRef: 'PriceFull7290696200003-001-20260601.gz', FileModifyDate: '...' }
+    // FileRef may be a bare filename or a relative path.
+    const makeUrl = (ref) => {
+      if (!ref) return '';
+      if (ref.startsWith('http')) return ref;
+      if (ref.startsWith('/')) return chain.baseUrl + ref;
+      return chain.baseUrl + '/' + ref;
+    };
+
+    const priceFullFiles = files
+      .filter(f => /PriceFull/i.test(f.FileRef || f.FileName || f.url || ''))
+      .map(f => ({ url: makeUrl(f.FileRef || f.FileName || f.url), date: f.FileModifyDate || f.modifyDate || '' }));
+
+    const priceFiles = files
+      .filter(f => /Price\d+/i.test(f.FileRef || f.FileName || f.url || '') && !/PriceFull/i.test(f.FileRef || ''))
+      .map(f => ({ url: makeUrl(f.FileRef || f.FileName || f.url), date: f.FileModifyDate || f.modifyDate || '' }));
+
+    const storeFiles = files
+      .filter(f => /Stores/i.test(f.FileRef || f.FileName || f.url || ''))
+      .map(f => ({ url: makeUrl(f.FileRef || f.FileName || f.url), date: f.FileModifyDate || f.modifyDate || '' }));
+
+    // Sort by date descending (latest first); fall back to alphabetical
+    const sortByDate = (arr) => arr.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : b.url.localeCompare(a.url)));
+    sortByDate(priceFullFiles);
+    sortByDate(priceFiles);
+    sortByDate(storeFiles);
+
+    const priceUrl = (priceFullFiles[0] || priceFiles[0])?.url || null;
+    const storeUrl = storeFiles[0]?.url || null;
+
+    logger.info(`[${chain.name}] JSON-API URLs resolved`, {
+      totalEntries: files.length,
+      priceFullFound: priceFullFiles.length,
+      priceFound: priceFiles.length,
+      storeFound: storeFiles.length,
+      priceUrl,
+      storeUrl,
+    });
+
+    return { priceUrl, storeUrl };
+  }, { retries: 3, delayMs: 2000, label: `[${chain.name}] json-api index` });
 }
 
 function extractFileUrls(body, chain) {

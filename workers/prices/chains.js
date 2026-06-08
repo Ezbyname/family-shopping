@@ -50,32 +50,34 @@ export const CHAINS = [
     id:       'victory',
     name:     'ויקטורי',
     chainId:  '7290696200003',
-    enabled:  false,
-    status:   'needs-json-parser',
-    sanityRequired: false,
+    enabled:  true,
+    status:   'enabled',
+    sanityRequired: true,
+    lastVerified: '2026-06-08',
     // Verified 2026-06-07: matrixcatalog.co.il is dead. New source: laibcatalog.co.il.
     // Uses REST JSON API (not HTML directory listing): GET /webapi/api/getfiles?edi={chainId}
     // Returns JSON array of file objects. Domain is alive, geo-blocked from non-IL IPs.
     // Also used by chain ID 7290058103393.
-    // Requires new indexType: 'json-api' handler in the worker — not yet implemented.
-    knownIssue: 'laibcatalog.co.il is alive and geo-blocked. Uses JSON REST API (not HTML), needs new indexType handler. GET /webapi/api/getfiles?edi=7290696200003 returns file list.',
+    // json-api indexType handler implemented in fetchPrices.js 2026-06-08.
+    knownIssue: null,
     indexUrl: 'https://laibcatalog.co.il/webapi/api/getfiles?edi=7290696200003',
     baseUrl:  'https://laibcatalog.co.il',
-    indexType: 'json-api',  // not yet implemented in worker
+    indexType: 'json-api',
   },
   {
     id:       'carrefour',
     name:     'קרפור / יינות ביתן',
     chainId:  '7290055700007',  // corrected from 7290873255550 — verified via OpenIsraeliSupermarkets scraper
-    enabled:  false,
-    status:   'ready-to-test',
-    sanityRequired: false,
+    enabled:  true,
+    status:   'enabled',
+    sanityRequired: true,
+    lastVerified: '2026-06-08',
     // Verified 2026-06-07: Yeinot Bitan and Mega rebranded to Carrefour IL ~2022-2023.
     // prices.carrefour.co.il is alive (HTTP 403 from non-IL — geo-blocked, not dead).
     // Uses standard HTML directory listing (PublishPrice engine) — same format as other chains.
     // Covers all former Yeinot Bitan AND Mega branches.
     // Previously listed chainId 7290873255550 was wrong; 7290055700007 is the correct Mega/Bitan GS1 id.
-    knownIssue: 'Needs verification from Israeli IP. Domain is alive. HTML index — existing parser should work.',
+    knownIssue: null,
     indexUrl: 'https://prices.carrefour.co.il/',
     baseUrl:  'https://prices.carrefour.co.il',
     indexType: 'html',
