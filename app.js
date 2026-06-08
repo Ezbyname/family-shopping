@@ -159,7 +159,7 @@ let curTab='all', priceRadius=10;
 const STORES=['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב','אושר עד'];
 let activeStores=new Set(STORES);
 
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 
 // ── CUSTOM MODAL DIALOGS (replaces native confirm/alert/prompt) ──
 (function() {
@@ -681,7 +681,7 @@ function renderQuickItems(){
   if(!pending.length){wrap.style.display='none';return;}
   wrap.style.display='flex';
   wrap.innerHTML = pending.map(i=>
-    `<button class="quick-chip" onclick="quickSearch('${esc(i.name)}')">${esc(i.name)}</button>`
+    `<button class="quick-chip" data-name="${esc(i.name)}" onclick="quickSearch(this.dataset.name)">${esc(i.name)}</button>`
   ).join('');
 }
 
@@ -2614,7 +2614,8 @@ function itemHTML(item) {
     </div>
     <div class="item-acts">
       <button class="fav-star-btn${isFavSaved?' starred':''}"
-        onclick="toggleSavedFavorite('${item.id}','${esc(item.name)}','${item.barcode||''}')"
+        data-item-id="${item.id}" data-name="${esc(item.name)}" data-barcode="${item.barcode||''}"
+        onclick="toggleSavedFavorite(this.dataset.itemId,this.dataset.name,this.dataset.barcode)"
         aria-pressed="${isFavSaved?'true':'false'}"
         aria-label="${isFavSaved?'הסר ממועדפים':'הוסף למועדפים'}"
         title="${isFavSaved?'הסר ממועדפים':'שמור במועדפים'}"
@@ -7091,11 +7092,11 @@ async function _refreshPdAfterSave(barcode) {
 // ══════════════════════════════════════════════════
 // STAGE 2 — SEARCH CLEAR BUTTON
 // ══════════════════════════════════════════════════
-function _updatePsiClear() {
+window._updatePsiClear = function _updatePsiClear() {
   const btn = document.getElementById('psi-clear');
   if (!btn) return;
   btn.classList.toggle('show', (document.getElementById('price-search-input')?.value?.length || 0) > 0);
-}
+};
 
 window.clearPriceSearch = function() {
   const inp = document.getElementById('price-search-input');
