@@ -1,7 +1,7 @@
 // sw.js — Family Shopping PWA Service Worker v3
 // Strategy: Network-first for API/Firebase, Cache-first for app shell
 
-const CACHE_VERSION = 'fsl-v5';
+const CACHE_VERSION = 'fsl-v6';
 const APP_SHELL = [
   '/',
   '/index.html',
