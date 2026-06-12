@@ -16,6 +16,10 @@ package-lock.json
 Thumbs.db
 .vercel
 
+# ── Test output ───────────────────────────────────────────────────────────────
+tests/playwright-report/
+tests/test-results/
+
 # ── Generated data files ──────────────────────────────────────────────────────
 # Store snapshot — generated file, updated monthly on VPS
 workers/prices/data/stores-geocoded.json
