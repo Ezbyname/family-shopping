@@ -276,7 +276,7 @@ export default async function handler(req, res) {
     itemsRequested: validItems.length,
     bestFullBasket: full[0] || null,
     summary,
-    results:        sorted.slice(0, 20),
+    results:        sorted,
     note: 'Items marked isFallback:true use proxy/manual prices — official XML sync pending',
   });
 }

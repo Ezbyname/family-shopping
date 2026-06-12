@@ -10,6 +10,10 @@
     "test:e2e:debug":  "playwright test --debug",
     "test:smoke":      "node smoke/firebase-health.js",
     "test:smoke:vercel": "node smoke/vercel-health.js",
+    "validate:bc":        "node pw-bc-validate.mjs",
+    "validate:bc:large":  "node pw-bc-large.mjs",
+    "validate:bc:chains": "node pw-bc-chains.mjs",
+    "validate:all":       "node pw-bc-validate.mjs && node pw-bc-large.mjs && node pw-bc-chains.mjs",
     "test:all":        "npm run test:smoke && npm run test:e2e",
     "report":          "playwright show-report"
   },
