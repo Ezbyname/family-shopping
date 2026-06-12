@@ -7126,6 +7126,9 @@ function _renderBasketCompare(data, requestItems) {
   body.innerHTML = html;
 }
 
+// Test-only hook — allows validation scripts to call _renderBasketCompare directly
+if (typeof window !== 'undefined') window._bcRenderForTest = (data) => _renderBasketCompare(data, []);
+
 function _bcRenderCard(s, rank, bestTotal, isChampion) {
   const delta       = (bestTotal != null && !isChampion) ? (s.total - bestTotal) : 0;
   const missingCnt  = s.missingItems?.length || 0;
