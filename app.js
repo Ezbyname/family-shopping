@@ -7024,6 +7024,11 @@ window.closeBasketCompare = function() {
   if (_bcAbort) { _bcAbort.abort(); _bcAbort = null; }
 };
 
+// Pagination state for basket compare
+let _bcAllResults = [];
+let _bcShownCount = 0;
+const _BC_PAGE = 10;
+
 function _renderBasketCompare(data, requestItems) {
   const body = document.getElementById('bc-body');
   if (!body) return;
@@ -7032,7 +7037,10 @@ function _renderBasketCompare(data, requestItems) {
   const full     = results.filter(s => !(s.missingItems?.length));
   const partial  = results.filter(s => (s.missingItems?.length || 0) > 0 && s.availableItems > 0);
   const cheapest = data.bestFullBasket;
+  const summary  = data.summary;
   const hasLoc   = _hasLoc();
+  _bcAllResults  = results;
+  _bcShownCount  = 0;
   let html = '';
 
   if (!results.length) {
@@ -7048,10 +7056,15 @@ function _renderBasketCompare(data, requestItems) {
     return;
   }
 
+  // Savings banner
+  if (summary?.maxSavings > 0.05) {
+    html += `<div class="bc-savings-banner">💰 תחסוך ₪${summary.maxSavings.toFixed(2)} אם תבחר בסופר הזול ביותר</div>`;
+  }
+
   // Hero — cheapest full basket
   if (cheapest) {
-    const nextTotal = full.length > 1 ? full[1].total : null;
-    const maxTotal  = full.length > 1 ? full[full.length - 1].total : null;
+    const nextTotal    = full.length > 1 ? full[1].total : null;
+    const maxTotal     = full.length > 1 ? full[full.length - 1].total : null;
     const savingVsNext = nextTotal != null ? (nextTotal - cheapest.total) : 0;
     const savingVsMax  = maxTotal  != null ? (maxTotal  - cheapest.total) : 0;
     const nameLine = [cheapest.chainName, cheapest.storeName !== cheapest.chainName ? cheapest.storeName : '']
@@ -7069,7 +7082,6 @@ function _renderBasketCompare(data, requestItems) {
       </div>
     </div>`;
   } else if (!full.length && partial.length) {
-    // No complete basket anywhere
     html += `<div class="bc-no-full">
       <div class="bc-ns-icon">⚠️</div>
       <p>לא מצאנו סופר אחד עם כל הרשימה${hasLoc ? ' בטווח הזה' : ''}</p>
@@ -7082,10 +7094,22 @@ function _renderBasketCompare(data, requestItems) {
     </div>`;
   }
 
-  // Full basket results
+  // Full basket results with pagination
   if (full.length > 0) {
-    if (full.length > 1) html += `<span class="bc-section-title">כל הרשימה — ${full.length} חנויות</span>`;
-    full.forEach((s, i) => { html += _bcRenderCard(s, i, cheapest?.total, i === 0 && !!cheapest); });
+    const firstPage = Math.min(_BC_PAGE, full.length);
+    if (full.length > 1) {
+      html += `<div class="bc-section-header">
+        <span class="bc-section-title">כל הרשימה — ${full.length} חנויות</span>
+        <span class="bc-status-line" id="bc-status">מציג 1–${firstPage} מתוך ${full.length}</span>
+      </div>`;
+    }
+    full.slice(0, firstPage).forEach((s, i) => {
+      html += _bcRenderCard(s, i, cheapest?.total, i === 0 && !!cheapest);
+    });
+    _bcShownCount = firstPage;
+    if (full.length > firstPage) {
+      html += `<button class="bc-show-more-btn" id="bc-show-more" onclick="_bcShowMore()">הצג עוד חנויות · נותרו ${full.length - firstPage}</button>`;
+    }
   }
 
   // Partial results
@@ -7095,6 +7119,9 @@ function _renderBasketCompare(data, requestItems) {
       html += _bcRenderCard(s, full.length + i, cheapest?.total, false);
     });
   }
+
+  // Diagnostics link
+  html += `<div class="bc-diag-wrap"><button class="bc-diag-btn" onclick="_bcShowDiagnostics()">📊 נתוני כיסוי רשתות</button></div>`;
 
   body.innerHTML = html;
 }
@@ -7106,17 +7133,27 @@ function _bcRenderCard(s, rank, bestTotal, isChampion) {
   const moreMissing = missingCnt > 3 ? ` ו-${missingCnt - 3} נוספים` : '';
   const nameParts   = [s.chainName, s.storeName && s.storeName !== s.chainName ? s.storeName : ''].filter(Boolean);
 
+  // Medal display for top 3
+  const medals      = ['🥇', '🥈', '🥉'];
+  const rankInner   = rank < 3
+    ? `<span style="font-size:14px;line-height:1">${medals[rank]}</span>`
+    : `${rank + 1}`;
+
+  // Address — skip generic placeholders
+  const addrParts = [s.address, s.city].filter(v => v && v.trim() && !v.includes('לא זמינה') && !v.includes('unavailable'));
+  const addrLine  = addrParts.join(', ');
+
   return `<div class="bc-rank-card${isChampion ? ' best' : ''}" id="bc-card-${rank}">
     <div class="bc-rank-top">
-      <div class="bc-rank-num${isChampion ? ' best' : ''}">${rank + 1}</div>
+      <div class="bc-rank-num${isChampion ? ' best' : ''}">${rankInner}</div>
       <div class="bc-rank-name">${nameParts.length > 1
           ? esc(nameParts[0]) + '<br><span style="font-size:11px;font-weight:400;color:var(--muted)">' + esc(nameParts[1]) + '</span>'
           : esc(nameParts[0] || '')}</div>
       <div class="bc-rank-price${isChampion ? ' best' : ''}">₪${s.total.toFixed(2)}</div>
     </div>
     <div class="bc-rank-meta">
-      ${s.city ? `<span>${esc(s.city)}</span>` : ''}
-      ${s.distanceKm != null ? `<span>📍 ${s.distanceKm} ק"מ</span>` : ''}
+      ${addrLine ? `<span>📍 ${esc(addrLine)}</span>` : s.city ? `<span>${esc(s.city)}</span>` : ''}
+      ${s.distanceKm != null ? `<span>🚗 ${s.distanceKm} ק"מ</span>` : ''}
     </div>
     <div class="bc-rank-footer">
       <div class="bc-rank-items">
@@ -7124,7 +7161,7 @@ function _bcRenderCard(s, rank, bestTotal, isChampion) {
         ${missingCnt > 0 ? `<span class="bc-rank-missing"> · חסרים ${missingCnt}: ${missing3}${moreMissing}</span>` : ''}
       </div>
       ${isChampion ? `<div class="bc-rank-delta cheaper">🏆 הכי זול</div>`
-        : delta > 0.05 ? `<div class="bc-rank-delta pricier">יקר ב־₪${delta.toFixed(2)}</div>` : ''}
+        : delta > 0.05 ? `<div class="bc-rank-delta pricier">+₪${delta.toFixed(2)}</div>` : ''}
     </div>
     <button class="bc-expand-btn" onclick="_bcToggleBreakdown(${rank})">📋 פירוט →</button>
     <div class="bc-breakdown" id="bc-breakdown-${rank}">
@@ -7188,6 +7225,80 @@ window._bcSearchAll = async function() {
 
 window._bcSplitShopping = function() {
   toast('🚧 פיצול קנייה — בקרוב!');
+};
+
+window._bcShowMore = function() {
+  const full         = _bcAllResults.filter(s => !(s.missingItems?.length));
+  const cheapestTotal = full[0]?.total ?? null;
+  const nextBatch    = full.slice(_bcShownCount, _bcShownCount + _BC_PAGE);
+  const prevShown    = _bcShownCount;
+
+  const btn      = document.getElementById('bc-show-more');
+  const statusEl = document.getElementById('bc-status');
+  const body     = document.getElementById('bc-body');
+  const diagWrap = body?.querySelector('.bc-diag-wrap');
+  if (btn) btn.remove();
+
+  nextBatch.forEach((s, i) => {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = _bcRenderCard(s, prevShown + i, cheapestTotal, false);
+    if (diagWrap) body.insertBefore(tmp.firstElementChild, diagWrap);
+    else body.appendChild(tmp.firstElementChild);
+  });
+
+  _bcShownCount += nextBatch.length;
+  if (statusEl) statusEl.textContent = `מציג 1–${_bcShownCount} מתוך ${full.length}`;
+
+  if (_bcShownCount < full.length) {
+    const newBtn = document.createElement('button');
+    newBtn.className = 'bc-show-more-btn';
+    newBtn.id = 'bc-show-more';
+    newBtn.onclick = _bcShowMore;
+    newBtn.textContent = `הצג עוד חנויות · נותרו ${full.length - _bcShownCount}`;
+    if (diagWrap) body.insertBefore(newBtn, diagWrap);
+    else body.appendChild(newBtn);
+  }
+};
+
+let _bcDiagSavedHTML = '';
+
+window._bcShowDiagnostics = async function() {
+  const body = document.getElementById('bc-body');
+  if (!body) return;
+  _bcDiagSavedHTML = body.innerHTML;
+  body.innerHTML = `<div class="bc-loading"><div class="spin"></div><p>טוען נתוני כיסוי...</p></div>`;
+  try {
+    const res  = await fetch('/api/coverage');
+    const data = await res.json();
+    const chainRows = (data.chains || []).map(c => {
+      const icon   = c.errors > 0 ? '⚠️' : '✅';
+      const items  = c.itemsProcessed  != null ? `${c.itemsProcessed.toLocaleString()} מוצרים` : '';
+      const stores = c.storesProcessed != null ? `${c.storesProcessed} חנויות` : '';
+      return `<div class="bc-diag-row">
+        <span>${icon} ${esc(c.name || c.id)}</span>
+        <span class="bc-diag-meta">${[stores, items].filter(Boolean).join(' · ')}</span>
+      </div>`;
+    }).join('');
+    body.innerHTML = `<div class="bc-diag-panel">
+      <div class="bc-diag-header">
+        <strong>📊 כיסוי רשתות</strong>
+        <button class="bc-close-diag" onclick="_bcCloseDiagnostics()">✕ סגור</button>
+      </div>
+      ${data.lastSync ? `<div class="bc-diag-sync">עדכון אחרון: ${data.lastSync}</div>` : ''}
+      ${data.totalProducts ? `<div class="bc-diag-sync">סה"כ מוצרים: ${data.totalProducts.toLocaleString()}</div>` : ''}
+      <div class="bc-diag-chains">${chainRows || '<div style="color:var(--muted);padding:10px">אין נתוני רשת</div>'}</div>
+    </div>`;
+  } catch (e) {
+    body.innerHTML = `<div style="text-align:center;padding:30px">
+      <div style="font-size:13px;font-weight:700">⚠️ לא ניתן לטעון נתוני כיסוי</div>
+      <button class="bc-action-btn" style="margin-top:12px;width:auto;padding:8px 20px" onclick="_bcCloseDiagnostics()">חזור</button>
+    </div>`;
+  }
+};
+
+window._bcCloseDiagnostics = function() {
+  const body = document.getElementById('bc-body');
+  if (body && _bcDiagSavedHTML) body.innerHTML = _bcDiagSavedHTML;
 };
 
 // Navigate directly using coordinates from basket compare results

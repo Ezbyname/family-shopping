@@ -1749,6 +1749,35 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
   animation:spin .8s linear infinite;margin:0 auto 12px}
 .bc-loading p{font-size:13px;font-weight:600}
 /* "Compare list" button in basket totals bar */
+/* Basket compare V2 additions */
+.bc-savings-banner{background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);
+  border-radius:12px;padding:10px 14px;font-size:12px;font-weight:700;color:var(--green);
+  margin-bottom:10px;text-align:center}
+.bc-section-header{display:flex;align-items:center;justify-content:space-between;
+  margin:14px 2px 6px}
+.bc-section-header .bc-section-title{margin:0}
+.bc-status-line{font-size:10px;color:var(--muted);font-weight:600;flex-shrink:0}
+.bc-show-more-btn{width:100%;background:var(--card);border:1.5px solid var(--border);
+  border-radius:11px;padding:11px;font-family:'Rubik',sans-serif;font-size:13px;
+  font-weight:700;color:var(--accent);cursor:pointer;margin-top:4px;
+  transition:all .15s;display:block}
+.bc-show-more-btn:active{opacity:.8}
+.bc-diag-wrap{text-align:center;margin-top:16px}
+.bc-diag-btn{background:none;border:none;font-size:11px;color:var(--muted);
+  font-family:'Rubik',sans-serif;font-weight:700;cursor:pointer;padding:6px 10px;
+  text-decoration:underline;text-decoration-color:var(--border)}
+.bc-diag-panel{background:var(--card);border-radius:14px;padding:14px;margin-bottom:10px}
+.bc-diag-header{display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:10px;font-size:14px}
+.bc-close-diag{background:var(--card2);border:none;border-radius:8px;padding:4px 10px;
+  font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;
+  font-family:'Rubik',sans-serif}
+.bc-diag-sync{font-size:11px;color:var(--muted);margin-bottom:4px}
+.bc-diag-chains{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.bc-diag-row{display:flex;align-items:center;justify-content:space-between;
+  font-size:12px;font-weight:700;padding:6px 0;border-bottom:1px solid var(--border)}
+.bc-diag-row:last-child{border-bottom:none}
+.bc-diag-meta{font-size:11px;color:var(--muted);font-weight:400}
 .bc-open-btn{background:var(--green-dim);border:1.5px solid rgba(52,211,153,.3);
   border-radius:11px;padding:7px 12px;font-family:'Rubik',sans-serif;
   font-size:11px;font-weight:800;color:var(--green);cursor:pointer;
