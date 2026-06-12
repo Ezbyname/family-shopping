@@ -46,6 +46,19 @@ async function setupPage(ctx, resultCount) {
   page.on('console',m=>{ if(m.type()==='error') consoleErrors.push(m.text()); });
   page.on('requestfailed',r=>failedReqs.push(r.url()));
 
+  // Inject test hook into app.js dynamically — production file is untouched.
+  // This intercepts the served app.js and appends window._bcRenderForTest
+  // only inside the test browser context.
+  await page.route('**/app.js', async route => {
+    const response = await route.fetch();
+    const body = await response.text();
+    const patched = body.replace(
+      'function _bcRenderCard(s, rank, bestTotal, isChampion) {',
+      'window._bcRenderForTest=(data)=>_renderBasketCompare(data,[]);\nfunction _bcRenderCard(s, rank, bestTotal, isChampion) {'
+    );
+    await route.fulfill({ response, body: patched });
+  });
+
   await page.route('https://www.gstatic.com/**firebase-app.js',    r=>r.fulfill({contentType:'application/javascript',body:APPSTUB}));
   await page.route('https://www.gstatic.com/**firebase-database.js',r=>r.fulfill({contentType:'application/javascript',body:DBSTUB}));
   await page.route('https://www.gstatic.com/**firebase-auth.js',   r=>r.fulfill({contentType:'application/javascript',body:AUTHSTUB}));
