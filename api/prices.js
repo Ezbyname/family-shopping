@@ -296,9 +296,15 @@ export default async function handler(req, res) {
       ((b.prices?.length || 0) - (a.prices?.length || 0))
     );
 
-    // Drop weak matches (score < 50) UNLESS that would leave too few results.
+    // Drop weak matches. Fallback ladder:
+    //   1. strong (score ≥ 50) — preferred
+    //   2. any non-zero score — prevents pure-Israeli-bonus (score 6) flooding results
+    //   3. everything — last resort so we never return empty
     const strong = enriched.filter(p => p._score >= 50);
-    const ranked = strong.length >= 3 ? strong : enriched;
+    const hasAny = enriched.filter(p => p._score >  0);
+    const ranked = strong.length >= 3 ? strong
+                 : hasAny.length  >= 3 ? hasAny
+                 : enriched;
 
     let syncStatus = null;
     if (dbUrl) {
@@ -310,7 +316,7 @@ export default async function handler(req, res) {
 
     timings.totalMs = Date.now() - t0;
     const response = {
-      version: '6.3.0', query, englishQuery: en,
+      version: '6.3.1', query, englishQuery: en,
       results: ranked.slice(0, 20), total: ranked.length,
       syncStatus,
     };
@@ -545,7 +551,7 @@ async function searchOFF(hebrewQuery, englishQuery) {
           isIsraeli, prices: [], source: 'none',
         });
       }
-      if (results.length >= 10) break;
+      if (results.length >= 20) break;
     } catch (e) {
       console.warn('[OFF] search error:', e.message);
     }
