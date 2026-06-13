@@ -246,9 +246,10 @@ export default async function handler(req, res) {
   if (!q || String(q).trim().length < 2)
     return res.status(400).json({ error: 'Provide ?barcode= or ?q=' });
 
-  const query  = String(q).trim();
-  const hebrew = isHebrew(query);
-  const en     = hebrew ? (translate(query) || query) : query;
+  const query      = String(q).trim();
+  const hebrew     = isHebrew(query);
+  const en         = hebrew ? (translate(query) || query) : query;
+  const debugScore = req.query.debugScore === '1';
   console.log(`[prices v6.3] search: "${query}" → "${en}"`);
 
   const dbUrl = getDbUrl();
@@ -286,16 +287,6 @@ export default async function handler(req, res) {
     // Relevance score per product (deterministic, Hebrew-aware)
     for (const p of enriched) p._score = scoreProductMatch(query, en, p);
 
-    // Phase 0 audit log — emitted on every search so we can inspect Vercel logs
-    console.log(`[search-audit] q="${query}" en="${en}" candidates=${enriched.length} top50=` +
-      JSON.stringify(
-        [...enriched]
-          .sort((a, b) => b._score - a._score)
-          .slice(0, 50)
-          .map(p => ({ name: p.name, score: p._score, isIsraeli: p.isIsraeli, src: p.source }))
-      )
-    );
-
     // Rank: relevance first, then availability (has prices), then source quality.
     // This ensures "חלב תנובה" beats "שוקולד חלב"/"Kinder Chocolate" for query "חלב".
     const ORDER = { official: 0, override: 0, proxy: 1, manual: 2, none: 3 };
@@ -308,13 +299,23 @@ export default async function handler(req, res) {
 
     // Drop weak matches. Fallback ladder:
     //   1. strong (score ≥ 50) — preferred
-    //   2. any non-zero score — prevents pure-Israeli-bonus (score 6) flooding results
+    //   2. MIN_FALLBACK_SCORE threshold — blocks isIsraeli-only and weak partial-English matches
     //   3. everything — last resort so we never return empty
+    const MIN_FALLBACK_SCORE = 10;
     const strong = enriched.filter(p => p._score >= 50);
-    const hasAny = enriched.filter(p => p._score >  0);
+    const hasAny = enriched.filter(p => p._score >  MIN_FALLBACK_SCORE);
     const ranked = strong.length >= 3 ? strong
                  : hasAny.length  >= 3 ? hasAny
                  : enriched;
+
+    if (debugScore) {
+      console.log(`[search-audit] query="${query}" en="${en}" ` +
+        `candidates=${enriched.length} strong=${strong.length} fallback=${hasAny.length}\n` +
+        enriched.slice(0, 50).map((p, i) =>
+          `${i + 1}. ${p.name} score=${p._score} israeli=${!!p.isIsraeli} src=${p.source}`
+        ).join('\n')
+      );
+    }
 
     let syncStatus = null;
     if (dbUrl) {
@@ -326,7 +327,7 @@ export default async function handler(req, res) {
 
     timings.totalMs = Date.now() - t0;
     const response = {
-      version: '6.3.1', query, englishQuery: en,
+      version: '6.3.2', query, englishQuery: en,
       results: ranked.slice(0, 20), total: ranked.length,
       syncStatus,
     };
