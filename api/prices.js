@@ -286,6 +286,16 @@ export default async function handler(req, res) {
     // Relevance score per product (deterministic, Hebrew-aware)
     for (const p of enriched) p._score = scoreProductMatch(query, en, p);
 
+    // Phase 0 audit log — emitted on every search so we can inspect Vercel logs
+    console.log(`[search-audit] q="${query}" en="${en}" candidates=${enriched.length} top50=` +
+      JSON.stringify(
+        [...enriched]
+          .sort((a, b) => b._score - a._score)
+          .slice(0, 50)
+          .map(p => ({ name: p.name, score: p._score, isIsraeli: p.isIsraeli, src: p.source }))
+      )
+    );
+
     // Rank: relevance first, then availability (has prices), then source quality.
     // This ensures "חלב תנובה" beats "שוקולד חלב"/"Kinder Chocolate" for query "חלב".
     const ORDER = { official: 0, override: 0, proxy: 1, manual: 2, none: 3 };
