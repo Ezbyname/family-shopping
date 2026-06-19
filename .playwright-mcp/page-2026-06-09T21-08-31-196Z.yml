@@ -1,0 +1,8 @@
+- generic [ref=e4]:
+  - img "logo" [ref=e9]
+  - generic [ref=e15]:
+    - textbox "Username" [ref=e17]
+    - textbox "Password" [ref=e19]
+    - link "Forgot your password?" [ref=e21] [cursor=pointer]:
+      - /url: /forgotPassword?client_id=18bmi0qjc2ni8jevjr9ja3kkfh&redirect_uri=https%3A%2F%2Faws-man-qa113.dev.pltsys.com%2Fcallback&response_type=code&scope=openid%20aws.cognito.signin.user.admin&code_challenge=v1-6qQGzB1zSLfFVe4q5TMeORyPvpfLOiGUIBC3m8VQ&code_challenge_method=S256&response_mode=form_post&nonce=639166361103989900.MjQwNDFiNmUtMmIzZS00N2I1LWI5YWItMWI5ZDQwMzkxMzAwMmE0YzBjNzQtZTE4Yi00MzgxLWIyZWMtZWIyYzc5ZThmNDZl&lang=en&state=CfDJ8KajKBPgYy1Hg0B8g97GTV1Y_-om2_RC2cPXfud4JMn6gJzTuUNF8z7iIUWs-amJrPSMveaQNxoth_HAdB3bjUwuW5w1yKrHtrgp8JR4pY32DpWZWfM9V3S8su_I1DSM2EI1Wp7C4DZmdA37rKqVNgbTcB4RnlnIH2EEeE35TBJ-KV8jnAkQ0XU74hZ5RDfHKojchpWFeGq9Xem3nvhqzcw2-M_QbEq-5yIqFDLghLHleF4zQ08y98oTs_d8FExArnocnFRMyUEpWot14WtGtjedGBfycWZw00dmd6nkbCo_b48mcDIrSy1ojo_BiXr0t6UZGXw6ysEBKNKuIrb1wjE8jGcgI6y-gJtkeL-C15CIR21wfPAmR_heNgbkNW6dHA&x-client-SKU=ID_NET6_0&x-client-ver=6.15.1.0
+    - button "submit" [ref=e22] [cursor=pointer]: Sign in

@@ -1,0 +1,35 @@
+{
+  "name": "Login Flow - Blocked",
+  "metadata": {
+    "business_goal": "Verify that a user can log in with valid credentials"
+  },
+  "preconditions": [
+    "App is running and accessible",
+    "Test user account exists in the system"
+  ],
+  "test_data": {
+    "username": {"value": "test@example.com", "stable": true},
+    "password": {"value": "TestPass123", "stable": true}
+  },
+  "steps": [
+    {
+      "action": "Enter username in login field",
+      "expected_result": "Username field shows entered value",
+      "validation_method": "Verify Content"
+    },
+    {
+      "action": "Enter password and submit form",
+      "expected_result": "User is redirected to dashboard",
+      "validation_method": "Verify Content"
+    }
+  ],
+  "results": [
+    {"classification": "PASS", "label": "Login succeeds and redirects"},
+    {"classification": "FAIL", "label": "Login fails or no redirect"}
+  ],
+  "automation_readiness_status": "",
+  "risks": [
+    {"risk": "Test account may be locked after failed login attempts", "mitigation": "Reset account state before each run"}
+  ],
+  "registry_needs": []
+}
