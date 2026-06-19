@@ -53,9 +53,12 @@ function hits(results, tokens) {
   }).length;
 }
 
+const BYPASS = process.env.VERCEL_BYPASS || '';
+
 async function runQuery(q) {
   const url = `${BASE}/api/prices?q=${encodeURIComponent(q)}&debugScore=1`;
-  const res = await fetch(url);
+  const headers = BYPASS ? { 'x-vercel-protection-bypass': BYPASS } : {};
+  const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`HTTP ${res.status} for "${q}"`);
   return res.json();
 }
