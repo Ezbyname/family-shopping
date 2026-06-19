@@ -92,10 +92,31 @@ const HE_EN = {
 };
 
 const isHebrew  = s => /[֐-׿]/.test(s);
+
+// Strip common Hebrew plural/construct suffixes to find a singular dictionary hit.
+// Order matters: try longest suffix first so "תפוזים" → "תפוז" not "תפוזי".
+const _hebrewSingular = w => {
+  for (const sfx of ['ות', 'ים', 'י', 'ת']) {
+    if (w.length > sfx.length + 2 && w.endsWith(sfx)) {
+      const stem = w.slice(0, -sfx.length);
+      if (HE_EN[stem]) return HE_EN[stem];
+    }
+  }
+  return null;
+};
+
 const translate = q => {
   const l = q.trim();
+  // 1. Exact match
   if (HE_EN[l]) return HE_EN[l];
+  // 2. Substring / superstring match (handles "שמן זית" ↔ "שמן")
   for (const [h, e] of Object.entries(HE_EN)) if (l.includes(h) || h.includes(l)) return e;
+  // 3. Plural/construct suffix stripping — handles בננות→בננה, מלפפונים→מלפפון, etc.
+  const words = l.split(/\s+/);
+  for (const w of words) {
+    const hit = _hebrewSingular(w);
+    if (hit) return hit;
+  }
   return null;
 };
 
