@@ -59,7 +59,7 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
   font-family:'Rubik',sans-serif;font-size:15px;outline:none;transition:border-color .2s;}
 .field input:focus{border-color:var(--accent)}
 .field input::placeholder{color:var(--muted)}
-.btn-p{width:100%;background:var(--accent);color:#111;border:none;
+.btn-p{width:100%;background:var(--accent);color:#fff;border:none;
   border-radius:12px;padding:12px;font-family:'Rubik',sans-serif;
   font-size:15px;font-weight:800;cursor:pointer;transition:opacity .15s,transform .1s;}
 .btn-p:active{opacity:.85;transform:scale(.98)}
@@ -122,7 +122,7 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
   font-family:'Rubik',sans-serif;font-size:14px;outline:none;transition:border-color .2s;}
 .add-input:focus{border-color:var(--accent)}
 .add-input::placeholder{color:var(--muted)}
-.add-btn{background:var(--accent);color:#111;border:none;border-radius:11px;
+.add-btn{background:var(--accent);color:#fff;border:none;border-radius:11px;
   width:40px;height:40px;font-size:22px;cursor:pointer;font-weight:700;
   display:flex;align-items:center;justify-content:center;flex-shrink:0;
   transition:transform .1s,opacity .1s;}
@@ -133,7 +133,7 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
   flex-shrink:0;display:none;align-items:center;justify-content:center;
   transition:all .15s;color:var(--muted)}
 .brand-pick-btn.show{display:flex}
-.brand-pick-btn:active{background:var(--accent);color:#111;border-color:var(--accent)}
+.brand-pick-btn:active{background:var(--accent);color:#fff;border-color:var(--accent)}
 /* ── BRAND PICKER SHEET ── */
 .bp-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
   z-index:900;align-items:flex-end;justify-content:center}
@@ -164,7 +164,7 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
 .bp-item-name{font-size:14px;font-weight:600;line-height:1.35;word-break:break-word}
 .bp-item-name strong{color:var(--accent);font-weight:800}
 .bp-item-sub{font-size:11px;color:var(--muted);margin-top:3px}
-.bp-add-btn{background:var(--accent);color:#111;border:none;border-radius:20px;
+.bp-add-btn{background:var(--accent);color:#fff;border:none;border-radius:20px;
   padding:8px 14px;font-size:13px;font-weight:800;cursor:pointer;flex-shrink:0;
   font-family:'Rubik',sans-serif;white-space:nowrap;transition:opacity .15s}
 .bp-add-btn:active{opacity:.75}
@@ -225,16 +225,17 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
 .qty-btn{width:24px;height:24px;border-radius:50%;border:none;background:var(--card2);
   color:var(--text);font-size:14px;cursor:pointer;display:flex;align-items:center;
   justify-content:center;font-weight:700;transition:background .1s,transform .1s;line-height:1;}
-.qty-btn:active{transform:scale(.78);background:var(--accent);color:#111}
+.qty-btn:active{transform:scale(.78);background:var(--accent);color:#fff}
 .qty-num{font-size:13px;font-weight:800;min-width:18px;text-align:center;color:var(--accent)}
 /* ── "קניתי" PRIMARY CTA (tap to mark purchased) ── */
 .pending-tag{display:inline-flex;align-items:center;justify-content:center;gap:5px;
   min-height:40px;min-width:104px;padding:9px 18px;
-  background:var(--accent);color:#000;
+  background:var(--accent);color:#fff;
   border:none;border-radius:14px;font-family:'Rubik',sans-serif;
   font-size:14px;font-weight:900;cursor:pointer;
   box-shadow:0 3px 12px var(--shadow-accent);
-  transition:transform .12s,box-shadow .15s,filter .15s;}
+  transition:transform .12s,box-shadow .15s,filter .15s;
+  flex-shrink:0;align-self:center;}
 .pending-tag::before{content:'🛒';font-size:15px;line-height:1}
 .pending-tag:hover{filter:brightness(1.06);transform:translateY(-1px);
   box-shadow:0 5px 16px var(--shadow-accent-h)}
@@ -247,7 +248,8 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
   background:var(--green-dim);color:var(--green);
   border:1.5px solid rgba(52,211,153,.5);border-radius:14px;
   font-family:'Rubik',sans-serif;font-size:13px;font-weight:800;cursor:pointer;
-  transition:transform .12s,background .15s;}
+  transition:transform .12s,background .15s;
+  flex-shrink:0;align-self:center;}
 .bought-tag:active{transform:scale(.93)}
 .bought-tag:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 .item-acts{display:flex;flex-direction:column;gap:4px;flex-shrink:0}
@@ -276,7 +278,7 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
   font-family:'Rubik',sans-serif;font-size:14px;outline:none;transition:border-color .2s;}
 .price-search-input:focus{border-color:var(--accent)}
 .price-search-input::placeholder{color:var(--muted)}
-.price-search-btn{background:var(--accent);color:#111;border:none;border-radius:11px;
+.price-search-btn{background:var(--accent);color:#fff;border:none;border-radius:11px;
   padding:10px 16px;font-family:'Rubik',sans-serif;font-size:14px;font-weight:800;
   cursor:pointer;flex-shrink:0;transition:opacity .15s;}
 .price-search-btn:active{opacity:.8}
@@ -322,7 +324,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 .spr-name{font-size:12px;font-weight:600}
 .spr-price{font-size:14px;font-weight:800}
 .spr.best .spr-price{color:var(--green)}
-.best-badge{font-size:9px;background:var(--green);color:#000;border-radius:4px;padding:1px 5px;font-weight:700}
+.best-badge{font-size:9px;background:var(--green);color:#fff;border-radius:4px;padding:1px 5px;font-weight:700}
 .no-price{font-size:12px;color:var(--muted)}
 .savings-bar{background:var(--accent-dim);border:1px solid rgba(22,163,74,.25);
   border-radius:9px;padding:8px 11px;margin-top:6px;font-size:12px;font-weight:700;color:var(--accent);
@@ -349,7 +351,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   border-radius:50px;padding:5px 13px;font-family:'Rubik',sans-serif;font-size:12px;font-weight:700;
   color:var(--text);cursor:pointer;display:flex;align-items:center;gap:5px;flex-shrink:0;transition:all .15s}
 .sr-filter-btn.active{border-color:var(--accent);color:var(--accent)}
-.sr-filter-badge{display:none;position:absolute;top:-5px;right:-5px;background:var(--accent);color:#111;
+.sr-filter-badge{display:none;position:absolute;top:-5px;right:-5px;background:var(--accent);color:#fff;
   border-radius:50%;width:16px;height:16px;font-size:9px;font-weight:800;
   align-items:center;justify-content:center}
 .sr-filter-badge.show{display:flex}
@@ -373,7 +375,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 .pc2-img{width:58px;height:58px;object-fit:contain;border-radius:8px;align-self:center;background:#fff}
 .pc2-img-ph{width:58px;height:58px;border-radius:8px;background:var(--surface);
   display:flex;align-items:center;justify-content:center;font-size:22px;align-self:center}
-.pc2-badge{position:absolute;top:7px;left:7px;background:var(--green);color:#052e16;
+.pc2-badge{position:absolute;top:7px;left:7px;background:var(--green);color:#fff;
   border-radius:5px;padding:1px 5px;font-size:9px;font-weight:800;line-height:1.4}
 .pc2-badge.worst{background:rgba(248,113,113,.18);color:var(--red)}
 .pc2-name{font-size:11px;font-weight:700;line-height:1.3;margin-top:4px;
@@ -410,7 +412,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   color:var(--muted);cursor:pointer}
 .fd-apply{flex:2;background:var(--accent);border:none;border-radius:13px;
   padding:11px;font-family:'Rubik',sans-serif;font-size:13px;font-weight:800;
-  color:#111;cursor:pointer}
+  color:#fff;cursor:pointer}
 /* product modal */
 .pm-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);
   z-index:450;align-items:flex-end;justify-content:center}
@@ -436,7 +438,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px}
 .pm-add-btn{width:100%;margin-top:14px;background:var(--accent);border:none;border-radius:14px;
   padding:13px;font-family:'Rubik',sans-serif;font-size:14px;font-weight:800;
-  color:#111;cursor:pointer;transition:opacity .15s}
+  color:#fff;cursor:pointer;transition:opacity .15s}
 .pm-add-btn:active{opacity:.8}
 .pm-swipe-hint{font-size:10px;color:var(--muted);text-align:center;margin-top:10px;padding-bottom:6px}
 .pm-detail-btn{width:100%;margin-top:8px;background:transparent;
@@ -466,7 +468,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 .modal-row{display:flex;gap:8px;margin-top:10px}
 .mbtn{flex:1;padding:12px;border-radius:12px;border:none;
   font-family:'Rubik',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:opacity .15s;}
-.mbtn.primary{background:var(--accent);color:#111}
+.mbtn.primary{background:var(--accent);color:#fff}
 .mbtn.ghost{background:var(--card2);color:var(--text)}
 .mbtn:active{opacity:.8}
 
@@ -542,7 +544,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   font-size:38px;margin:0 auto 20px;position:relative;cursor:pointer;overflow:hidden;}
 .profile-preview img{width:100%;height:100%;object-fit:cover;border-radius:50%}
 .profile-preview .edit-badge{position:absolute;bottom:0;right:0;background:var(--accent);
-  color:#111;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;
+  color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;
   justify-content:center;font-size:12px;}
 .avatar-options{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;margin:14px 0}
 .av-opt{background:var(--card);border:1.5px solid var(--border);border-radius:14px;
@@ -610,7 +612,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 .basket-item-row:last-child{border-bottom:none}
 .basket-missing{background:rgba(248,113,113,.1);color:var(--red);border-radius:6px;
   padding:3px 8px;font-size:10px;font-weight:600;margin-top:5px;text-align:center}
-.best-badge-full{background:var(--green);color:#000;border-radius:6px;
+.best-badge-full{background:var(--green);color:#fff;border-radius:6px;
   padding:2px 8px;font-size:10px;font-weight:700}
 
 /* ══ RADIUS CONTROL ══ */
@@ -772,7 +774,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 .radius-seg-btn{flex:1;border:none;background:transparent;color:var(--muted);
   border-radius:18px;padding:5px 2px;font-family:'Rubik',sans-serif;font-size:11px;
   font-weight:700;cursor:pointer;transition:all .15s;white-space:nowrap}
-.radius-seg-btn.active{background:var(--accent);color:#111}
+.radius-seg-btn.active{background:var(--accent);color:#fff}
 /* ── Location picker ── */
 .loc-label-bar{display:none;align-items:center;gap:6px;padding:5px 12px;
   background:var(--card);border-bottom:1px solid var(--border);font-size:11px;
@@ -827,7 +829,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 .nnr-btn{padding:12px 18px;border-radius:13px;border:none;font-family:'Rubik',sans-serif;
   font-size:14px;font-weight:700;cursor:pointer;transition:all .15s}
 .nnr-btn:active{transform:scale(.97);opacity:.85}
-.nnr-btn.primary{background:var(--accent);color:#111}
+.nnr-btn.primary{background:var(--accent);color:#fff}
 .nnr-btn.ghost{background:var(--card2);color:var(--text);border:1.5px solid var(--border)}
 /* Approximate location badge */
 .approx-badge{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;
@@ -952,7 +954,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   padding:10px 14px 6px;flex-shrink:0}
 .fav-section-title{font-size:13px;font-weight:700;color:var(--muted);
   letter-spacing:.6px;text-transform:uppercase}
-.add-all-btn{background:var(--accent);color:#111;border:none;border-radius:10px;
+.add-all-btn{background:var(--accent);color:#fff;border:none;border-radius:10px;
   padding:7px 14px;font-family:'Rubik',sans-serif;font-size:12px;font-weight:700;
   cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s}
 .add-all-btn:active{opacity:.8;transform:scale(.97)}
@@ -971,7 +973,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   border:1px solid rgba(52,211,153,.3);border-radius:5px;
   padding:1px 6px;font-size:9px;font-weight:700}
 .fav-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
-.fav-add-btn{background:var(--accent);color:#111;border:none;border-radius:9px;
+.fav-add-btn{background:var(--accent);color:#fff;border:none;border-radius:9px;
   width:32px;height:32px;font-size:16px;cursor:pointer;display:flex;
   align-items:center;justify-content:center;transition:all .15s;font-weight:700}
 .fav-add-btn:active{transform:scale(.9)}
@@ -1065,7 +1067,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   transition:background .15s}
 .notif-btn:active{background:var(--card2)}
 .notif-badge{position:absolute;top:-2px;right:-2px;background:var(--accent);
-  color:#111;border-radius:50%;min-width:16px;height:16px;
+  color:#fff;border-radius:50%;min-width:16px;height:16px;
   font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;
   padding:0 3px;border:2px solid var(--surface);display:none}
 .notif-badge.show{display:flex}
@@ -1245,7 +1247,7 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
 }
 .hdr-cart-btn:active{background:rgba(255,255,255,.1)}
 .hdr-cart-badge{
-  position:absolute;top:-2px;left:-2px;background:var(--accent);color:#111;
+  position:absolute;top:-2px;left:-2px;background:var(--accent);color:#fff;
   border-radius:50%;min-width:16px;height:16px;padding:0 3px;
   font-size:9px;font-weight:800;display:none;
   align-items:center;justify-content:center;line-height:1;
@@ -1406,7 +1408,7 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
 .gs-sep{height:1px;background:rgba(255,255,255,.05);margin:4px 0}
 
 /* ══ PRICE CHIP — shopping list item price preview ══ */
-.price-chip-area{min-height:0;overflow:hidden}
+.price-chip-area{min-height:0;overflow:hidden;display:block}
 .price-chip{display:inline-flex;align-items:center;gap:4px;margin-top:5px;cursor:pointer;
   border-radius:8px;padding:3px 9px;font-family:'Rubik',sans-serif;
   font-size:11px;font-weight:700;transition:all .15s;max-width:220px;
@@ -1416,9 +1418,9 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
 .price-chip.best{background:var(--green-dim);border-color:rgba(52,211,153,.3);color:var(--green)}
 .price-chip.stale{border-color:rgba(248,113,113,.25);color:var(--red)}
 @keyframes shimmer{0%{background-position:200% center}100%{background-position:-200% center}}
-.price-chip-shimmer{display:inline-block;margin-top:5px;height:20px;width:72px;
-  border-radius:7px;
-  background:linear-gradient(90deg,var(--card2) 25%,rgba(255,255,255,.06) 50%,var(--card2) 75%);
+.price-chip-shimmer{display:block;margin-top:5px;height:18px;width:88px;
+  border-radius:9px;
+  background:linear-gradient(90deg,var(--card2) 25%,rgba(255,255,255,.08) 50%,var(--card2) 75%);
   background-size:200% 100%;animation:shimmer 1.4s ease infinite}
 
 /* ══ PRICE DETAIL BOTTOM SHEET ══ */
@@ -1523,7 +1525,7 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
   border-radius:12px;padding:10px;color:var(--text);font-family:'Rubik',sans-serif;
   font-size:20px;font-weight:800;text-align:center;outline:none;direction:ltr}
 .mp2-price-input:focus{border-color:var(--accent)}
-.mp2-save-btn{width:100%;background:var(--accent);color:#111;border:none;
+.mp2-save-btn{width:100%;background:var(--accent);color:#fff;border:none;
   border-radius:13px;padding:13px;font-family:'Rubik',sans-serif;
   font-size:15px;font-weight:800;cursor:pointer;transition:opacity .15s}
 .mp2-save-btn:active{opacity:.8}
@@ -1643,7 +1645,7 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
 .sd-fallback{font-size:12px;color:var(--muted);font-style:italic}
 .sd-actions{display:flex;flex-direction:column;gap:8px;padding:0 16px 4px}
 .sd-nav-btn{display:flex;align-items:center;justify-content:center;gap:8px;
-  background:var(--accent);color:#111;border:none;border-radius:13px;padding:13px;
+  background:var(--accent);color:#fff;border:none;border-radius:13px;padding:13px;
   font-family:'Rubik',sans-serif;font-size:14px;font-weight:800;
   cursor:pointer;transition:opacity .15s;width:100%;text-align:center}
 .sd-nav-btn:active{opacity:.8}
@@ -1689,7 +1691,7 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
   display:inline-block;margin-bottom:8px}
 .bc-hero-note{font-size:11px;color:var(--muted);margin-bottom:10px}
 .bc-hero-actions{display:flex;gap:7px}
-.bc-hero-btn{flex:1;background:var(--green);color:#000;border:none;border-radius:11px;
+.bc-hero-btn{flex:1;background:var(--green);color:#fff;border:none;border-radius:11px;
   padding:10px 6px;font-family:'Rubik',sans-serif;font-size:12px;font-weight:800;
   cursor:pointer;transition:opacity .15s;text-align:center}
 .bc-hero-btn:active{opacity:.8}
@@ -1704,7 +1706,7 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
 .bc-rank-num{width:22px;height:22px;border-radius:50%;background:var(--card2);
   font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;
   color:var(--muted);flex-shrink:0}
-.bc-rank-num.best{background:var(--green);color:#000}
+.bc-rank-num.best{background:var(--green);color:#fff}
 .bc-rank-name{font-size:14px;font-weight:800;flex:1;min-width:0}
 .bc-rank-price{font-size:16px;font-weight:900;flex-shrink:0}
 .bc-rank-price.best{color:var(--green)}
@@ -1741,7 +1743,7 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
   border-radius:11px;padding:10px;font-family:'Rubik',sans-serif;
   font-size:13px;font-weight:700;color:var(--text);cursor:pointer;
   transition:all .15s;width:100%;display:block}
-.bc-action-btn.primary{background:var(--accent);color:#111;border-color:transparent}
+.bc-action-btn.primary{background:var(--accent);color:#fff;border-color:transparent}
 .bc-action-btn:active{opacity:.8}
 .bc-loading{text-align:center;padding:50px 20px;color:var(--muted)}
 .bc-loading .spin{width:36px;height:36px;border:3px solid var(--border);
