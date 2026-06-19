@@ -252,7 +252,7 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
   flex-shrink:0;align-self:center;}
 .bought-tag:active{transform:scale(.93)}
 .bought-tag:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
-.item-acts{display:flex;flex-direction:column;gap:4px;flex-shrink:0}
+.item-acts{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0}
 .act-btn{width:27px;height:27px;border-radius:50%;border:none;cursor:pointer;
   display:flex;align-items:center;justify-content:center;font-size:13px;
   transition:transform .1s,background .15s;background:var(--card2);color:var(--muted);}
