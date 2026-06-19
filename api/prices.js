@@ -153,7 +153,7 @@ function _scoreOne(query, name) {
 }
 
 // Best score across Hebrew query, English query, and the product brand line.
-export function scoreProductMatch(heQuery, enQuery, product) {
+export function scoreProductMatch(heQuery, enQuery, product, _debugOut) {
   const name  = product.name || '';
   const brand = product.brand || '';
   const nameScore = Math.max(
@@ -167,7 +167,16 @@ export function scoreProductMatch(heQuery, enQuery, product) {
   );
   let score = Math.max(nameScore, brandScore * 0.6);
   if (product.isIsraeli) score += 6;   // modest tiebreaker, never dominant
-  return Math.round(Math.min(100, score));
+  const final = Math.round(Math.min(100, score));
+  if (_debugOut) {
+    _debugOut.normalizedQuery = normalizeProductText(heQuery);
+    _debugOut.normalizedName  = normalizeProductText(name);
+    _debugOut.normalizedBrand = normalizeProductText(brand);
+    _debugOut.nameScore  = nameScore;
+    _debugOut.brandScore = brandScore;
+    _debugOut.isIsraeli  = !!product.isIsraeli;
+  }
+  return final;
 }
 
 // ── Main handler ─────────────────────────────────────────────────────────────
@@ -177,8 +186,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
 
-  const { barcode, q, lat, lng, radiusKm, groupId, userId, debug } = req.query || {};
-  const isDebug = debug === '1' || debug === 'true';
+  const { barcode, q, lat, lng, radiusKm, groupId, userId, debug, debugScore } = req.query || {};
+  const isDebug      = debug === '1' || debug === 'true';
+  const isDebugScore = debugScore === '1' || debugScore === 'true';
   const timings = { initMs: 0, priceReadMs: 0, storeReadMs: 0, totalMs: 0 };
 
   const userLat = parseFloat(lat  || '');
@@ -285,7 +295,11 @@ export default async function handler(req, res) {
     }));
 
     // Relevance score per product (deterministic, Hebrew-aware)
-    for (const p of enriched) p._score = scoreProductMatch(query, en, p);
+    for (const p of enriched) {
+      const dbg = isDebugScore ? {} : undefined;
+      p._score = scoreProductMatch(query, en, p, dbg);
+      if (isDebugScore) p._debug = dbg;
+    }
 
     // Rank: relevance first, then availability (has prices), then source quality.
     // This ensures "חלב תנובה" beats "שוקולד חלב"/"Kinder Chocolate" for query "חלב".
@@ -326,9 +340,11 @@ export default async function handler(req, res) {
     }
 
     timings.totalMs = Date.now() - t0;
+    const results = ranked.slice(0, 20);
+    if (!isDebugScore) results.forEach(p => { delete p._score; delete p._debug; });
     const response = {
       version: '6.3.2', query, englishQuery: en,
-      results: ranked.slice(0, 20), total: ranked.length,
+      results, total: ranked.length,
       syncStatus,
     };
     if (isDebug) response.timings = timings;
