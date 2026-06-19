@@ -1,0 +1,297 @@
+- generic [ref=e1]:
+  - generic [ref=e5]:
+    - navigation [ref=e6]:
+      - generic [ref=e8]:
+        - generic [ref=e9]:
+          - img [ref=e2007]
+          - generic [ref=e1310]:
+            - link [ref=e2008] [cursor=pointer]:
+              - /url: "#/15/Tangles/start"
+            - link [ref=e2009] [cursor=pointer]:
+              - /url: "#/15/Tangles/overview"
+            - link [ref=e2010] [cursor=pointer]:
+              - /url: "#/15/Tangles/analysis/1289/graph-view"
+            - link [ref=e2011] [cursor=pointer]:
+              - /url: "#/15/Tangles/map/"
+            - link [ref=e2012] [cursor=pointer]:
+              - /url: "#/15/Tangles/explorer"
+            - link [ref=e2013] [cursor=pointer]:
+              - /url: "#/15/Tangles/analysis-grid"
+            - link [ref=e2014] [cursor=pointer]:
+              - /url: "#/15/Tangles/live-grid"
+            - link [ref=e2015] [cursor=pointer]:
+              - /url: "#/15/Tangles/subjects"
+        - generic [ref=e15]:
+          - link [ref=e2016] [cursor=pointer]:
+            - /url: ""
+          - link [ref=e2017] [cursor=pointer]:
+            - /url: ""
+          - link [ref=e2018] [cursor=pointer]:
+            - /url: "#/projects/"
+    - generic [ref=e31]:
+      - banner [ref=e32]:
+        - generic [ref=e34]:
+          - generic [ref=e1561]:
+            - combobox [ref=e2019]
+            - generic [ref=e1563]:
+              - generic [ref=e1565]:
+                - button [ref=e1566] [cursor=pointer]
+                - button [ref=e1568] [cursor=pointer]
+              - generic [ref=e1571]:
+                - button [ref=e1572] [cursor=pointer]
+                - button [ref=e1574] [cursor=pointer]
+              - generic [ref=e1577]:
+                - button [ref=e1578] [cursor=pointer]
+                - button [ref=e1580] [cursor=pointer]
+          - generic [ref=e35]:
+            - generic [ref=e36]:
+              - generic [ref=e39] [cursor=pointer]:
+                - img [ref=e2020]
+                - text: CoAnalyst
+              - button [ref=e1481] [cursor=pointer]
+            - combobox [ref=e1486] [cursor=pointer]:
+              - generic [ref=e1490]: erez test
+              - button [ref=e2021]:  
+            - generic [ref=e42]:
+              - generic [ref=e43]:
+                - button [ref=e2022] [cursor=pointer]:
+                  - generic [ref=e46]:
+                    - generic: "46"
+                - button [ref=e49] [cursor=pointer]
+                - button [ref=e53] [cursor=pointer]
+              - button [ref=e2023] [cursor=pointer]:
+                - generic [ref=e59]: E
+      - main [ref=e62]:
+        - group [ref=e64]:
+          - generic [ref=e1583]:
+            - generic [ref=e1587]:
+              - generic [ref=e1590]:
+                - heading [level=3] [ref=e2024]: 11 / 11 Dictionaries
+                - generic [ref=e1592]:
+                  - textbox [ref=e2025]:
+                    - /placeholder: Search
+                  - button [ref=e1597] [cursor=pointer]
+                  - button [ref=e1599] [cursor=pointer]
+                  - button [ref=e1601] [cursor=pointer]
+                  - button [ref=e1603] [cursor=pointer]
+              - list [ref=e1608]:
+                - generic [ref=e1658]:
+                  - listitem [ref=e1659]:
+                    - generic [ref=e1660]:
+                      - text: Violent Wordsssss
+                      - img [ref=e1662]
+                    - generic [ref=e1663]:
+                      - button [ref=e1664] [cursor=pointer]
+                      - button [ref=e1666] [cursor=pointer]
+                  - listitem [ref=e1668]:
+                    - generic [ref=e1669]: Test Dictionary A - Cyber
+                    - generic [ref=e1670]:
+                      - button [ref=e1671] [cursor=pointer]
+                      - button [ref=e1673] [cursor=pointer]
+                  - listitem [ref=e1675]:
+                    - generic [ref=e1676]: ho darling
+                    - generic [ref=e1677]:
+                      - button [ref=e1678] [cursor=pointer]
+                      - button [ref=e1680] [cursor=pointer]
+                  - listitem [ref=e1682]:
+                    - generic [ref=e1683]:
+                      - text: TestSeverity
+                      - img [ref=e1685]
+                    - generic [ref=e1686]:
+                      - button [ref=e1687] [cursor=pointer]
+                      - button [ref=e1689] [cursor=pointer]
+                  - listitem [ref=e1691]:
+                    - generic [ref=e1692]:
+                      - text: Violent Words
+                      - img [ref=e1694]
+                    - generic [ref=e1695]:
+                      - button [ref=e1696] [cursor=pointer]
+                      - button [ref=e1698] [cursor=pointer]
+                  - listitem [ref=e1700]:
+                    - generic [ref=e1701]: Dictionary with 5 words
+                    - generic [ref=e1702]:
+                      - button [ref=e1703] [cursor=pointer]
+                      - button [ref=e1705] [cursor=pointer]
+                  - listitem [ref=e1707]:
+                    - generic [ref=e1708]:
+                      - text: Crime
+                      - img [ref=e1710]
+                    - generic [ref=e1711]:
+                      - button [ref=e1712] [cursor=pointer]
+                      - button [ref=e1714] [cursor=pointer]
+                  - listitem [ref=e1716]:
+                    - generic [ref=e1717]:
+                      - text: Hate
+                      - img [ref=e1719]
+                    - generic [ref=e1720]:
+                      - button [ref=e1721] [cursor=pointer]
+                      - button [ref=e1723] [cursor=pointer]
+                  - listitem [ref=e1725]:
+                    - generic [ref=e1726]:
+                      - text: Cyber Crime
+                      - img [ref=e1728]
+                    - generic [ref=e1729]:
+                      - button [ref=e1730] [cursor=pointer]
+                      - button [ref=e1732] [cursor=pointer]
+                  - listitem [ref=e1734]:
+                    - generic [ref=e1735]:
+                      - text: Financial Crime
+                      - img [ref=e1737]
+                    - generic [ref=e1738]:
+                      - button [ref=e1739] [cursor=pointer]
+                      - button [ref=e1741] [cursor=pointer]
+                  - listitem [ref=e1743]:
+                    - generic [ref=e1744]:
+                      - text: Terror
+                      - img [ref=e1746]
+                    - generic [ref=e1747]:
+                      - button [ref=e1748] [cursor=pointer]
+                      - button [ref=e1750] [cursor=pointer]
+            - generic [ref=e1616]:
+              - generic [ref=e1618]:
+                - heading [level=3] [ref=e2026]:
+                  - generic [ref=e1620]: 6 /
+                  - text: 6 Keywords
+                - generic [ref=e1621]:
+                  - textbox [ref=e2027]:
+                    - /placeholder: Search
+                  - button [ref=e2028] [cursor=pointer]
+                  - button [active] [ref=e2029] [cursor=pointer]
+                  - button [ref=e2030] [cursor=pointer]
+              - generic [ref=e1634]:
+                - text:  
+                - grid [ref=e1635]:
+                  - rowgroup [ref=e1636]:
+                    - row [ref=e2031]:
+                      - columnheader [ref=e2032] [cursor=pointer]:
+                        - generic [ref=e1639]: 
+                        - generic [ref=e1640]: Keyword
+                        - text:     
+                      - columnheader [ref=e2033] [cursor=pointer]:
+                        - generic [ref=e1642]: 
+                        - generic [ref=e1643]: Language
+                        - text:     
+                      - columnheader [ref=e2034] [cursor=pointer]:
+                        - generic [ref=e1645]: 
+                        - generic [ref=e1646]: Origin Keyword
+                        - text:     
+                      - columnheader [ref=e2035] [cursor=pointer]:
+                        - generic [ref=e1648]: 
+                        - generic [ref=e1649]: Synonyms
+                        - text:     
+                      - columnheader [ref=e2036] [cursor=pointer]:
+                        - generic [ref=e1651]: 
+                        - generic [ref=e1652]: Type
+                        - text:     
+                      - columnheader [ref=e2037] [cursor=pointer]:
+                        - generic [ref=e1654]: 
+                        - generic [ref=e1655]: Severity
+                        - text:     
+                      - columnheader [ref=e1656]:  
+                  - rowgroup [ref=e1916]:
+                    - row [ref=e2038]:
+                      - gridcell [ref=e2039]:
+                        - generic [ref=e1919]: bomb
+                      - gridcell [ref=e1920]
+                      - gridcell [ref=e1921]
+                      - gridcell [ref=e1922]
+                      - gridcell [ref=e2040]: Other
+                      - gridcell [ref=e2041]: Med
+                      - gridcell [ref=e1925]:
+                        - generic [ref=e1927]:
+                          - button [ref=e1928] [cursor=pointer]
+                          - button [ref=e1930] [cursor=pointer]
+                    - row [ref=e2042]:
+                      - gridcell [ref=e2043]:
+                        - generic [ref=e1934]: cyber
+                      - gridcell [ref=e1935]
+                      - gridcell [ref=e1936]
+                      - gridcell [ref=e1937]
+                      - gridcell [ref=e2044]: Other
+                      - gridcell [ref=e2045]: Critical
+                      - gridcell [ref=e1940]:
+                        - generic [ref=e1942]:
+                          - button [ref=e1943] [cursor=pointer]
+                          - button [ref=e1945] [cursor=pointer]
+                    - row [ref=e2046]:
+                      - gridcell [ref=e2047]:
+                        - generic [ref=e1949]: hacking
+                      - gridcell [ref=e1950]
+                      - gridcell [ref=e1951]
+                      - gridcell [ref=e1952]
+                      - gridcell [ref=e2048]: Other
+                      - gridcell [ref=e2049]: Critical
+                      - gridcell [ref=e1955]:
+                        - generic [ref=e1957]:
+                          - button [ref=e1958] [cursor=pointer]
+                          - button [ref=e1960] [cursor=pointer]
+                    - row [ref=e2050]:
+                      - gridcell [ref=e2051]:
+                        - generic [ref=e1964]: malware
+                      - gridcell [ref=e1965]
+                      - gridcell [ref=e1966]
+                      - gridcell [ref=e1967]
+                      - gridcell [ref=e2052]: Other
+                      - gridcell [ref=e2053]: Low
+                      - gridcell [ref=e1970]:
+                        - generic [ref=e1972]:
+                          - button [ref=e1973] [cursor=pointer]
+                          - button [ref=e1975] [cursor=pointer]
+                    - row [ref=e2054]:
+                      - gridcell [ref=e2055]:
+                        - generic [ref=e1979]: phishing
+                      - gridcell [ref=e1980]
+                      - gridcell [ref=e1981]
+                      - gridcell [ref=e1982]
+                      - gridcell [ref=e2056]: Other
+                      - gridcell [ref=e2057]: Critical
+                      - gridcell [ref=e1985]:
+                        - generic [ref=e1987]:
+                          - button [ref=e1988] [cursor=pointer]
+                          - button [ref=e1990] [cursor=pointer]
+                    - row [ref=e2058]:
+                      - gridcell [ref=e2059]:
+                        - generic [ref=e1994]: ransomware
+                      - gridcell [ref=e1995]
+                      - gridcell [ref=e1996]
+                      - gridcell [ref=e1997]
+                      - gridcell [ref=e2060]: Other
+                      - gridcell [ref=e2061]: Low
+                      - gridcell [ref=e2000]:
+                        - generic [ref=e2002]:
+                          - button [ref=e2003] [cursor=pointer]
+                          - button [ref=e2005] [cursor=pointer]
+                - text:    
+  - generic [ref=e2067]:
+    - heading "New Keyword" [level=2] [ref=e2069]
+    - generic [ref=e2072]:
+      - generic [ref=e2073]:
+        - generic [ref=e2074]: Keyword *
+        - textbox [ref=e2076]
+      - generic [ref=e2080] [cursor=pointer]:
+        - generic [ref=e2081]:
+          - checkbox "Case Sensitive" [ref=e2082]
+          - generic:
+            - img
+        - generic [ref=e2083]: Case Sensitive
+      - generic [ref=e2084]:
+        - generic [ref=e2085]: Synonym
+        - combobox [ref=e2086]
+      - generic [ref=e2087]:
+        - generic [ref=e2088]: Severity
+        - combobox [ref=e2089] [cursor=pointer]:
+          - generic [ref=e2091]: Med
+          - button "Select" [ref=e2092]:
+            - generic [ref=e2094]: 
+      - generic [ref=e2095]:
+        - generic [ref=e2096]: Type
+        - combobox [ref=e2097] [cursor=pointer]:
+          - generic [ref=e2099]: Other
+          - button "Select" [ref=e2100]:
+            - generic [ref=e2102]: 
+      - generic [ref=e2104]:
+        - generic [ref=e2105]: Translate To
+        - combobox "Select Languages" [ref=e2111]
+    - generic [ref=e2112]:
+      - button "Cancel" [ref=e2113] [cursor=pointer]
+      - button "Save" [ref=e2114] [cursor=pointer]

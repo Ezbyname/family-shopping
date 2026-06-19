@@ -15,6 +15,9 @@ package-lock.json
 .DS_Store
 Thumbs.db
 .vercel
+__pycache__/
+*.pyc
+*.pyo
 
 # ── Test output ───────────────────────────────────────────────────────────────
 tests/playwright-report/

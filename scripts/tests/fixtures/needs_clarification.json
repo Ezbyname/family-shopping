@@ -1,0 +1,32 @@
+{
+  "name": "Cart Total Update - Missing Preconditions",
+  "metadata": {
+    "business_goal": "Verify that cart total updates correctly when items are added and removed"
+  },
+  "preconditions": [],
+  "test_data": {
+    "item_price": {"value": 9.99, "stable": true},
+    "item_name": {"value": "Milk 3%", "stable": true}
+  },
+  "steps": [
+    {
+      "action": "Add item to cart",
+      "expected_result": "Cart badge shows count of 1",
+      "validation_method": "Verify Count"
+    },
+    {
+      "action": "Check cart total",
+      "expected_result": "Total equals item price",
+      "validation_method": "Verify Content"
+    }
+  ],
+  "results": [
+    {"classification": "PASS", "label": "Cart total is correct"},
+    {"classification": "FAIL", "label": "Cart total is wrong"}
+  ],
+  "automation_readiness_status": "needs_clarification",
+  "risks": [
+    {"risk": "Cart state from prior session may persist", "mitigation": "Reset cart state in setup"}
+  ],
+  "registry_needs": []
+}
