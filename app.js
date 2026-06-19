@@ -229,7 +229,7 @@ function _showDuplicateMemberDialog(name) {
         <div style="font-size:16px;font-weight:800;margin-bottom:10px">קיים כבר חבר בשם "${safe}"</div>
         <div style="font-size:14px;color:var(--muted,#888);margin-bottom:20px">האם אתה אותו אדם?</div>
         <div style="display:flex;gap:10px;justify-content:center">
-          <button id="dup-yes" style="flex:1;padding:12px;border-radius:12px;border:none;background:var(--accent,#22c55e);color:#111;font-size:15px;font-weight:700;cursor:pointer">כן</button>
+          <button id="dup-yes" style="flex:1;padding:12px;border-radius:12px;border:none;background:var(--accent,#22c55e);color:#fff;font-size:15px;font-weight:700;cursor:pointer">כן</button>
           <button id="dup-no"  style="flex:1;padding:12px;border-radius:12px;border:1.5px solid var(--border,#ddd);background:transparent;font-size:15px;cursor:pointer">לא</button>
         </div>
       </div>`;
@@ -1832,7 +1832,7 @@ function showProductPrices(product){
               border-radius:8px;padding:4px 8px;color:var(--text);font-family:'Rubik',sans-serif;
               font-size:12px;text-align:left;outline:none;direction:ltr">
           <button onclick="saveManualPrice('${r.store}','mp-${storeKey}')"
-            style="background:var(--accent);color:#111;border:none;border-radius:7px;
+            style="background:var(--accent);color:#fff;border:none;border-radius:7px;
               padding:4px 10px;font-family:'Rubik',sans-serif;font-size:11px;font-weight:700;cursor:pointer;">
             שמור
           </button>
@@ -1943,7 +1943,7 @@ function renderManualFallback(query, product){
     </div>
     <div class="store-prices">${storeInputs}</div>
     <button onclick="saveManualPrices('${query.replace(/'/g,"\'")}')" 
-      style="margin-top:10px;width:100%;background:var(--accent);color:#111;border:none;
+      style="margin-top:10px;width:100%;background:var(--accent);color:#fff;border:none;
         border-radius:10px;padding:10px;font-family:'Rubik',sans-serif;font-size:14px;font-weight:700;cursor:pointer;">
       💾 שמור מחירים
     </button>
@@ -2329,10 +2329,10 @@ function itemHTML(item) {
         <button class="qty-btn" onclick="changeQty('${item.id}',-1)">−</button>
         <span class="qty-num">${item.qty||1}</span>
         <button class="qty-btn" onclick="changeQty('${item.id}',1)">+</button>
-        ${boughtBtn}
       </div>
       ${priceChipHTML}
     </div>
+    ${boughtBtn}
     <div class="item-acts">
       <button class="fav-star-btn${isFavSaved?' starred':''}"
         onclick="toggleSavedFavorite('${item.id}','${esc(item.name)}','${item.barcode||''}')"
@@ -3689,7 +3689,7 @@ window.showProductPricesEnhanced = async function(product) {
           <span class="ps-currency">₪</span>
           <input type="number" id="mp-${s.replace(/\s/g,'_')}" placeholder="0.00" step="0.01" min="0" class="ps-input">
           <button onclick="saveSingleManualPrice('${s}','mp-${s.replace(/\s/g,'_')}','${barcode}','${esc(product.name||'')}')"
-            style="background:var(--accent);color:#111;border:none;border-radius:7px;padding:4px 10px;font-family:'Rubik',sans-serif;font-size:11px;font-weight:700;cursor:pointer">שמור</button>
+            style="background:var(--accent);color:#fff;border:none;border-radius:7px;padding:4px 10px;font-family:'Rubik',sans-serif;font-size:11px;font-weight:700;cursor:pointer">שמור</button>
         </span>
       </div>`).join('')}
     </div>` : '';
