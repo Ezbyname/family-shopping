@@ -1,8 +1,0 @@
-- generic [active] [ref=e1]:
-  - img [ref=e3]
-  - generic [ref=e5]:
-    - paragraph [ref=e6]: You are already logged in to the system.
-    - paragraph [ref=e7]: In order to login from this computer press "Login".
-    - generic [ref=e8]:
-      - button "Back" [ref=e9] [cursor=pointer]
-      - button "Login" [ref=e10] [cursor=pointer]
