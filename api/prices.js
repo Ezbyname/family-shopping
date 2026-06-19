@@ -70,33 +70,171 @@ async function getStoreIndex(dbUrl) {
 }
 
 // ── Hebrew → English for Open Food Facts search ──────────────────────────────
+// ~300 most popular ingredients in Israeli supermarkets, grouped by category.
+// Plural forms are listed explicitly where the stem-stripping heuristic would
+// produce a wrong or ambiguous result (e.g. ביצים, עגבניות).
 const HE_EN = {
-  'חלב':'milk','חלב 3%':'milk 3%','חלב 1%':'milk 1%','חלב עיזים':'goat milk',
-  'גבינה':'cheese','גבינה לבנה':'white cheese',"קוטג'":'cottage cheese','קוטג':'cottage cheese',
-  'שמנת':'cream','יוגורט':'yogurt','חמאה':'butter','לחם':'bread','פיתה':'pita',
-  'קמח':'flour','ביצים':'eggs','ביצה':'egg','קורנפלקס':'cornflakes',
-  'שיבולת שועל':'oatmeal','גרנולה':'granola','אורז':'rice','פסטה':'pasta',
-  'ספגטי':'spaghetti','מקרוני':'macaroni','שמן':'oil','שמן זית':'olive oil',
-  'שמן חמניות':'sunflower oil','סוכר':'sugar','דבש':'honey','מלח':'salt',
-  'טחינה':'tahini','חומוס':'hummus','קטשופ':'ketchup','מיונז':'mayonnaise',
-  'טונה':'tuna','קפה':'coffee','תה':'tea','מיץ':'juice','מים':'water',
-  'מיץ תפוזים':'orange juice','מיץ תפוחים':'apple juice',
-  'שוקולד':'chocolate','עוגיות':'cookies','במבה':'bamba','ביסלי':'bisli',
-  'גלידה':'ice cream','עוף':'chicken','בשר טחון':'ground beef',
-  'עגבניות':'tomatoes','מלפפון':'cucumber','בצל':'onion','שום':'garlic',
-  'גזר':'carrot','תפוח אדמה':'potato','ברוקולי':'broccoli',
-  'תפוח':'apple','בננה':'banana','בננות':'banana','תפוז':'orange','לימון':'lemon',
+  // ── Dairy ────────────────────────────────────────────────────────────────
+  'חלב':'milk','חלב 3%':'milk 3%','חלב 1%':'milk 1%','חלב 3 אחוז':'milk 3%',
+  'חלב עיזים':'goat milk','חלב כבשים':'sheep milk','חלב סויה':'soy milk',
+  'חלב שקדים':'almond milk','חלב קוקוס':'coconut milk',
+  'גבינה':'cheese','גבינה לבנה':'white cheese','גבינה צהובה':'yellow cheese',
+  'גבינה קשה':'hard cheese','גבינה מלוחה':'salty cheese',
+  'גבינת עיזים':'goat cheese','גבינת פטה':'feta cheese',
+  'גבינת מוצרלה':'mozzarella','גבינת עמק':'emek cheese',
+  "קוטג'":'cottage cheese','קוטג':'cottage cheese',
+  'שמנת':'cream','שמנת חמוצה':'sour cream','שמנת מתוקה':'heavy cream',
+  'שמנת לבישול':'cooking cream',
+  'יוגורט':'yogurt','יוגורט טבעי':'plain yogurt','יוגורט יווני':'greek yogurt',
+  'לבן':'leben','גבינת ריקוטה':'ricotta',
+  'חמאה':'butter','חמאה מלוחה':'salted butter','חמאה ללא מלח':'unsalted butter',
+  'מרגרינה':'margarine',
+  'ביצים':'eggs','ביצה':'egg','ביצי חופש':'free range eggs',
+  'ביצים גדולות':'large eggs','ביצים קטנות':'small eggs',
+  'גלידה':'ice cream','שמנת קפואה':'frozen cream',
+  // ── Produce — Vegetables ──────────────────────────────────────────────────
+  'עגבניות':'tomatoes','עגבנייה':'tomato','עגבניות שרי':'cherry tomatoes',
+  'מלפפון':'cucumber','מלפפונים':'cucumbers','מלפפון חמוץ':'pickle',
+  'בצל':'onion','בצלים':'onions','בצל סגול':'red onion','בצל ירוק':'green onion',
+  'שום':'garlic','שיני שום':'garlic cloves',
+  'גזר':'carrot','גזרים':'carrots',
+  'תפוח אדמה':'potato','תפוחי אדמה':'potatoes','בטטה':'sweet potato',
+  'ברוקולי':'broccoli','כרובית':'cauliflower','כרוב':'cabbage',
+  'פלפל':'pepper','פלפל אדום':'red pepper','פלפל ירוק':'green pepper',
+  'פלפל צהוב':'yellow pepper','פלפל חריף':'chili pepper',
+  'חציל':'eggplant','קישוא':'zucchini','דלעת':'pumpkin','דלורית':'butternut squash',
+  'תירס':'corn','תירס מתוק':'sweet corn',
+  'אפונה':'peas','שעועית ירוקה':'green beans','שעועית':'beans',
+  'גרגיר הנחלים':'watercress','תרד':'spinach','מנגולד':'chard',
+  'חסה':'lettuce','רוקט':'arugula','עלי בייבי':'baby leaves',
+  'כוסברה':'cilantro','פטרוזיליה':'parsley','שמיר':'dill',
+  'בזיליקום':'basil','נענע':'mint','טימין':'thyme','רוזמרין':'rosemary',
+  'כרישה':'leek','סלרי':'celery','פטריות':'mushrooms','פטריית שמפיניון':'mushroom',
+  'אבוקדו':'avocado','ארטישוק':'artichoke','אספרגוס':'asparagus',
+  'ג׳ינג׳ר':'ginger','כורכום':'turmeric','צנון':'radish',
+  // ── Produce — Fruit ───────────────────────────────────────────────────────
+  'תפוח':'apple','תפוחים':'apples','תפוח אדום':'red apple','תפוח ירוק':'green apple',
+  'בננה':'banana','בננות':'banana',
+  'תפוז':'orange','תפוזים':'oranges',
+  'לימון':'lemon','לימונים':'lemons','ליים':'lime',
+  'מנגו':'mango','ענבים':'grapes','אבטיח':'watermelon','מלון':'melon',
+  'תות שדה':'strawberry','תותים':'strawberries','אוכמניות':'blueberries',
+  'פטל':'raspberry','דובדבן':'cherry','משמש':'apricot',
+  'אפרסק':'peach','שזיף':'plum','אגס':'pear','רימון':'pomegranate',
+  'קיווי':'kiwi','אננס':'pineapple','פפאיה':'papaya','ליצ׳י':'lychee',
+  'תמר':'date','תמרים':'dates','צימוקים':'raisins','שזיפים מיובשים':'prunes',
+  'משמשים מיובשים':'dried apricots',
+  // ── Pantry — Grains & Bread ───────────────────────────────────────────────
+  'לחם':'bread','לחם מלא':'whole wheat bread','לחם שיפון':'rye bread',
+  'לחם פיתה':'pita bread','פיתה':'pita','לחמניות':'rolls','בגט':'baguette',
+  'לחם אחיד':'sliced bread',
+  'קמח':'flour','קמח חיטה':'wheat flour','קמח מלא':'whole wheat flour',
+  'קמח תירס':'corn flour','קמח כוסמת':'buckwheat flour','קמח שיפון':'rye flour',
+  'אורז':'rice','אורז לבן':'white rice','אורז מלא':'brown rice',
+  'אורז בסמטי':'basmati rice','אורז יסמין':'jasmine rice','אורז פרסי':'persian rice',
+  'פסטה':'pasta','ספגטי':'spaghetti','מקרוני':'macaroni','פנה':'penne',
+  'פוסילי':'fusilli','לינגוויני':'linguine','פפרדלה':'pappardelle',
+  'אטריות':'noodles','כוסמת':'buckwheat','קינואה':'quinoa','בולגור':'bulgur',
+  'כוסכוס':'couscous','פולנטה':'polenta','שעורה':'barley',
+  'שיבולת שועל':'oatmeal','גרנולה':'granola','קורנפלקס':'cornflakes',
+  'מוזלי':'muesli','דגני בוקר':'cereal',
+  // ── Pantry — Oils, Sauces & Condiments ───────────────────────────────────
+  'שמן זית':'olive oil','שמן זית כתית':'extra virgin olive oil',
+  'שמן חמניות':'sunflower oil','שמן קנולה':'canola oil','שמן תירס':'corn oil',
+  'שמן קוקוס':'coconut oil','שמן שומשום':'sesame oil',
+  'שמן':'oil',
+  'חומץ':'vinegar','חומץ תפוחים':'apple cider vinegar','חומץ בלסמי':'balsamic vinegar',
+  'רוטב עגבניות':'tomato sauce','רוטב פסטה':'pasta sauce',
+  'קטשופ':'ketchup','מיונז':'mayonnaise','חרדל':'mustard',
+  'רוטב סויה':'soy sauce','רוטב טריאקי':'teriyaki sauce',
+  'רוטב חריף':'hot sauce','טחינה גולמית':'raw tahini',
+  'טחינה':'tahini','חומוס':'hummus','פסטו':'pesto',
   'ריבה':'jam','ריבת תות':'strawberry jam','ריבת משמש':'apricot jam',
-  'נייר טואלט':'toilet paper','סבון':'soap','שמפו':'shampoo',
-  'אבקת כביסה':'laundry detergent','נוזל כלים':'dish soap',
+  'ריבת תאנים':'fig jam','ריבת פירות יער':'berry jam',
+  'דבש':'honey','סירופ מייפל':'maple syrup','ממרח שוקולד':'chocolate spread',
+  'חמאת בוטנים':'peanut butter','ממרח שקדים':'almond butter',
+  // ── Pantry — Sugar, Salt & Spices ────────────────────────────────────────
+  'סוכר':'sugar','סוכר לבן':'white sugar','סוכר חום':'brown sugar',
+  'סוכר דקל':'palm sugar','סטיביה':'stevia','אריתריטול':'erythritol',
+  'מלח':'salt','מלח ים':'sea salt','מלח שולחן':'table salt','מלח הימלאיה':'himalayan salt',
+  'פלפל שחור':'black pepper','פלפל לבן':'white pepper','פפריקה':'paprika',
+  'כמון':'cumin','כורכום':'turmeric','קינמון':'cinnamon','כרכום':'saffron',
+  'אגוז מוסקט':'nutmeg','הל':'cardamom','ציפורן':'cloves','אניס':'anise',
+  'זעתר':'za\'atar','בהרט':'baharat','כמון טחון':'ground cumin',
+  'שומשום':'sesame','פרג':'poppy seeds','זרעי פשתן':'flax seeds',
+  'זרעי צ׳יה':'chia seeds','זרעי חמניות':'sunflower seeds',
+  'אבקת שום':'garlic powder','אבקת בצל':'onion powder',
+  'אורגנו':'oregano','בזיליקום יבש':'dried basil',
+  // ── Pantry — Canned & Preserved ──────────────────────────────────────────
+  'טונה':'tuna','טונה בשמן':'tuna in oil','טונה במים':'tuna in water',
+  'סרדינים':'sardines','מקרל':'mackerel','סלמון משומר':'canned salmon',
+  'עגבניות מרוסקות':'crushed tomatoes','רסק עגבניות':'tomato paste',
+  'עגבניות שלמות משומרות':'canned whole tomatoes',
+  'שעועית משומרת':'canned beans','גרגרי חומוס משומרים':'canned chickpeas',
+  'עדשים':'lentils','עדשים כתומות':'red lentils','עדשים שחורות':'black lentils',
+  'אפונה משומרת':'canned peas','תירס משומר':'canned corn',
+  'זיתים':'olives','זיתים שחורים':'black olives','זיתים ירוקים':'green olives',
+  // ── Pantry — Baking ───────────────────────────────────────────────────────
+  'שוקולד':'chocolate','שוקולד מריר':'dark chocolate','שוקולד חלב':'milk chocolate',
+  'שוקולד לבן':'white chocolate','טבלת שוקולד':'chocolate bar',
+  'קקאו':'cocoa','אבקת קקאו':'cocoa powder',
+  'אבקת אפייה':'baking powder','סודה לשתייה':'baking soda',
+  'שמרים':'yeast','שמרים יבשים':'dry yeast',
+  'וניל':'vanilla','תמצית וניל':'vanilla extract',
+  'קמח תופח':'self-rising flour','עמילן תירס':'corn starch',
+  'ג׳לטין':'gelatin','אגר אגר':'agar agar',
+  'שקדים':'almonds','אגוזי מלך':'walnuts','קשיו':'cashews',
+  'בוטנים':'peanuts','פיסטוקים':'pistachios','אגוזי לוז':'hazelnuts',
+  'קוקוס מגורד':'shredded coconut','שמן קוקוס':'coconut oil',
+  // ── Beverages ─────────────────────────────────────────────────────────────
+  'קפה':'coffee','קפה טחון':'ground coffee','קפה נמס':'instant coffee',
+  'קפה אספרסו':'espresso','קפסולות קפה':'coffee capsules',
+  'תה':'tea','תה ירוק':'green tea','תה שחור':'black tea','תה צמחים':'herbal tea',
+  'תה נענע':'mint tea','תה קמומיל':'chamomile tea',
+  'מים':'water','מים מינרלים':'mineral water','מים מוגזים':'sparkling water',
+  'מיץ תפוזים':'orange juice','מיץ תפוחים':'apple juice',
+  'מיץ ענבים':'grape juice','מיץ גזר':'carrot juice',
+  'מיץ אשכולית':'grapefruit juice','מיץ לימון':'lemon juice',
+  'מיץ':'juice','מיץ טבעי':'natural juice',
+  'סודה':'soda','מי ברז':'tap water',
+  'שייק':'shake','שייק חלב':'milkshake',
+  // ── Meat & Fish ───────────────────────────────────────────────────────────
+  'עוף':'chicken','חזה עוף':'chicken breast','שוקיים':'chicken thighs',
+  'כנפיים':'chicken wings','פרגית':'young chicken','שניצל עוף':'chicken schnitzel',
+  'בשר בקר':'beef','בשר טחון':'ground beef','סטייק':'steak',
+  'אנטריקוט':'entrecote','פילה בקר':'beef fillet',
+  'כבש':'lamb','טלה':'lamb','בשר עגל':'veal',
+  'הודו':'turkey','חזה הודו':'turkey breast','שניצל הודו':'turkey schnitzel',
+  'נקניק':'sausage','נקניקיות':'frankfurters','קבב':'kebab',
+  'המבורגר':'hamburger','פלאפל':'falafel',
+  'סלמון':'salmon','דג':'fish','דג ים':'sea fish','דג מוסר':'sea bass',
+  'דג ברמונדי':'barramundi','בורי':'mullet','קרפיון':'carp',
+  'שרימפס':'shrimp','קלמרי':'calamari','סושי':'sushi',
+  // ── Snacks & Sweets ───────────────────────────────────────────────────────
+  'במבה':'bamba','ביסלי':'bisli','אפקים':'tapuchips',
+  'עוגיות':'cookies','ביסקוויטים':'biscuits','קרקרים':'crackers',
+  'צ׳יפס':'chips','פופקורן':'popcorn','פריכיות':'rice cakes',
+  'עוגה':'cake','עוגת שוקולד':'chocolate cake','מאפינס':'muffins',
+  'לחמניית מתוקה':'sweet bun','קרואסון':'croissant','דנמרקי':'danish pastry',
+  'גומי':'gummy candy','סוכריות':'candy','שוקולד ממולא':'filled chocolate',
+  // ── Household essentials ──────────────────────────────────────────────────
+  'נייר טואלט':'toilet paper','מגבות נייר':'paper towels',
+  'שקיות אשפה':'garbage bags','נייר אלומיניום':'aluminum foil',
+  'ניילון נצמד':'plastic wrap','כוסות חד פעמי':'disposable cups',
+  'סבון':'soap','סבון ידיים':'hand soap','סבון גוף':'body wash',
+  'שמפו':'shampoo','מרכך שיער':'conditioner',
+  'אבקת כביסה':'laundry detergent','נוזל כביסה':'liquid detergent',
+  'מרכך כביסה':'fabric softener','נוזל כלים':'dish soap',
+  'חומר ניקוי':'cleaning agent','אקונומיקה':'bleach',
 };
 
-const isHebrew  = s => /[֐-׿]/.test(s);
+const isHebrew = s => /[֐-׿]/.test(s);
 
-// Strip common Hebrew plural/construct suffixes to find a singular dictionary hit.
-// Order matters: try longest suffix first so "תפוזים" → "תפוז" not "תפוזי".
-const _hebrewSingular = w => {
-  for (const sfx of ['ות', 'ים', 'י', 'ת']) {
+// Dictionary-backed plural normalization — strips common Hebrew suffixes only
+// when the resulting stem exists in HE_EN. Never returns a raw stem (safe).
+const _singularLookup = w => {
+  // Try longest suffix first: ות before ת, ים before י
+  for (const sfx of ['ות', 'ים', 'יות', 'יים', 'י', 'ת']) {
     if (w.length > sfx.length + 2 && w.endsWith(sfx)) {
       const stem = w.slice(0, -sfx.length);
       if (HE_EN[stem]) return HE_EN[stem];
@@ -107,14 +245,13 @@ const _hebrewSingular = w => {
 
 const translate = q => {
   const l = q.trim();
-  // 1. Exact match
+  // 1. Exact phrase match (highest precision — covers "מיץ תפוזים" etc.)
   if (HE_EN[l]) return HE_EN[l];
   // 2. Substring / superstring match (handles "שמן זית" ↔ "שמן")
   for (const [h, e] of Object.entries(HE_EN)) if (l.includes(h) || h.includes(l)) return e;
-  // 3. Plural/construct suffix stripping — handles בננות→בננה, מלפפונים→מלפפון, etc.
-  const words = l.split(/\s+/);
-  for (const w of words) {
-    const hit = _hebrewSingular(w);
+  // 3. Plural suffix stripping — dictionary-backed only, no garbage stems
+  for (const w of l.split(/\s+/)) {
+    const hit = _singularLookup(w);
     if (hit) return hit;
   }
   return null;
