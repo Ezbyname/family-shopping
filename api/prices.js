@@ -80,11 +80,13 @@ const HE_EN = {
   'שמן חמניות':'sunflower oil','סוכר':'sugar','דבש':'honey','מלח':'salt',
   'טחינה':'tahini','חומוס':'hummus','קטשופ':'ketchup','מיונז':'mayonnaise',
   'טונה':'tuna','קפה':'coffee','תה':'tea','מיץ':'juice','מים':'water',
+  'מיץ תפוזים':'orange juice','מיץ תפוחים':'apple juice',
   'שוקולד':'chocolate','עוגיות':'cookies','במבה':'bamba','ביסלי':'bisli',
   'גלידה':'ice cream','עוף':'chicken','בשר טחון':'ground beef',
   'עגבניות':'tomatoes','מלפפון':'cucumber','בצל':'onion','שום':'garlic',
   'גזר':'carrot','תפוח אדמה':'potato','ברוקולי':'broccoli',
-  'תפוח':'apple','בננה':'banana','תפוז':'orange','לימון':'lemon',
+  'תפוח':'apple','בננה':'banana','בננות':'banana','תפוז':'orange','לימון':'lemon',
+  'ריבה':'jam','ריבת תות':'strawberry jam','ריבת משמש':'apricot jam',
   'נייר טואלט':'toilet paper','סבון':'soap','שמפו':'shampoo',
   'אבקת כביסה':'laundry detergent','נוזל כלים':'dish soap',
 };
@@ -550,10 +552,17 @@ function buildCommunityWarning(reportsData, officialPrices) {
 async function searchOFF(hebrewQuery, englishQuery) {
   const seen = new Set(), results = [];
   const isHeb = isHebrew(hebrewQuery);
+  const FIELDS = 'product_name,product_name_he,brands,quantity,image_small_url,code,countries_tags';
+  const OFF    = 'https://world.openfoodfacts.org/cgi/search.pl';
   const urls = [
-    `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(englishQuery)}&search_simple=1&action=process&json=1&page_size=8&fields=product_name,product_name_he,brands,quantity,image_small_url,code,countries_tags&tagtype_0=countries&tag_contains_0=contains&tag_0=israel`,
-    isHeb ? `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(hebrewQuery)}&search_simple=1&action=process&json=1&page_size=6&fields=product_name,product_name_he,brands,quantity,image_small_url,code` : null,
-    `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(englishQuery)}&search_simple=1&action=process&json=1&page_size=12&fields=product_name,product_name_he,brands,quantity,image_small_url,code,countries_tags`,
+    // 1. Hebrew query with Israel filter — highest precision for Israeli products
+    isHeb ? `${OFF}?search_terms=${encodeURIComponent(hebrewQuery)}&search_simple=1&action=process&json=1&page_size=10&fields=${FIELDS}&tagtype_0=countries&tag_contains_0=contains&tag_0=israel` : null,
+    // 2. English query with Israel filter
+    `${OFF}?search_terms=${encodeURIComponent(englishQuery)}&search_simple=1&action=process&json=1&page_size=8&fields=${FIELDS}&tagtype_0=countries&tag_contains_0=contains&tag_0=israel`,
+    // 3. Hebrew query without filter — catches products with missing country tags
+    isHeb ? `${OFF}?search_terms=${encodeURIComponent(hebrewQuery)}&search_simple=1&action=process&json=1&page_size=8&fields=${FIELDS}` : null,
+    // 4. English query without filter — broadest fallback
+    `${OFF}?search_terms=${encodeURIComponent(englishQuery)}&search_simple=1&action=process&json=1&page_size=12&fields=${FIELDS}`,
   ].filter(Boolean);
 
   for (const url of urls) {
