@@ -256,10 +256,9 @@ export default async function handler(req, res) {
   if (!q || String(q).trim().length < 2)
     return res.status(400).json({ error: 'Provide ?barcode= or ?q=' });
 
-  const query      = String(q).trim();
-  const hebrew     = isHebrew(query);
-  const en         = hebrew ? (translate(query) || query) : query;
-  const debugScore = req.query.debugScore === '1';
+  const query  = String(q).trim();
+  const hebrew = isHebrew(query);
+  const en     = hebrew ? (translate(query) || query) : query;
   console.log(`[prices v6.3] search: "${query}" → "${en}"`);
 
   const dbUrl = getDbUrl();
@@ -322,7 +321,7 @@ export default async function handler(req, res) {
                  : hasAny.length  >= 3 ? hasAny
                  : enriched;
 
-    if (debugScore) {
+    if (isDebugScore) {
       console.log(`[search-audit] query="${query}" en="${en}" ` +
         `candidates=${enriched.length} strong=${strong.length} fallback=${hasAny.length}\n` +
         enriched.slice(0, 50).map((p, i) =>
