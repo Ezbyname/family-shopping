@@ -14,7 +14,7 @@
  */
 
 import { CATALOG, SYNONYMS } from '../api/ingredients.js';
-import { translateIngredient, normalizeHe } from '../api/normalize-he.js';
+import { translateIngredient, normalizeHe, phraseScan, singularScan } from '../api/normalize-he.js';
 
 let passed = 0, failed = 0;
 
@@ -176,6 +176,75 @@ assert('collapses spaces',   normalizeHe('  חלב   3%  ') === 'חלב 3%');
 assert('strips left-double-quote', normalizeHe('גבינה"לבנה') === 'גבינהלבנה');
 assert('empty string',       normalizeHe('') === '');
 assert('null safe',          normalizeHe(null) === '');
+
+// ── 9. phraseScan unit tests (token-sequence, word-boundary safe) ─────────────
+// These prove the phrase path fires for multi-word queries that are NOT in
+// CATALOG or SYNONYMS exactly, and that it picks the LONGEST matching key.
+console.log('\n9. phraseScan unit tests');
+
+function assertPhrase(input, expectedSubstring, label) {
+  const result = phraseScan(input);
+  const ok = result !== null && result.toLowerCase().includes(expectedSubstring.toLowerCase());
+  assert(label ?? `phraseScan("${input}") contains "${expectedSubstring}"`, ok);
+  if (!ok) console.error(`        got: ${JSON.stringify(result)}`);
+}
+
+assertPhrase('מיץ תפוזים',       'orange juice',   'exact 2-token key in CATALOG');
+assertPhrase('שמן זית טוב',      'olive oil',      '2-token key within 3-token query');
+assertPhrase('לחם שיפון כהה',    'rye bread',      '2-token key at start of 3-token query');
+assertPhrase('קפה שחור',         'coffee',         '1-token key within 2-token query');
+assertPhrase('שוקולד מריר 70%',  'dark chocolate', '2-token key with suffix token');
+assertPhrase('יוגורט יווני ביו', 'greek yogurt',   'longest key wins: יוגורט יווני over יוגורט');
+// Verify longest-match: "שמן זית" (2 tokens) must beat "שמן" (1 token)
+const oilResult = phraseScan('שמן זית מצוין');
+assert('phraseScan longest-match: "שמן זית" beats "שמן"', oilResult === 'olive oil');
+
+// ── 10. singularScan unit tests (plural strip, dictionary-backed) ─────────────
+// These prove the plural path fires for single-word plurals whose stems are in
+// CATALOG but the plural form itself is neither in CATALOG nor SYNONYMS.
+console.log('\n10. singularScan unit tests');
+
+function assertSingular(input, expectedSubstring, label) {
+  const result = singularScan(input);
+  const ok = result !== null && result.toLowerCase().includes(expectedSubstring.toLowerCase());
+  assert(label ?? `singularScan("${input}") contains "${expectedSubstring}"`, ok);
+  if (!ok) console.error(`        got: ${JSON.stringify(result)}`);
+}
+
+assertSingular('ארטישוקים', 'artichoke', 'ארטישוקים → ארטישוק (strip ים)');
+assertSingular('אספרגוסים', 'asparagus', 'אספרגוסים → אספרגוס (strip ים)');
+assertSingular('קישואים',   'zucchini',  'קישואים → קישוא (strip ים)');
+assertSingular('חצילים',    'eggplant',  'חצילים → חציל (strip ים)');
+assertSingular('אגסים',     'pear',      'אגסים → אגס (strip ים)');
+assertSingular('דובדבנים',  'cherry',    'דובדבנים → דובדבן (strip ים)');
+// Safety: unknown word must return null (never a garbage stem)
+assert('singularScan returns null for unknown stem "בלבלים"', singularScan('בלבלים') === null);
+assert('singularScan returns null for short word "אם"', singularScan('אם') === null);
+
+// ── 11. Pipeline integration: path routing ────────────────────────────────────
+// Verifies that the correct path fires end-to-end given the priority order.
+console.log('\n11. Pipeline path routing (integration)');
+
+// Plural (single-word, not in catalog/synonyms, stem in catalog) → plural path
+assert(
+  'ארטישוקים routes to plural path (not short-circuited by phrase)',
+  translateIngredient('ארטישוקים') === 'artichoke'
+);
+// Phrase beats plural for multi-word: "מיץ תפוזים" must NOT singularize "תפוזים"→"תפוז"
+assert(
+  'מיץ תפוזים → "orange juice" (phrase beats plural)',
+  translateIngredient('מיץ תפוזים') === 'orange juice'
+);
+// Synonym beats phrase
+assert(
+  'ביצים → synonym path (not phrase)',
+  translateIngredient('ביצים') === 'egg'
+);
+// Exact beats synonym
+assert(
+  'חלב → exact path',
+  translateIngredient('חלב') === 'milk'
+);
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log('\n' + '─'.repeat(60));

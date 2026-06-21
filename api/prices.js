@@ -237,7 +237,12 @@ export default async function handler(req, res) {
   const query  = String(q).trim();
   const hebrew = isHebrew(query);
   const en     = hebrew ? (translate(query) || query) : query;
-  console.log(`[prices v6.3] search: "${query}" → "${en}"`);
+  const translated = hebrew && translate(query) !== null;
+  if (hebrew && !translated) {
+    // Structured log for unmapped query backlog — parse with: jq 'select(.event=="unmapped_query")'
+    console.log(JSON.stringify({ event: 'unmapped_query', query, ts: new Date().toISOString() }));
+  }
+  console.log(`[prices v6.3] search: "${query}" → "${en}" translated=${translated}`);
 
   const dbUrl = getDbUrl();
 
@@ -318,6 +323,9 @@ export default async function handler(req, res) {
 
     timings.totalMs = Date.now() - t0;
     const results = ranked.slice(0, 20);
+    if (results.length === 0) {
+      console.log(JSON.stringify({ event: 'zero_results', query, englishQuery: en, translated, ts: new Date().toISOString() }));
+    }
     if (!isDebugScore) results.forEach(p => { delete p._score; delete p._debug; });
     const response = {
       version: '6.3.2', query, englishQuery: en,
