@@ -70,6 +70,24 @@ DRY_RUN=true node index.js rami-levy 2>&1 | grep -E "items|error|warn"
 
 ---
 
+## Branching Rule
+
+**Every new vendor gets its own branch, branched from the main dev branch.**
+
+```
+claude/happy-johnson-4rkqam   ← main dev branch (working chains only)
+  └── rami-levy               ← Rami Levy integration (isolated)
+  └── yeinot-bitan            ← Carrefour IL integration (isolated)
+  └── yochananof              ← Yochananof integration (isolated)
+```
+
+- Vendor branch is created **before** any integration work begins.
+- Nothing from a vendor branch is merged to main until all 5 phases pass.
+- The main dev branch must stay green (Shufersal sync + `search-health.mjs`) at all times.
+- Branch name = chain `id` from `chains.js` (e.g. `rami-levy`, `yeinot-bitan`).
+
+---
+
 ## Architecture Rules for Retailer Integration
 
 1. **Do not modify normalization logic** (`api/ingredients.js`, `api/normalize-he.js`) during integration.
