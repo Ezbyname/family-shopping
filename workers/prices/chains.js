@@ -33,12 +33,19 @@ export const CHAINS = [
     name:     'רמי לוי',
     chainId:  '7290058140886',
     enabled:  false,
-    status:   'pending',
+    // Phase 3 implementation complete 2026-06-22. Enable only after dry-run passes on VPS.
+    // To enable: DRY_RUN=true node index.js rami-levy → confirm items > 1000, errors = 0
+    //            then set enabled: true, status: 'enabled', lastVerified: today
+    status:   'pending-dry-run',
     sanityRequired: false,
-    knownIssue: 'url.retail.pe.il ENOTFOUND. Chain uses FTP (url.retail.publishedprices.co.il) — no confirmed HTTP index URL.',
-    indexUrl: 'https://url.retail.publishedprices.co.il/MF/latest/7290058140886/',
-    baseUrl:  'https://url.retail.publishedprices.co.il',
-    indexType: 'html',
+    knownIssue: null,
+    // Auth: POST https://url.retail.publishedprices.co.il/login, username=RamiLevi, password=''
+    // Files: PriceFull{chainId}-{storeId}-{YYYYMMDDHHmm}.gz listed at /file after login
+    // Handled by rami-levy-auth.js + rami-levy-discovery.js + rami-levy.js
+    syncModule: './rami-levy.js',  // custom module dispatch in index.js
+    indexUrl:   'https://url.retail.publishedprices.co.il/file',
+    baseUrl:    'https://url.retail.publishedprices.co.il',
+    indexType:  'html',
   },
   {
     id:       'victory',
