@@ -18,6 +18,8 @@ const FIELD_MAP = {
   'quantity':           'quantity',
   'unitqty':            'unitQty',
   'manufacturername':   'brand',
+  'manufacturename':    'brand',
+  'priceupdatetime':   'updatedAt',
   'manufacturecountry': 'country',
   'storeid':            'storeId',
   'storename':          'storeName',

@@ -716,6 +716,10 @@ async function main() {
         result = await syncChainStores(chain, writer, config);
         result = { chainId: chain.id, chainName: chain.name, count: result.count || 0,
                    failed: result.failed, failReason: result.failReason };
+      } else if (chain.syncModule) {
+        // Chain has a dedicated sync module (e.g. rami-levy.js for auth-gated portals)
+        const mod = await import(new URL(chain.syncModule, import.meta.url));
+        result = await mod.sync(chain, writer, config);
       } else {
         result = await syncChain(chain, writer, config);
       }
