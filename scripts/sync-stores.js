@@ -1,12 +1,12 @@
-﻿import { execFile } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
 import { resolveCity } from './lib/city-code-resolver.js';
 const execFileAsync = promisify(execFile);
 const CHAIN_ID = '7290058140886';
-const CHAIN_NAME = 'רמי לוי';
-const FTP_BASE = 'ftp://url.retail.publishedprices.co.il/RamiLevy/';
+const CHAIN_NAME = '??? ???';
+const FTP_BASE = 'ftp://url.retail.publishedprices.co.il/';
 const BATCH_SIZE = 400;
 const DRY_RUN = process.argv.includes('--dry-run') || process.env.DRY_RUN === 'true';
 const VERBOSE = process.argv.includes('--verbose');
@@ -72,7 +72,7 @@ async function main() {
   } catch(e) { log('ERROR decode:', e.message); process.exit(2); }
   const rawStores = parseXml(xml);
   log(`Parsed ${rawStores.length} stores`);
-  if (!rawStores.length) { log('ERROR: 0 stores — aborting'); process.exit(2); }
+  if (!rawStores.length) { log('ERROR: 0 stores � aborting'); process.exit(2); }
   const now = Date.now();
   const records = rawStores.map(s => {
     const cr = resolveCity(s.rawCityCode), key = `${CHAIN_ID}_${s.storeId}`;
