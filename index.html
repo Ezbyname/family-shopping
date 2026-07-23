@@ -728,6 +728,24 @@
   </div>
 </div>
 
+
+<!-- ═══ EXIT CONFIRMATION MODAL (standalone/TWA Android back-button guard) ═══ -->
+<div class="confirm-modal-overlay" id="exit-confirm-overlay"
+  onclick="if(event.target===this)closeExitConfirm()">
+  <div class="confirm-modal">
+    <div class="confirm-modal-handle"></div>
+    <div class="confirm-modal-icon">👋</div>
+    <div class="confirm-modal-title">לצאת מהאפליקציה?</div>
+    <div class="confirm-modal-item">האם ברצונך לסגור את האפליקציה?</div>
+    <div class="confirm-btns">
+      <button class="confirm-btn-cancel" onclick="closeExitConfirm()">ביטול</button>
+      <button class="confirm-btn-exit" id="exit-confirm-btn" onclick="confirmAppExit()">
+        יציאה
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ ADMIN OVERLAY ═══════════════════════════════════════════════ -->
 <div id="admin-overlay" onclick="if(event.target===this)closeAdminOverlay()">
 
