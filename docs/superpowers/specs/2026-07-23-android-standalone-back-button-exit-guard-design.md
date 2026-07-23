@@ -118,14 +118,23 @@ function so side effects are preserved (camera stream teardown, clearing pending
 | `notif-overlay` | `closeNotifications()` | |
 | `import-overlay` | `closeImportModal()` | |
 | `mp2-overlay`, `members-overlay`, `share-overlay`, `basket-overlay`, `price-submit-overlay`, `override-overlay`, `report-overlay`, `profile-edit-overlay`, `add-group-overlay` | `closeOL2('<id>')` | generic `.overlay` convention |
-| `exit-confirm-overlay` | `cancelExitDialog()` | the exit dialog itself — see below |
+| `exit-confirm-overlay` | `closeExitConfirm()` | the exit dialog itself — its **official** close path; used by the Cancel button, Esc, backdrop click, *and* the Back-press overlay path below. Nothing closes this overlay any other way (no direct `style.display`/class manipulation), so `exitDialogOpen` can never go stale. |
 
-Priority when more than one is (unexpectedly) visible at once: reuse each overlay's own CSS `z-index`
-(already authored per-overlay, e.g. `admin-overlay: 9000`, `import-overlay: 1100`, `notif-overlay: 700`,
-`bc-overlay: 610`, `scanner-overlay`/`sd-overlay: 600`, `pm-overlay: 450`, generic `.overlay`: 200) —
-sort visible overlays by computed z-index descending and close only the top one. This piggybacks on an
-ordering the app already maintains instead of hand-authoring a second, parallel priority list that could
-drift out of sync.
+**Priority is an explicit, hand-authored tier list, not raw CSS `z-index`.** `z-index` governs visual
+paint order, which is a different concern from "what should Back close first" — conflating the two was
+the risk flagged during spec review (e.g. `confirm-delete-overlay` and `exit-confirm-overlay` currently
+share the same CSS class and would tie on raw z-index). When more than one overlay is visible at once,
+close only the topmost tier's overlay, in this deterministic order:
+
+1. `admin-overlay` (`closeAdminOverlay`) — security-sensitive, always wins
+2. `scanner-overlay` (`closeScanner`) — holds a live camera stream
+3. `confirm-delete-overlay` (`closeConfirmDelete`) — destructive-action confirm
+4. `exit-confirm-overlay` (`closeExitConfirm`)
+5. Bottom sheets — `gs-overlay` (`closeGroupSheet`), `fd-overlay` (`closeFilterDrawer`)
+6. Generic overlays/modals — everything else in the table above
+
+This tier list is the single source of truth for close priority; CSS `z-index` is left as-is for
+rendering only and is not read by the back-guard logic.
 
 ## Exit-confirmation dialog
 
@@ -138,15 +147,23 @@ New markup in `index.html`, next to the existing `confirm-delete-overlay`, reusi
   of `.confirm-btn-delete` using `var(--accent)`)
 
 Behavior:
-- **Cancel** (button, Esc, or backdrop click all call one `cancelExitDialog()`): hide dialog,
-  `exitDialogOpen = false`, re-arm the trap.
+- **Cancel** (button, Esc, or backdrop click — all call the one official `closeExitConfirm()`): hide
+  dialog, `exitDialogOpen = false`, re-arm the trap, stay on `main-screen`.
 - A **Back press while the dialog is open** needs no special-case code: `exit-confirm-overlay` is
-  itself matched by the generic `[id$="-overlay"]` visibility scan, so it is simply the highest-priority
-  visible overlay at that moment (see priority table above — give it the highest z-index of all
-  overlays) and step 1 of the normal handling order closes it via `cancelExitDialog()`, same as any
-  other overlay. This is what keeps "exactly one state transition per Back press" true without a
+  itself matched by the generic `[id$="-overlay"]` visibility scan, so per the tier list above it is
+  simply "the visible overlay" at that moment, and step 1 of the normal handling order closes it via
+  `closeExitConfirm()` — the exact same function and the exact same result as pressing Cancel:
+  `exitDialogOpen = false`, trap re-armed, `main-screen` stays active. This `popstate` is **fully
+  consumed by the cancel action** — it must not also fall through and be treated as if the user had
+  pressed יציאה. This is what keeps "exactly one state transition per Back press" true without a
   parallel code path: every `popstate` always maps to exactly one of {close overlay, return to main,
-  open dialog}, and "cancel the exit dialog" is just a instance of "close overlay."
+  open dialog}, and "Back while the exit dialog is open" is just an instance of "close overlay," never
+  a distinct branch.
+
+  > **The exit confirmation dialog participates in the same overlay stack as all other overlays. Back
+  > while it is visible closes it through its official close function and is treated as cancel. No
+  > separate Back-dialog special case is allowed.**
+
 - **Confirm (יציאה)**: hide dialog, `exitInProgress = true`, do **not** re-arm the trap, call
   `history.back()` exactly once. Whether this closes the TWA outright or lands on a prior real history
   entry is between the browser and the OS — both outcomes are correct per the Non-goals section.
@@ -156,9 +173,10 @@ Behavior:
 - `armBackTrap()` is a no-op unless `backTrapArmed === false`, so rapid Back presses can never stack up
   more than one outstanding dummy entry.
 - Rapid Back presses while the dialog is open never open a second dialog: each one closes the
-  (already-open) `exit-confirm-overlay` via the overlay path above, which is a terminal action per
-  press — there is nothing left open afterward for a following press to re-trigger the dialog from
-  (the next Back after that lands back on "main screen, nothing open" and opens a fresh single dialog).
+  (already-open) `exit-confirm-overlay` via `closeExitConfirm()` (the same cancel path), which is a
+  terminal action per press — there is nothing left open afterward for a following press to re-trigger
+  the dialog from (the next Back after that lands back on "main screen, nothing open" and opens a fresh
+  single dialog).
 - Once `exitInProgress === true`, the `popstate` listener returns immediately on any further event —
   no repeated `history.back()` calls, no re-opened dialog.
 
