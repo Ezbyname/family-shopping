@@ -161,6 +161,7 @@ let activeStores=new Set(STORES);
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
+window.showScreen = showScreen;
 
 function saveLocal(){localStorage.setItem('fsl_v2',JSON.stringify({myName,myId,groupId,groupName}))}
 
