@@ -112,12 +112,13 @@ function so side effects are preserved (camera stream teardown, clearing pending
 | `addr-overlay` | `closeManualAddressModal()` | |
 | `pm-overlay` | `closeProductModal()` | |
 | `bp-overlay` | `closeBrandPicker()` | |
-| `pd-overlay` | `closePriceDetail()` | |
+| `price-detail-overlay` | `closePriceDetail()` | DOM `id` is `price-detail-overlay`; its CSS class is `pd-overlay` — do not confuse the two |
 | `sd-overlay` | `closeStoreDetail()` | |
 | `bc-overlay` | `closeBasketCompare()` | |
 | `notif-overlay` | `closeNotifications()` | |
 | `import-overlay` | `closeImportModal()` | |
-| `mp2-overlay`, `members-overlay`, `share-overlay`, `basket-overlay`, `price-submit-overlay`, `override-overlay`, `report-overlay`, `profile-edit-overlay`, `add-group-overlay` | `closeOL2('<id>')` | generic `.overlay` convention |
+| `mp2-overlay` | `closeMp2()` | own dedicated close function, not `closeOL2` |
+| `members-overlay`, `share-overlay`, `basket-overlay`, `price-submit-overlay`, `override-overlay`, `report-overlay`, `profile-edit-overlay`, `add-group-overlay` | `closeOL2('<id>')` | generic `.overlay` convention |
 | `exit-confirm-overlay` | `closeExitConfirm()` | the exit dialog itself — its **official** close path; used by the Cancel button, Esc, backdrop click, *and* the Back-press overlay path below. Nothing closes this overlay any other way (no direct `style.display`/class manipulation), so `exitDialogOpen` can never go stale. |
 
 **Priority is an explicit, hand-authored tier list, not raw CSS `z-index`.** `z-index` governs visual
