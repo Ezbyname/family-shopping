@@ -325,7 +325,18 @@ Since there is no test framework, this task builds a throwaway HTML harness in t
 
 ```html
 <!DOCTYPE html>
-<html><head><title>back-guard harness</title></head>
+<html><head><title>back-guard harness</title>
+<style>
+/* Reproduces styles.css:1033-1036 verbatim (the real .confirm-modal-overlay
+   show/hide convention). No inline style on #exit-confirm-overlay below —
+   an inline style would always beat this stylesheet rule and permanently
+   hide the element from getComputedStyle regardless of the .show class,
+   producing a false-negative "back-guard.js is broken" result that is
+   actually a fixture bug, not a back-guard.js bug. */
+.confirm-modal-overlay{opacity:0;pointer-events:none}
+.confirm-modal-overlay.show{opacity:1;pointer-events:all}
+</style>
+</head>
 <body>
 <div class="screen active" id="main-screen">MAIN</div>
 <div class="screen" id="profile-screen">PROFILE</div>
@@ -333,7 +344,7 @@ Since there is no test framework, this task builds a throwaway HTML harness in t
 <div id="confirm-delete-overlay" style="display:none">
   <button onclick="log('closeConfirmDelete called'); document.getElementById('confirm-delete-overlay').style.display='none'">x</button>
 </div>
-<div id="exit-confirm-overlay" class="confirm-modal-overlay" style="opacity:0;pointer-events:none">exit dialog</div>
+<div id="exit-confirm-overlay" class="confirm-modal-overlay">exit dialog</div>
 
 <div id="log"></div>
 <script>
@@ -352,13 +363,21 @@ Since there is no test framework, this task builds a throwaway HTML harness in t
     document.getElementById(id).classList.add('active');
   };
   // exit-confirm-overlay uses the real .confirm-modal-overlay show/hide
-  // convention (opacity + pointer-events), matching styles.css exactly,
-  // so isOverlayVisible() and the real window.closeExitConfirm from
-  // back-guard.js exercise the actual production logic unmodified.
+  // convention (opacity + pointer-events), matching styles.css exactly via
+  // the <style> block above, so isOverlayVisible() and the real
+  // window.closeExitConfirm from back-guard.js exercise the actual
+  // production logic unmodified.
 </script>
 <script src="back-guard.js"></script>
 </body></html>
 ```
+
+Serve the scratchpad directory over HTTP rather than opening the harness via a `file://` URL — this repo's own local-dev convention already uses `python -m http.server` (see `CLAUDE.md`), and `file://` navigation is unreliable in some browser-automation tools:
+```bash
+cd "C:\Users\erezg\AppData\Local\Temp\claude\C--Codes-family-shopping--claude-worktrees-modest-hamilton-0350ac\b132072d-a7b1-44b7-8482-7bad2d28e14a\scratchpad"
+python -m http.server 8934
+```
+Then navigate to `http://127.0.0.1:8934/back-guard-harness.html`. Stop the server (Ctrl+C / kill the process) once verification is complete.
 
 Copy the real `back-guard.js` next to this harness file so the `<script src="back-guard.js">` reference resolves:
 ```bash
