@@ -1060,6 +1060,11 @@ input[type=range]{flex:1;height:4px;border-radius:2px;accent-color:var(--accent)
   font-weight:700;color:#fff;cursor:pointer;transition:all .12s}
 .confirm-btn-delete:active{opacity:.8;transform:scale(.97)}
 
+.confirm-btn-exit{flex:1;background:var(--accent);border:none;
+  border-radius:13px;padding:13px;font-family:'Rubik',sans-serif;font-size:15px;
+  font-weight:700;color:#fff;cursor:pointer;transition:all .12s}
+.confirm-btn-exit:active{opacity:.8;transform:scale(.97)}
+
 /* ══ NOTIFICATION BELL ══ */
 .notif-btn{position:relative;width:34px;height:34px;border-radius:50%;
   border:none;background:var(--card);cursor:pointer;
