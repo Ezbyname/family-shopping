@@ -100,11 +100,13 @@ Applied to every `[id$="-overlay"]` element (excluding `#splash-overlay`, which 
 ### Overlay close-function map and priority
 
 Detection only decides *what's* open; closing always goes through the overlay's own existing close
-function so side effects are preserved (camera stream teardown, clearing pending-delete state, etc.):
+function so side effects are preserved (camera stream teardown, clearing pending-delete state, etc.).
+This table is a plain id→close-function lookup — row order carries no meaning. The authoritative
+close-priority order is the explicit tier list below the table, not this list's row order:
 
 | Overlay id | Close function | Notes |
 |---|---|---|
-| `scanner-overlay` | `closeScanner()` | releases `getUserMedia` camera stream — highest priority |
+| `scanner-overlay` | `closeScanner()` | releases `getUserMedia` camera stream |
 | `confirm-delete-overlay` | `closeConfirmDelete()` | |
 | `admin-overlay` | `closeAdminOverlay()` | |
 | `gs-overlay` | `closeGroupSheet()` | bottom sheet |
