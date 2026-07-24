@@ -508,6 +508,74 @@ This environment cannot install the app as an Android TWA or send a genuine hard
 
 ---
 
+### Task 7: Service Worker App Shell Integration (release-readiness follow-up)
+
+Discovered during Task 6's code-quality review, not part of the original 6-task scope: `back-guard.js` was never added to `sw.js`'s offline precache. Under the existing cache-first strategy, a user who updates the installed PWA/TWA and goes offline before `back-guard.js` is ever fetched once over the network would silently get no back-button guard at all — reproducing the exact bug this feature exists to fix, for exactly the offline-first standalone/TWA users who are its target audience.
+
+**Files:**
+- Modify: `sw.js` only
+
+- [ ] **Step 1: Add `/back-guard.js` to `APP_SHELL` and bump `CACHE_VERSION`**
+
+Current (`sw.js:4-17`):
+```js
+const CACHE_VERSION = 'fsl-v6';
+
+const APP_SHELL = [
+  '/',
+  '/index.html',
+  '/styles.css',
+  '/app.js',
+  '/appinline.js',
+  '/sw-killer.js',
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/splash.png',
+];
+```
+
+Change to:
+```js
+const CACHE_VERSION = 'fsl-v7';
+
+const APP_SHELL = [
+  '/',
+  '/index.html',
+  '/styles.css',
+  '/app.js',
+  '/appinline.js',
+  '/back-guard.js',
+  '/sw-killer.js',
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/splash.png',
+];
+```
+
+(`/back-guard.js` placed next to `/appinline.js`, matching the two files' load-order adjacency in `index.html`.)
+
+- [ ] **Step 2: Verify**
+
+```bash
+grep -n "back-guard.js\|CACHE_VERSION" sw.js
+```
+Expected: `CACHE_VERSION = 'fsl-v7'` and `/back-guard.js` present in `APP_SHELL`, and nothing else in the file changed (fetch handler, install/activate listeners, `NETWORK_ONLY_PATTERNS` all untouched).
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add sw.js
+git commit -m "Add back-guard.js to service worker app-shell precache (v3.2.0 offline delivery)"
+```
+
+- [ ] **Step 4: Document the runtime-verification boundary**
+
+Full "clear cache → load online → go offline → reload → confirm back-guard.js still runs" verification requires a real browser with persistent Cache Storage across a simulated offline toggle. State plainly whatever subset of this was actually achievable in this environment versus what remains for the user to confirm on a real device/browser profile.
+
+---
+
 ## Self-Review Notes
 
 - **Spec coverage:** Standalone gating (Task 4 Step 1's early return) · idempotent trap (`backTrapArmed` guard in `armBackTrap`) · three-branch order (popstate handler body) · overlay tier list with corrected `mp2-overlay`/`price-detail-overlay` ids (Task 4) · exit dialog official close function used everywhere (Task 4 + markup in Task 2) · single `history.back()` on confirm, no re-arm (`confirmAppExit`) · race protection (`exitInProgress` short-circuit, dialog-as-overlay reduction) · Hebrew copy exact match (Task 2) · manual test checklist (Task 6 Step 3-4, plus spec's own checklist handed to the user for on-device follow-up). No spec section is without a corresponding task.
