@@ -119,7 +119,17 @@
   }
 
   window.addEventListener('popstate', function() {
-    if (exitInProgress) return;
+    if (exitInProgress) {
+      // A popstate fired at all means the app is still alive to observe it - a
+      // genuinely finished TWA never runs more JS. The earlier exit attempt
+      // therefore didn't complete (see spec's "Accepted tradeoff"). Recover
+      // instead of leaving the guard permanently disabled for the rest of the
+      // session.
+      exitInProgress = false;
+      backTrapArmed = false;
+      armBackTrap();
+      return;
+    }
     backTrapArmed = false; // the dummy entry we armed was just consumed
 
     var toClose = findOverlayToClose();
