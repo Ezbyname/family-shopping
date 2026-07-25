@@ -147,4 +147,15 @@
   });
 
   armBackTrap();
+
+  // Defensive re-arm on first user interaction (still standalone-only, gated by
+  // the enclosing IIFE's early return above). Some Android WebView/TWA
+  // implementations may not reliably wire a JS-initiated pushState made at page
+  // load into the native back-stack until the page has received a genuine user
+  // gesture. armBackTrap() is already idempotent, so this cannot create a
+  // duplicate history entry regardless of how many of these fire for the same
+  // tap — it only matters if the load-time arm above wasn't actually honored.
+  ['pointerdown', 'touchstart', 'click'].forEach(function(evt) {
+    document.addEventListener(evt, armBackTrap, { once: true, passive: true });
+  });
 })();
