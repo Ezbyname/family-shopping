@@ -102,6 +102,22 @@
     history.back(); // exactly once — see spec's Non-goals section
   };
 
+  // Screens that are pre-main onboarding gates, not normal secondary screens.
+  // See the design spec's "Protected pre-main screens" section: verified via a
+  // repo-wide search that profile-screen has exactly one call site (the
+  // onboarding-gate check in app.js) and never serves a second role, so this
+  // is a static list, not a runtime app-state readiness check — back-guard.js
+  // still never reads business/session state, only DOM screen ids.
+  var PROTECTED_SCREENS = ['setup-screen', 'profile-screen'];
+
+  function isProtectedScreenActive() {
+    for (var i = 0; i < PROTECTED_SCREENS.length; i++) {
+      var el = document.getElementById(PROTECTED_SCREENS[i]);
+      if (el && el.classList.contains('active')) return true;
+    }
+    return false;
+  }
+
   window.addEventListener('popstate', function() {
     if (exitInProgress) return;
     backTrapArmed = false; // the dummy entry we armed was just consumed
@@ -109,6 +125,12 @@
     var toClose = findOverlayToClose();
     if (toClose) {
       toClose.close();
+      armBackTrap();
+      return;
+    }
+
+    if (isProtectedScreenActive()) {
+      showExitConfirm();
       armBackTrap();
       return;
     }
