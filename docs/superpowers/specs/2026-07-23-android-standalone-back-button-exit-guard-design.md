@@ -69,6 +69,21 @@ let exitInProgress  = false;  // user confirmed exit; suppress further handling
 - `popstate` listener: fires when the dummy entry is consumed by a physical Back press. Ignored entirely
   if `exitInProgress` is true (exit already confirmed and underway — see Race Conditions below).
 
+### First-interaction defensive re-arm
+
+Real-device testing found the exit dialog sometimes doesn't appear at all until the user has interacted
+with the page at least once (e.g. added an item to the cart) — pressing Back before any interaction just
+exits immediately, as if the guard weren't installed. The most likely explanation: some Android
+WebView/TWA implementations don't reliably wire a JS-initiated `pushState` made at page load into the
+native back-stack the hardware button consults until the page has received a genuine user gesture.
+
+Mitigation: in addition to the load-time arm, attach one-time listeners for the first `pointerdown`,
+`touchstart`, and `click` (whichever fires first) that call `armBackTrap()` again. This is purely
+defensive — `armBackTrap()` is already idempotent (no-ops if `backTrapArmed` is already true), so this
+cannot create a duplicate history entry regardless of how many of these three events fire for the same
+physical tap. It only has any effect if the load-time arm was, for whatever platform reason, not
+actually honored.
+
 ## Back-press handling order
 
 On every qualifying `popstate`, handle in this exact order, then perform **exactly one** state
@@ -203,6 +218,33 @@ Behavior:
 - **Confirm (יציאה)**: hide dialog, `exitInProgress = true`, do **not** re-arm the trap, call
   `history.back()` exactly once. Whether this closes the TWA outright or lands on a prior real history
   entry is between the browser and the OS — both outcomes are correct per the Non-goals section.
+
+### Accepted tradeoff: the exit dialog intentionally stays armed while open
+
+The exit dialog intentionally keeps the Back trap armed the entire time it is visible (both branches
+that call `showExitConfirm()` also call `armBackTrap()` immediately after).
+
+**Reason:** Back while the exit dialog is visible must be interceptable and must behave like Cancel —
+this was verified empirically (see below), not just assumed. For a `popstate` event to fire at all when
+Back is pressed, there must be a dummy history entry above the current position for that press to
+consume; with nothing armed, a Back press at the bottom of the page's own history is a silent no-op (in
+a browser tab) or likely finishes the Activity directly (in a TWA) — `findOverlayToClose()` never runs,
+and "Back while dialog open" could not be treated as Cancel at all.
+
+**Consequence:** because the dialog keeps one dummy entry armed, `confirmAppExit()`'s single
+`history.back()` call may just consume *that* entry, landing back on the app's own true root/launch
+entry rather than exiting the TWA outright. In that case, one additional native Back press (a second,
+genuine press by the user, not anything this code issues) is needed to actually leave the app. This is
+an accepted platform/History-API tradeoff, not a bug: within the constraints below, it is mathematically
+impossible to guarantee both "Back while the dialog is open is interceptable as Cancel" *and*
+"`confirmAppExit()`'s single `history.back()` always exits immediately" — satisfying the first requires
+an armed entry at the moment the dialog is shown; satisfying the second requires no armed entry at that
+same moment. There is no way to have both without violating one of the hard rules below.
+
+**The implementation must not** work around this by introducing `history.go()`, a second
+`history.back()` call, a `setTimeout`-based forced exit, or any other forced-close mechanism.
+"Back = Cancel" while the dialog is open is the higher-priority invariant — it is not to be traded away
+to make the Exit button close on the very first attempt in every possible history-stack state.
 
 ## Race-condition protection
 
