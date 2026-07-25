@@ -750,6 +750,75 @@ unchanged.
 
 ---
 
+### Task 11: Recover Back Guard after an incomplete exit attempt (real-device follow-up)
+
+Real-device investigation (with instrumentation, on the real app, using a real click on the real Exit
+button — see the design spec's "Recovery after an incomplete exit attempt" section for the full trace)
+found: `confirmAppExit()`'s single `history.back()` does not always finish the TWA (already an accepted
+tradeoff — see "Accepted tradeoff" in the spec). But when it doesn't, `exitInProgress` is never reset,
+so the *entire guard* silently stays disabled for the rest of the session if the user doesn't press Back
+again immediately — a genuine latent defect, separate from the accepted tradeoff.
+
+A dynamic `history.go(-exitBaselineLength)` alternative was investigated as a way to make Exit always
+immediate, and was **rejected** after direct empirical testing showed it behaves identically to a
+no-op `history.back()` at the bottom of history (see spec's "Investigated and rejected" section). Do
+not revisit that approach in this task.
+
+**Files:**
+- Modify: `back-guard.js` only
+
+- [ ] **Step 1: Reset state on the next observed `popstate` if exit didn't complete**
+
+Current `popstate` handler's first line (unchanged since Task 4):
+```js
+  window.addEventListener('popstate', function() {
+    if (exitInProgress) return;
+    backTrapArmed = false; // the dummy entry we armed was just consumed
+```
+
+Change to:
+```js
+  window.addEventListener('popstate', function() {
+    if (exitInProgress) {
+      // A popstate fired at all means the app is still alive to observe it - a
+      // genuinely finished TWA never runs more JS. The earlier exit attempt
+      // therefore didn't complete (see spec's "Accepted tradeoff"). Recover
+      // instead of leaving the guard permanently disabled for the rest of the
+      // session.
+      exitInProgress = false;
+      backTrapArmed = false;
+      armBackTrap();
+      return;
+    }
+    backTrapArmed = false; // the dummy entry we armed was just consumed
+```
+
+Nothing else in the file changes — the rest of the handler, `showExitConfirm`, `closeExitConfirm`,
+`confirmAppExit`, `OVERLAY_TIERS`, `PROTECTED_SCREENS`, `isOverlayVisible`, `findOverlayToClose` all stay
+byte-for-byte identical.
+
+- [ ] **Step 2: Verify**
+
+```bash
+node --check back-guard.js
+```
+Expected: no output, exit code 0.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add back-guard.js
+git commit -m "Recover back-guard state after an incomplete exit attempt"
+```
+
+**Non-goals (do not do any of these):** no `history.go()`, no second `history.back()` inside
+`confirmAppExit()`, no `setTimeout`, no change to Back-while-dialog-open (still Cancel), no change to
+re-arm-on-dialog-open, no change to `confirmAppExit()`'s single-`history.back()` behavior. This task
+only prevents the guard from staying permanently disabled — it does not attempt to make Exit always
+immediate (proven not achievable within the accepted constraints).
+
+---
+
 ## Self-Review Notes
 
 - **Spec coverage:** Standalone gating (Task 4 Step 1's early return) · idempotent trap (`backTrapArmed` guard in `armBackTrap`) · three-branch order (popstate handler body) · overlay tier list with corrected `mp2-overlay`/`price-detail-overlay` ids (Task 4) · exit dialog official close function used everywhere (Task 4 + markup in Task 2) · single `history.back()` on confirm, no re-arm (`confirmAppExit`) · race protection (`exitInProgress` short-circuit, dialog-as-overlay reduction) · Hebrew copy exact match (Task 2) · manual test checklist (Task 6 Step 3-4, plus spec's own checklist handed to the user for on-device follow-up). No spec section is without a corresponding task.
