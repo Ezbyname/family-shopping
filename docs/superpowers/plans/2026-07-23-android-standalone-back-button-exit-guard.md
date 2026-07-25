@@ -687,6 +687,69 @@ git commit -m "Protect onboarding/pre-main screens (setup-screen, profile-screen
 
 ---
 
+### Task 10: First-interaction Back-trap hardening (real-device follow-up)
+
+Real-device testing surfaced two observations, resolved as follows (full rationale in the design spec's
+"Accepted tradeoff" and "First-interaction defensive re-arm" sections):
+
+1. The exit dialog can require a prior user interaction (e.g. adding to cart) before it becomes
+   interceptable at all. **Fix:** add a one-time defensive re-arm on the first `pointerdown`/`touchstart`/
+   `click`, calling the existing idempotent `armBackTrap()`.
+2. Confirming exit can require one additional native Back press in some history-stack states. **Decision:**
+   this is an accepted platform/History-API tradeoff (empirically verified — see spec), not a bug. Do
+   **not** change `showExitConfirm()`/`closeExitConfirm()`/`confirmAppExit()` at all — the dialog must
+   keep re-arming the trap immediately when shown, so Back-while-dialog-open stays interceptable as
+   Cancel. No `history.go()`, no second `history.back()`, no `setTimeout` workaround.
+
+**Files:**
+- Modify: `back-guard.js` only
+
+- [ ] **Step 1: Add the defensive first-interaction listeners**
+
+Current end of the IIFE (unchanged since Task 9):
+```js
+  armBackTrap();
+})();
+```
+
+Change to:
+```js
+  armBackTrap();
+
+  // Defensive re-arm on first user interaction (still standalone-only, gated by
+  // the enclosing IIFE's early return above). Some Android WebView/TWA
+  // implementations may not reliably wire a JS-initiated pushState made at page
+  // load into the native back-stack until the page has received a genuine user
+  // gesture. armBackTrap() is already idempotent, so this cannot create a
+  // duplicate history entry regardless of how many of these fire for the same
+  // tap — it only matters if the load-time arm above wasn't actually honored.
+  ['pointerdown', 'touchstart', 'click'].forEach(function(evt) {
+    document.addEventListener(evt, armBackTrap, { once: true, passive: true });
+  });
+})();
+```
+
+- [ ] **Step 2: Verify**
+
+```bash
+node --check back-guard.js
+```
+Expected: no output, exit code 0.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add back-guard.js
+git commit -m "Add first-interaction defensive back-trap re-arm for TWA robustness"
+```
+
+**Explicitly out of scope for this task** (do not touch): `showExitConfirm`, `closeExitConfirm`,
+`confirmAppExit`, the `armBackTrap()` calls already present in the `popstate` handler's branches,
+`OVERLAY_TIERS`, `PROTECTED_SCREENS`, `isOverlayVisible`, `findOverlayToClose` — all byte-for-byte
+unchanged.
+
+---
+
 ## Self-Review Notes
 
 - **Spec coverage:** Standalone gating (Task 4 Step 1's early return) · idempotent trap (`backTrapArmed` guard in `armBackTrap`) · three-branch order (popstate handler body) · overlay tier list with corrected `mp2-overlay`/`price-detail-overlay` ids (Task 4) · exit dialog official close function used everywhere (Task 4 + markup in Task 2) · single `history.back()` on confirm, no re-arm (`confirmAppExit`) · race protection (`exitInProgress` short-circuit, dialog-as-overlay reduction) · Hebrew copy exact match (Task 2) · manual test checklist (Task 6 Step 3-4, plus spec's own checklist handed to the user for on-device follow-up). No spec section is without a corresponding task.
