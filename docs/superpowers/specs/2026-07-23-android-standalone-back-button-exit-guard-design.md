@@ -246,6 +246,30 @@ same moment. There is no way to have both without violating one of the hard rule
 "Back = Cancel" while the dialog is open is the higher-priority invariant — it is not to be traded away
 to make the Exit button close on the very first attempt in every possible history-stack state.
 
+### Investigated and rejected: dynamic `history.go()` for immediate exit
+
+Before settling on the tradeoff above, a dynamic (not hardcoded) `history.go(-N)` approach was
+investigated: record `exitBaselineLength = history.length` once, right after the load-time
+`armBackTrap()` call, and have `confirmAppExit()` call `history.go(-exitBaselineLength)` instead of a
+plain `history.back()`. Because the re-arm discipline provably pins `history.length` at that baseline
+for the app's whole lifetime (verified empirically three separate times — synthetic harness, real-app
+local test, and a dedicated probe), this value is a real, dynamically-computed target, not a magic
+constant — it would automatically adjust if a future launch context ever had more real entries beneath
+the trap.
+
+**This was rejected after direct empirical testing**, not on suspicion alone: `history.go()` targeting
+an index outside the document's own pushed-entry stack was tested directly and produces **no `popstate`,
+no URL change, no navigation of any kind** — behavior indistinguishable from a plain `history.back()`
+already sitting at the bottom of history. The critical insight this confirmed: **the JS History API and
+native Android hardware-Back-button behavior are not the same mechanism.** Whatever causes a genuine
+hardware Back press at the bottom of a TWA's history to finish the Activity is native-platform
+escalation tied to the physical key event — there is no evidence a JS-initiated `history.go()`/
+`history.back()` call reaching the same boundary triggers that same escalation, and this environment
+cannot verify on-device whether it ever does. Introducing it would add real risk (a second history API
+surface to reason about) for a benefit that could not be demonstrated. **`history.go()` remains
+off the table** for this feature unless a future investigation produces genuine on-device evidence that
+it behaves differently on a real TWA than it does in a standard browser context.
+
 ## Race-condition protection
 
 - `armBackTrap()` is a no-op unless `backTrapArmed === false`, so rapid Back presses can never stack up
@@ -257,6 +281,24 @@ to make the Exit button close on the very first attempt in every possible histor
   single dialog).
 - Once `exitInProgress === true`, the `popstate` listener returns immediately on any further event —
   no repeated `history.back()` calls, no re-opened dialog.
+
+### Recovery after an incomplete exit attempt
+
+`confirmAppExit()`'s single `history.back()` call does not always finish the TWA (see "Accepted
+tradeoff" above) — the app can remain alive, sitting at the entry `history.back()` landed on. Real-device
+testing surfaced a genuine latent defect here, distinct from the accepted tradeoff: the first line of the
+`popstate` handler (`if (exitInProgress) return;`) exits *before* the line that resets `backTrapArmed`,
+and nothing anywhere ever resets `exitInProgress` back to `false`. If the app survives the exit attempt
+(the common case) and the user doesn't immediately press Back again, **every subsequent Back press for
+the rest of that session is silently swallowed** — the guard never recovers, identical to the original
+pre-fix bug, even though the user never actually left.
+
+Fix: if a `popstate` is ever observed while `exitInProgress` is still `true`, that is proof the app is
+still alive to receive it (a genuinely finished TWA never runs more JS). Treat it as "the exit attempt
+didn't complete" — reset `exitInProgress = false` and `backTrapArmed = false`, then re-arm normally, so
+the guard resumes protecting the very next Back press instead of staying permanently disabled. This does
+not change the exit-immediacy tradeoff — it only prevents the guard from silently dying when that
+tradeoff's "one more press" doesn't happen right away.
 
 ## Files touched
 
