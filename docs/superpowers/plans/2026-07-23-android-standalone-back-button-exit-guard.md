@@ -576,6 +576,117 @@ Full "clear cache → load online → go offline → reload → confirm back-gua
 
 ---
 
+### Task 8: Align app.js APP_VERSION (release-readiness follow-up)
+
+Discovered during the final holistic review: `app.js:22`'s `APP_VERSION` constant was never bumped when `index.html`/`sw.js` moved to the 3.2.0/fsl-v7 release, so the settings sheet, the Firebase `appVersion` write, and the diagnostics clipboard copy all still reported `3.1.0`.
+
+**Files:** `app.js` only — one line, `const APP_VERSION = '3.1.0';` → `'3.2.0';`, comment text unchanged.
+
+Executed and approved (commit `829160b`).
+
+### Task 9: Protect onboarding/pre-main screens in back-guard.js
+
+Discovered during the final holistic review: `back-guard.js`'s "not on `main-screen` → `showScreen('main-screen')`" branch doesn't distinguish genuine secondary screens from onboarding gates. See the design spec's new "Protected pre-main screens" section for the full rationale and the evidence (`profile-screen` has exactly one call site in the whole codebase — the onboarding-gate check — and never serves as a normal secondary screen).
+
+**Files:**
+- Modify: `back-guard.js` only
+
+- [ ] **Step 1: Add the protected-screen list and check, and insert the new branch**
+
+Current `popstate` handler body (unchanged since Task 4):
+```js
+  window.addEventListener('popstate', function() {
+    if (exitInProgress) return;
+    backTrapArmed = false; // the dummy entry we armed was just consumed
+
+    var toClose = findOverlayToClose();
+    if (toClose) {
+      toClose.close();
+      armBackTrap();
+      return;
+    }
+
+    var mainScreen = document.getElementById('main-screen');
+    if (!mainScreen || !mainScreen.classList.contains('active')) {
+      if (typeof window.showScreen === 'function') window.showScreen('main-screen');
+      armBackTrap();
+      return;
+    }
+
+    showExitConfirm();
+    armBackTrap();
+  });
+
+  armBackTrap();
+})();
+```
+
+Change to (add the `PROTECTED_SCREENS` list/helper above the listener, and insert one new branch between the overlay check and the main-screen check):
+```js
+  // Screens that are pre-main onboarding gates, not normal secondary screens.
+  // See the design spec's "Protected pre-main screens" section: verified via a
+  // repo-wide search that profile-screen has exactly one call site (the
+  // onboarding-gate check in app.js) and never serves a second role, so this
+  // is a static list, not a runtime app-state readiness check — back-guard.js
+  // still never reads business/session state, only DOM screen ids.
+  var PROTECTED_SCREENS = ['setup-screen', 'profile-screen'];
+
+  function isProtectedScreenActive() {
+    for (var i = 0; i < PROTECTED_SCREENS.length; i++) {
+      var el = document.getElementById(PROTECTED_SCREENS[i]);
+      if (el && el.classList.contains('active')) return true;
+    }
+    return false;
+  }
+
+  window.addEventListener('popstate', function() {
+    if (exitInProgress) return;
+    backTrapArmed = false; // the dummy entry we armed was just consumed
+
+    var toClose = findOverlayToClose();
+    if (toClose) {
+      toClose.close();
+      armBackTrap();
+      return;
+    }
+
+    if (isProtectedScreenActive()) {
+      showExitConfirm();
+      armBackTrap();
+      return;
+    }
+
+    var mainScreen = document.getElementById('main-screen');
+    if (!mainScreen || !mainScreen.classList.contains('active')) {
+      if (typeof window.showScreen === 'function') window.showScreen('main-screen');
+      armBackTrap();
+      return;
+    }
+
+    showExitConfirm();
+    armBackTrap();
+  });
+
+  armBackTrap();
+})();
+```
+
+- [ ] **Step 2: Verify the file has no syntax errors**
+
+```bash
+node --check back-guard.js
+```
+Expected: no output, exit code 0.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add back-guard.js
+git commit -m "Protect onboarding/pre-main screens (setup-screen, profile-screen) from Back-to-main routing"
+```
+
+---
+
 ## Self-Review Notes
 
 - **Spec coverage:** Standalone gating (Task 4 Step 1's early return) · idempotent trap (`backTrapArmed` guard in `armBackTrap`) · three-branch order (popstate handler body) · overlay tier list with corrected `mp2-overlay`/`price-detail-overlay` ids (Task 4) · exit dialog official close function used everywhere (Task 4 + markup in Task 2) · single `history.back()` on confirm, no re-arm (`confirmAppExit`) · race protection (`exitInProgress` short-circuit, dialog-as-overlay reduction) · Hebrew copy exact match (Task 2) · manual test checklist (Task 6 Step 3-4, plus spec's own checklist handed to the user for on-device follow-up). No spec section is without a corresponding task.
