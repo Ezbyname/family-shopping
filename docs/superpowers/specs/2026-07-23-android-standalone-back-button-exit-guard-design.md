@@ -76,10 +76,43 @@ transition:
 
 1. **Visible overlay/modal/bottom-sheet** → close the highest-priority one via its *existing* close
    function (never a blind `style.display='none'`), re-arm the trap, return. No exit dialog.
-2. **Not on `main-screen`** (e.g. `profile-screen` active) → `showScreen('main-screen')`, re-arm the
-   trap, return. No exit dialog. History is not used to infer this — only `.screen.active` is checked.
-3. **Main screen, nothing open** → show the exit-confirmation dialog, re-arm the trap (see Exit Dialog
+2. **Protected pre-main/onboarding screen active** (`setup-screen` or `profile-screen` — see "Protected
+   pre-main screens" below) → show the exit-confirmation dialog, re-arm the trap, return. Do **not**
+   call `showScreen('main-screen')` — that would silently drop the user onto a screen that expects
+   group/list data they don't have yet.
+3. **Normal secondary screen** (any `.screen` other than `main-screen` that isn't a protected screen) →
+   `showScreen('main-screen')`, re-arm the trap, return. No exit dialog. History is not used to infer
+   this — only `.screen.active` is checked.
+4. **Main screen, nothing open** → show the exit-confirmation dialog, re-arm the trap (see Exit Dialog
    below for why re-arming here is safe), return.
+
+### Protected pre-main screens
+
+Some `.screen`s are not "secondary screens reached from an already-usable main app" — they are
+onboarding gates the user must complete *before* `main-screen` is meaningful at all. Routing Back to
+`main-screen` from one of these would silently drop a first-run user onto a screen expecting group/list
+data that doesn't exist yet. These screens are **statically** protected — always, unconditionally:
+
+- `setup-screen` — shown whenever there's no saved local session, or anonymous auth failed
+  (`app.js`, the `onAuthStateChanged` handler).
+- `profile-screen` — shown when the user has a saved group session but no `displayName` yet
+  (`app.js`, `_patchConnectToGroup`, guarded by `if (!myProfile || !myProfile.displayName)`).
+
+**Evidence this list is exhaustive, not a heuristic:** a repo-wide search found exactly **one** call
+site for `showScreen('profile-screen')` in the entire codebase — the onboarding-gate check above. There
+is no other code path that opens it. In particular, **`profile-screen` is not a normal secondary screen
+in the current codebase.** The "edit my profile while using the app" feature is a *different* UI
+element entirely — `profile-edit-overlay`, a modal in the generic `.overlay`/`closeOL2` family, already
+handled correctly by the existing overlay-tier logic above. Because `profile-screen` never serves a
+second role, it is protected unconditionally, with no readiness-state branching required.
+
+This is a deliberate, evidence-driven choice over the alternative (checking app state like
+`myProfile?.displayName` or `groupId` directly inside `back-guard.js` to decide protection dynamically):
+consistent with this doc's Core Goal #5 (history is a mechanism, never the source of navigation truth),
+`back-guard.js` should likewise never reach into business/session state to infer readiness — it reads
+only `.screen.active`/overlay DOM, exactly as it already does everywhere else. A static, DOM-id-based
+protected list keeps that boundary intact; if a screen is ever added that genuinely needs conditional
+protection, that would be a new design decision, not an extension of this static list.
 
 ### Overlay detection
 
@@ -197,7 +230,10 @@ Behavior:
 - Cancel (button / Esc / backdrop / Back) → dialog closes, app stays open, next Back re-opens it.
 - Confirm (יציאה) → exactly one `history.back()` fires; no duplicate dialogs, no repeated calls.
 - Rapid repeated Back presses on main screen → still only one dialog, one eventual exit.
-- Back on `profile-screen` → returns to `main-screen`, no dialog.
+- Back on `setup-screen` (protected pre-main screen) → exit dialog appears; `main-screen` is never shown.
+- Back on `profile-screen` (protected pre-main screen) → exit dialog appears; `main-screen` is never shown.
+- Back on any other secondary screen (i.e. anything besides `main-screen`/`setup-screen`/`profile-screen`,
+  should one ever be added) → returns to `main-screen`, no dialog.
 - Back with scanner overlay open → scanner closes, camera stream releases, no dialog.
 - Back with confirm-delete modal open → only that modal closes, no dialog.
 - Back with a bottom sheet (`gs-overlay`/`fd-overlay`) open → only the sheet closes, no dialog.
