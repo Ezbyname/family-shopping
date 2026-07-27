@@ -280,25 +280,65 @@ it behaves differently on a real TWA than it does in a standard browser context.
   the dialog from (the next Back after that lands back on "main screen, nothing open" and opens a fresh
   single dialog).
 - Once `exitInProgress === true`, the `popstate` listener returns immediately on any further event —
-  no repeated `history.back()` calls, no re-opened dialog.
+  no repeated `history.back()` calls, no re-opened dialog, and (per the corrected recovery design below)
+  no re-arming either — recovery happens only via a genuine subsequent user interaction, never via
+  `popstate`.
 
 ### Recovery after an incomplete exit attempt
 
 `confirmAppExit()`'s single `history.back()` call does not always finish the TWA (see "Accepted
-tradeoff" above) — the app can remain alive, sitting at the entry `history.back()` landed on. Real-device
-testing surfaced a genuine latent defect here, distinct from the accepted tradeoff: the first line of the
-`popstate` handler (`if (exitInProgress) return;`) exits *before* the line that resets `backTrapArmed`,
-and nothing anywhere ever resets `exitInProgress` back to `false`. If the app survives the exit attempt
-(the common case) and the user doesn't immediately press Back again, **every subsequent Back press for
-the rest of that session is silently swallowed** — the guard never recovers, identical to the original
-pre-fix bug, even though the user never actually left.
+tradeoff" above) — the app can remain alive, sitting at the entry `history.back()` landed on.
 
-Fix: if a `popstate` is ever observed while `exitInProgress` is still `true`, that is proof the app is
-still alive to receive it (a genuinely finished TWA never runs more JS). Treat it as "the exit attempt
-didn't complete" — reset `exitInProgress = false` and `backTrapArmed = false`, then re-arm normally, so
-the guard resumes protecting the very next Back press instead of staying permanently disabled. This does
-not change the exit-immediacy tradeoff — it only prevents the guard from silently dying when that
-tradeoff's "one more press" doesn't happen right away.
+**First attempt (superseded — kept here as a documented dead end, not a mystery to re-debug later):**
+reset `exitInProgress`/`backTrapArmed` and re-arm on the very next `popstate` observed while
+`exitInProgress` was still `true`, reasoning that a `popstate` firing at all proves the app is alive.
+This was **proven wrong by direct reproduction**: the very first `popstate` after `confirmAppExit()`
+*is* that `history.back()` call's own echo, firing asynchronously moments later — not a new user action.
+Recovering on it re-arms the trap *before* the user's genuine next Back press, so that press gets
+intercepted and **reopens the exit dialog** — trapping the user in a loop (confirmed empirically: Back →
+dialog → simulated Exit click → simulated second Back → dialog reopened). This is strictly worse than
+the original "guard stays inert" defect it was meant to fix.
+
+**Corrected design: recovery is keyed off genuine user interaction, not `popstate`.** A `popstate` cannot
+distinguish "echo of my own `history.back()` call" from "a new physical Back press" — but a `pointerdown`/
+`touchstart`/`click` event unambiguously means the user is interacting with the app's own UI, which only
+happens if they gave up on leaving and resumed normal use. So:
+
+- The `popstate` handler's `exitInProgress` branch goes back to a **plain, side-effect-free `return`** —
+  no re-arm, no flag reset, matching the original Task 4 design exactly. `exitInProgress`,
+  `backTrapArmed` are left exactly as `confirmAppExit()` set them.
+- A single, **persistent** (not one-time) interaction handler on `pointerdown`/`touchstart`/`click` now
+  serves two purposes depending on state, resolving what was previously two separate one-time listeners
+  from Task 10 into one:
+  - If `exitInProgress` is `true`: this interaction is the recovery signal — reset `exitInProgress` and
+    `backTrapArmed` to `false`, then re-arm.
+  - Otherwise: same defensive backstop Task 10 already had (idempotent `armBackTrap()` call, in case the
+    load-time arm wasn't honored).
+- Recovery is deliberately **not** wired to `popstate`, `pageshow`, `visibilitychange`, `focus`,
+  `DOMContentLoaded`, or `load` — none of those constitute "the user resumed using the app"; only a real
+  interaction event does. Those lifecycle events are used below for a *different* purpose (Bug 3
+  hardening) and only ever call the plain `armBackTrap()`, never touch `exitInProgress`.
+
+### Lifecycle re-arm hardening (Bug 3: no-interaction fresh-open Back exit)
+
+Real-device testing found that on a fresh standalone open, if the user's very first action is pressing
+the physical Back button (no prior tap anywhere on the page), the app can exit immediately with no
+dialog — as if the load-time `armBackTrap()` call never happened. Code inspection rules out a logic bug:
+`armBackTrap()` runs synchronously and unconditionally as the first thing the script does, and
+`history.pushState()` has no async/silent-failure mode. The likely explanation is a native-platform
+behavior this environment cannot verify or fix directly: a genuine user gesture may be required before
+Android/Chrome honors a JS-pushed history entry for hardware-Back purposes, and none of this app's
+existing interaction listeners fire from a hardware Back press itself (it isn't a `pointerdown`/
+`touchstart`/`click` DOM event) — so if the load-time arm isn't honored, there was previously no earlier
+opportunity to retry before the fatal first press.
+
+Mitigation (defensive redundancy, not a proven fix — see Non-goals): call the existing, idempotent
+`armBackTrap()` — never `history.pushState()` directly — from `DOMContentLoaded`, `load`, `pageshow`,
+`visibilitychange` (when becoming visible), and `focus`. None of these are genuine user gestures, so if
+the root cause is truly a gesture requirement, this won't fully close the gap — but they're free,
+idempotent, and cost nothing to add. **This is hardening, not a confirmed fix.** It must not be reported
+as resolving Bug 3 without real-device confirmation of the exact scenario: fresh open, zero interaction,
+physical Back, dialog appears.
 
 ## Files touched
 
