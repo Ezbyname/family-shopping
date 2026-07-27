@@ -819,6 +819,142 @@ immediate (proven not achievable within the accepted constraints).
 
 ---
 
+### Task 12: Fix Bug 4 (exit-dialog reopen loop) and harden Bug 3 (no-interaction fresh-open exit)
+
+**Task 11 is proven wrong and superseded by this task** — reproduced live in a harness: recovering on the
+`popstate` that follows `confirmAppExit()`'s own `history.back()` call re-arms the trap before the user's
+genuine next Back press, so that press reopens the exit dialog instead of letting the user leave. See the
+design spec's "Recovery after an incomplete exit attempt" section for the full reproduction and the
+corrected design (recovery keyed off genuine interaction, never `popstate`), and "Lifecycle re-arm
+hardening" for the Bug 3 defensive additions.
+
+**Files:**
+- Modify: `back-guard.js` only
+
+- [ ] **Step 1: Revert the `popstate` handler's `exitInProgress` branch to a plain, side-effect-free return**
+
+Current (from Task 11 — this is being reverted):
+```js
+  window.addEventListener('popstate', function() {
+    if (exitInProgress) {
+      // A popstate fired at all means the app is still alive to observe it - a
+      // genuinely finished TWA never runs more JS. The earlier exit attempt
+      // therefore didn't complete (see spec's "Accepted tradeoff"). Recover
+      // instead of leaving the guard permanently disabled for the rest of the
+      // session.
+      exitInProgress = false;
+      backTrapArmed = false;
+      armBackTrap();
+      return;
+    }
+    backTrapArmed = false; // the dummy entry we armed was just consumed
+```
+
+Change to:
+```js
+  window.addEventListener('popstate', function() {
+    // Do NOT recover here. This popstate may just be the async echo of
+    // confirmAppExit()'s own history.back() call, not a new user action -
+    // recovering on it would re-arm the trap before the user's genuine next
+    // Back press, reopening the exit dialog in a loop (proven by direct
+    // reproduction - see spec's "Recovery after an incomplete exit attempt").
+    // Recovery happens only via a real subsequent user interaction, in
+    // handleUserInteraction() below.
+    if (exitInProgress) return;
+    backTrapArmed = false; // the dummy entry we armed was just consumed
+```
+
+- [ ] **Step 2: Replace the Task 10 first-interaction listeners with one persistent, state-aware handler**
+
+Current (from Task 10 — being replaced):
+```js
+  armBackTrap();
+
+  // Defensive re-arm on first user interaction (still standalone-only, gated by
+  // the enclosing IIFE's early return above). Some Android WebView/TWA
+  // implementations may not reliably wire a JS-initiated pushState made at page
+  // load into the native back-stack until the page has received a genuine user
+  // gesture. armBackTrap() is already idempotent, so this cannot create a
+  // duplicate history entry regardless of how many of these fire for the same
+  // tap — it only matters if the load-time arm above wasn't actually honored.
+  ['pointerdown', 'touchstart', 'click'].forEach(function(evt) {
+    document.addEventListener(evt, armBackTrap, { once: true, passive: true });
+  });
+})();
+```
+
+Change to:
+```js
+  armBackTrap();
+
+  // A genuine user interaction (pointerdown/touchstart/click) serves two
+  // purposes depending on state, and is the ONLY trigger for either - never
+  // popstate/pageshow/visibilitychange/focus/DOMContentLoaded/load, which
+  // cannot distinguish "the app is still alive" from "the user resumed using
+  // it": (1) if a confirmed-exit attempt didn't complete (exitInProgress still
+  // true), this interaction proves the user gave up and resumed using the
+  // app - reset both flags and re-arm; (2) otherwise, the same defensive
+  // backstop from Task 10, in case the load-time arm below wasn't honored by
+  // the native back-stack. Persistent (not {once:true}) since purpose (1) can
+  // matter at any point in the session, not just the first interaction.
+  // armBackTrap() remains the only function that ever calls
+  // history.pushState(), so this can never create a duplicate trap entry.
+  function handleUserInteraction() {
+    if (exitInProgress) {
+      exitInProgress = false;
+      backTrapArmed = false;
+      armBackTrap();
+      return;
+    }
+    armBackTrap();
+  }
+  ['pointerdown', 'touchstart', 'click'].forEach(function(evt) {
+    document.addEventListener(evt, handleUserInteraction, { passive: true });
+  });
+
+  // Bug 3 hardening (defensive, NOT a confirmed fix - see spec's "Lifecycle
+  // re-arm hardening" section): real-device testing found the load-time arm
+  // above can go unhonored by the native back-stack if the user's very first
+  // action is the hardware Back button itself (which never fires
+  // pointerdown/touchstart/click, so handleUserInteraction can't help in that
+  // exact case). None of these are genuine user gestures either, so this may
+  // not fully close the gap, but re-arming through the existing idempotent
+  // armBackTrap() on these lifecycle signals is free and safe to add.
+  document.addEventListener('DOMContentLoaded', function() { armBackTrap(); });
+  window.addEventListener('load', function() { armBackTrap(); });
+  window.addEventListener('pageshow', function() { armBackTrap(); });
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') armBackTrap();
+  });
+  window.addEventListener('focus', function() { armBackTrap(); });
+})();
+```
+
+- [ ] **Step 3: Verify**
+
+```bash
+node --check back-guard.js
+```
+Expected: no output, exit code 0.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add back-guard.js
+git commit -m "Fix exit-dialog reopen loop (Bug 4); harden no-interaction fresh-open exit (Bug 3)"
+```
+
+**Non-goals (unchanged from every prior task on this file):** no `history.go()`, no second
+`history.back()`, no `setTimeout`, no change to Back-while-dialog-open (still Cancel via the same
+overlay-tier mechanism), no change to `confirmAppExit()` itself (still exactly one `history.back()`,
+still sets `exitInProgress = true` first), no change to `OVERLAY_TIERS`, `PROTECTED_SCREENS`,
+`isOverlayVisible`, `findOverlayToClose`, `showExitConfirm`, `closeExitConfirm`.
+
+**Bug 3 cannot be claimed fixed by this task alone** — report it as hardened, pending real-device
+confirmation of: fresh standalone open, zero interaction, physical Back, exit dialog appears.
+
+---
+
 ## Self-Review Notes
 
 - **Spec coverage:** Standalone gating (Task 4 Step 1's early return) · idempotent trap (`backTrapArmed` guard in `armBackTrap`) · three-branch order (popstate handler body) · overlay tier list with corrected `mp2-overlay`/`price-detail-overlay` ids (Task 4) · exit dialog official close function used everywhere (Task 4 + markup in Task 2) · single `history.back()` on confirm, no re-arm (`confirmAppExit`) · race protection (`exitInProgress` short-circuit, dialog-as-overlay reduction) · Hebrew copy exact match (Task 2) · manual test checklist (Task 6 Step 3-4, plus spec's own checklist handed to the user for on-device follow-up). No spec section is without a corresponding task.
