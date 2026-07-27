@@ -19,7 +19,7 @@ const db  = getDatabase(app);
 // ── APP VERSION ────────────────────────────────────────────────────────────
 // Single source of truth for the frontend build. BUMP on every shipped fix so
 // "which build am I running?" is answerable from the UI (group/settings sheet).
-const APP_VERSION = '3.1.0';   // 2026-06: search relevance + price stability + radius/pagination + clickable store details
+const APP_VERSION = '3.2.0';   // 2026-06: search relevance + price stability + radius/pagination + clickable store details
 
 // ── USER IDENTITY ─────────────────────────────────────────────────────────
 // Silent upsert — called on every auth. Never blocks UI, never fails loudly.
@@ -161,6 +161,7 @@ let activeStores=new Set(STORES);
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
+window.showScreen = showScreen;
 
 function saveLocal(){localStorage.setItem('fsl_v2',JSON.stringify({myName,myId,groupId,groupName}))}
 

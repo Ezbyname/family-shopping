@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
 <link rel="apple-touch-icon" sizes="192x192" href="icon-512.png">
 <title>קניות משפחה</title>
-<!-- App Version: 3.1.0 | search relevance + price stability + radius/pagination + clickable store details -->
+<!-- App Version: 3.2.0 | Android standalone back-button exit guard -->
 <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -427,6 +427,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="appinline.js"></script>
+<script src="back-guard.js"></script>
 <script type="module" src="app.js"></script>
 
 <!-- ═══ PROFILE SETUP SCREEN ═══ -->
@@ -723,6 +724,24 @@
       <button class="confirm-btn-cancel" onclick="closeConfirmDelete()">ביטול</button>
       <button class="confirm-btn-delete" id="confirm-delete-btn" onclick="confirmDeleteItem()">
         🗑 מחק
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ EXIT CONFIRMATION MODAL (standalone/TWA Android back-button guard) ═══ -->
+<div class="confirm-modal-overlay" id="exit-confirm-overlay"
+  onclick="if(event.target===this)closeExitConfirm()">
+  <div class="confirm-modal">
+    <div class="confirm-modal-handle"></div>
+    <div class="confirm-modal-icon">👋</div>
+    <div class="confirm-modal-title">לצאת מהאפליקציה?</div>
+    <div class="confirm-modal-item">האם ברצונך לסגור את האפליקציה?</div>
+    <div class="confirm-btns">
+      <button class="confirm-btn-cancel" onclick="closeExitConfirm()">ביטול</button>
+      <button class="confirm-btn-exit" id="exit-confirm-btn" onclick="confirmAppExit()">
+        יציאה
       </button>
     </div>
   </div>
