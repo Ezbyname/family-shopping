@@ -955,6 +955,59 @@ confirmation of: fresh standalone open, zero interaction, physical Back, exit di
 
 ---
 
+### Task 13: Bump CACHE_VERSION so real-device testing gets the latest back-guard.js
+
+Investigated from source before changing anything: `CACHE_VERSION` (`sw.js:4`) is the sole app-shell
+invalidation mechanism — the `install` handler precaches `APP_SHELL` (which includes `/back-guard.js`,
+line 12) under `caches.open(CACHE_VERSION)`; `activate` deletes any cache key that isn't the *current*
+`CACHE_VERSION` string (a no-op if it hasn't changed); `fetch` serves `back-guard.js` — a plain, unhashed
+static asset, not a `navigate`-mode request — via cache-first (`caches.match(request)`, returned without
+ever reaching network on a hit). No fingerprinting/hashed-filename/network-first mechanism exists for it.
+`back-guard.js` changed 5 times (Tasks 8–12) since `CACHE_VERSION` was last bumped to `fsl-v7` in Task 7 —
+an already-installed user's cache would still be serving the pre-Task-8 content. A bump is required.
+
+**Files:**
+- Modify: `sw.js` only, one line
+
+- [ ] **Step 1: Bump the version**
+
+Current:
+```js
+const CACHE_VERSION = 'fsl-v7';
+```
+
+Change to:
+```js
+const CACHE_VERSION = 'fsl-v8';
+```
+
+Nothing else in `sw.js` changes — `APP_SHELL`, `NETWORK_ONLY_PATTERNS`, and the `install`/`activate`/
+`fetch` handlers stay byte-for-byte identical.
+
+- [ ] **Step 2: Verify**
+
+```bash
+grep -n "CACHE_VERSION" sw.js
+```
+Expected: both occurrences (the `const` declaration and any other reference) show `fsl-v8`; no other line
+in the file changed.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add sw.js
+git commit -m "Bump CACHE_VERSION to fsl-v8 so real-device testing gets the latest back-guard.js"
+```
+
+**Non-goals:** no changes to `install`/`activate`/`fetch` logic, `APP_SHELL` list (already correct — do
+not touch unless `/back-guard.js` is found missing, which it isn't), `NETWORK_ONLY_PATTERNS`, or any file
+other than `sw.js`.
+
+**Status after this task:** Bug 4 is fixed in code and verified in harness; Bug 3 is hardened only. The
+Back Guard feature is **not release-verified** until real Android standalone/PWA/TWA testing passes.
+
+---
+
 ## Self-Review Notes
 
 - **Spec coverage:** Standalone gating (Task 4 Step 1's early return) · idempotent trap (`backTrapArmed` guard in `armBackTrap`) · three-branch order (popstate handler body) · overlay tier list with corrected `mp2-overlay`/`price-detail-overlay` ids (Task 4) · exit dialog official close function used everywhere (Task 4 + markup in Task 2) · single `history.back()` on confirm, no re-arm (`confirmAppExit`) · race protection (`exitInProgress` short-circuit, dialog-as-overlay reduction) · Hebrew copy exact match (Task 2) · manual test checklist (Task 6 Step 3-4, plus spec's own checklist handed to the user for on-device follow-up). No spec section is without a corresponding task.
