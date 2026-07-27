@@ -119,17 +119,14 @@
   }
 
   window.addEventListener('popstate', function() {
-    if (exitInProgress) {
-      // A popstate fired at all means the app is still alive to observe it - a
-      // genuinely finished TWA never runs more JS. The earlier exit attempt
-      // therefore didn't complete (see spec's "Accepted tradeoff"). Recover
-      // instead of leaving the guard permanently disabled for the rest of the
-      // session.
-      exitInProgress = false;
-      backTrapArmed = false;
-      armBackTrap();
-      return;
-    }
+    // Do NOT recover here. This popstate may just be the async echo of
+    // confirmAppExit()'s own history.back() call, not a new user action -
+    // recovering on it would re-arm the trap before the user's genuine next
+    // Back press, reopening the exit dialog in a loop (proven by direct
+    // reproduction - see spec's "Recovery after an incomplete exit attempt").
+    // Recovery happens only via a real subsequent user interaction, in
+    // handleUserInteraction() below.
+    if (exitInProgress) return;
     backTrapArmed = false; // the dummy entry we armed was just consumed
 
     var toClose = findOverlayToClose();
@@ -158,14 +155,44 @@
 
   armBackTrap();
 
-  // Defensive re-arm on first user interaction (still standalone-only, gated by
-  // the enclosing IIFE's early return above). Some Android WebView/TWA
-  // implementations may not reliably wire a JS-initiated pushState made at page
-  // load into the native back-stack until the page has received a genuine user
-  // gesture. armBackTrap() is already idempotent, so this cannot create a
-  // duplicate history entry regardless of how many of these fire for the same
-  // tap — it only matters if the load-time arm above wasn't actually honored.
+  // A genuine user interaction (pointerdown/touchstart/click) serves two
+  // purposes depending on state, and is the ONLY trigger for either - never
+  // popstate/pageshow/visibilitychange/focus/DOMContentLoaded/load, which
+  // cannot distinguish "the app is still alive" from "the user resumed using
+  // it": (1) if a confirmed-exit attempt didn't complete (exitInProgress still
+  // true), this interaction proves the user gave up and resumed using the
+  // app - reset both flags and re-arm; (2) otherwise, the same defensive
+  // backstop from Task 10, in case the load-time arm below wasn't honored by
+  // the native back-stack. Persistent (not {once:true}) since purpose (1) can
+  // matter at any point in the session, not just the first interaction.
+  // armBackTrap() remains the only function that ever calls
+  // history.pushState(), so this can never create a duplicate trap entry.
+  function handleUserInteraction() {
+    if (exitInProgress) {
+      exitInProgress = false;
+      backTrapArmed = false;
+      armBackTrap();
+      return;
+    }
+    armBackTrap();
+  }
   ['pointerdown', 'touchstart', 'click'].forEach(function(evt) {
-    document.addEventListener(evt, armBackTrap, { once: true, passive: true });
+    document.addEventListener(evt, handleUserInteraction, { passive: true });
   });
+
+  // Bug 3 hardening (defensive, NOT a confirmed fix): real-device testing
+  // found the load-time arm above can go unhonored by the native back-stack
+  // if the user's very first action is the hardware Back button itself
+  // (which never fires pointerdown/touchstart/click, so
+  // handleUserInteraction can't help in that exact case). None of these are
+  // genuine user gestures either, so this may not fully close the gap, but
+  // re-arming through the existing idempotent armBackTrap() on these
+  // lifecycle signals is free and safe to add.
+  document.addEventListener('DOMContentLoaded', function() { armBackTrap(); });
+  window.addEventListener('load', function() { armBackTrap(); });
+  window.addEventListener('pageshow', function() { armBackTrap(); });
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') armBackTrap();
+  });
+  window.addEventListener('focus', function() { armBackTrap(); });
 })();
