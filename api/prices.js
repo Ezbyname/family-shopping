@@ -12,7 +12,7 @@
 // v6.3.0: storeCoords index support — lightweight {lat,lng,city} read instead of full stores node
 
 import { restGet, getDbUrl, getAdminToken, haversine, setCors, isValidBarcode, isValidPrice } from './_firebase.js';
-import { translateIngredient } from './normalize-he.js';
+import { translateIngredient } from './_normalize-he.js';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const INIT_TIMEOUT_MS  = 8_000;   // admin token fetch budget
