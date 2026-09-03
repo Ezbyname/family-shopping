@@ -4685,6 +4685,7 @@ window.switchGroup = async function(newGroupId) {
   groupId   = newGroupId;
   groupName = newGroupName;
   items = {}; members = {}; prices = {}; favorites = {};
+  _updateListTotals();
 
   // Persist active group
   localStorage.setItem('activeGroupId', groupId);
@@ -7369,6 +7370,18 @@ window.applyTheme = function(theme) {
 
 let _importParsed = [];
 
+// Extract quantity from start or end: "3 קפה" / "קפה 3" / "קפה x3" → { qty: 3, rest: "קפה" }
+function _extractLeadingQty(s) {
+  let m;
+  // Leading: "3 " or "3x "
+  m = s.match(/^(\d+)\s*x?\s+/i);
+  if (m && +m[1] >= 1 && +m[1] <= 999) return { qty: +m[1], rest: s.slice(m[0].length).trim() };
+  // Trailing: " 3" or " x3"
+  m = s.match(/\s+x?(\d+)$/i);
+  if (m && +m[1] >= 1 && +m[1] <= 999) return { qty: +m[1], rest: s.slice(0, -m[0].length).trim() };
+  return { qty: 1, rest: s };
+}
+
 function _parseImportLines(raw) {
   const CHECKBOX_RE  = /^[✅☑✔]\s*/u;
   const NOISE_RE     = /^[-–—•*#\s]*$/u;
@@ -7377,24 +7390,38 @@ function _parseImportLines(raw) {
   const NL_BOUGHT_RE = /^(קניתי|כבר קניתי|סיימתי לקנות|כבר יש|נקנה|כבר קנינו)\s+/u;
   const NL_ADD_RE    = /^(לקנות|צריך|תוסיף|להוסיף|קנה|קני|נצטרך|צריכים|תקני|תקנה)\s+/u;
   const result = [];
+
+  // Split a cleaned name on commas → multiple items (e.g. "חמוצים, תירס, תירס גמדי")
+  function pushItems(name, action, qty) {
+    const parts = name.split(',').map(p => p.trim()).filter(Boolean);
+    if (parts.length > 1) {
+      // qty applies to first part only when commas split a multi-item line
+      parts.forEach((p, i) => result.push({ name: p, action, qty: i === 0 ? qty : 1 }));
+    } else {
+      result.push({ name, action, qty });
+    }
+  }
+
   for (const line of raw.split('\n')) {
     const t = line.trim();
     if (!t || NOISE_RE.test(t)) continue;
     if (CHECKBOX_RE.test(t)) {
       const n = t.replace(CHECKBOX_RE, '').trim();
-      if (n) result.push({ name: n, action: 'bought' });
+      if (n) result.push({ name: n, action: 'bought', qty: 1 });
     } else if (NL_REMOVE_RE.test(t)) {
       const n = t.replace(NL_REMOVE_RE, '').trim();
-      if (n) result.push({ name: n, action: 'remove' });
+      if (n) result.push({ name: n, action: 'remove', qty: 1 });
     } else if (NL_BOUGHT_RE.test(t)) {
       const n = t.replace(NL_BOUGHT_RE, '').trim();
-      if (n) result.push({ name: n, action: 'bought' });
+      if (n) result.push({ name: n, action: 'bought', qty: 1 });
     } else if (NL_ADD_RE.test(t)) {
-      const n = t.replace(NL_ADD_RE, '').trim();
-      if (n) result.push({ name: n, action: 'add' });
+      const raw2 = t.replace(NL_ADD_RE, '').trim();
+      const { qty, rest } = _extractLeadingQty(raw2);
+      if (rest) pushItems(rest, 'add', qty);
     } else {
-      const n = t.replace(BULLET_RE, '').trim();
-      if (n) result.push({ name: n, action: 'add' });
+      const raw2 = t.replace(BULLET_RE, '').trim();
+      const { qty, rest } = _extractLeadingQty(raw2);
+      if (rest) pushItems(rest, 'add', qty);
     }
   }
   return result;
@@ -7428,13 +7455,15 @@ function _importShowPreview(parsed) {
   if (!pv) return;
   pv.style.display = 'flex';
   const ICON = { add: '➕', bought: '✅', remove: '🗑' };
-  const html = parsed.map(({ name, action }) => {
+  const html = parsed.map(({ name, action, qty }) => {
     const norm = normalizeName(name);
     const missing = action === 'remove' &&
       !Object.values(items).some(i => normalizeName(i.name) === norm);
+    const qtyLabel = (action === 'add' && qty > 1) ? `<span class="import-preview-qty">×${qty}</span>` : '';
     return '<div class="import-preview-row' + (missing ? ' import-preview-missing' : '') + '">' +
       '<span class="import-preview-icon">' + ICON[action] + '</span>' +
       '<span class="import-preview-name">' + esc(name) + '</span>' +
+      qtyLabel +
       (missing ? '<span class="import-preview-note">לא ברשימה</span>' : '') +
       '</div>';
   }).join('');
@@ -7457,7 +7486,8 @@ window.executeImport = async function() {
   const m = myProfile || {};
   let added = 0, bought = 0, removed = 0;
 
-  for (const { name, action } of _importParsed) {
+  for (const { name, action, qty: itemQty } of _importParsed) {
+    const qty = itemQty || 1;
 
     if (action === 'bought') {
       const existing = findExistingListItem(name, null);
@@ -7502,11 +7532,11 @@ window.executeImport = async function() {
     } else {
       const existing = findExistingListItem(name, null);
       if (existing) {
-        await update(ref(db, `groups/${groupId}/items/${existing.id}`), { qty: (existing.qty || 1) + 1 });
+        await update(ref(db, `groups/${groupId}/items/${existing.id}`), { qty: (existing.qty || 1) + qty });
       } else {
         const newRef = push(ref(db, `groups/${groupId}/items`));
         set(newRef, {
-          name, qty: 1, bought: false, fav: false, barcode: null,
+          name, qty, bought: false, fav: false, barcode: null,
           addedByUserId: myId, addedByDisplayName: myName,
           addedByAvatarType:  m.avatarType  || 'emoji',
           addedByAvatarValue: m.avatarValue || '👤',

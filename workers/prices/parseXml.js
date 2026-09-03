@@ -18,8 +18,8 @@ const FIELD_MAP = {
   'quantity':           'quantity',
   'unitqty':            'unitQty',
   'manufacturername':   'brand',
-  'manufacturename':    'brand',      // Rami Levy: ManufactureName (no trailing 'r')
-  'priceupdatetime':   'updatedAt',  // Rami Levy: PriceUpdateTime
+  'manufacturename':    'brand',
+  'priceupdatetime':   'updatedAt',
   'manufacturecountry': 'country',
   'storeid':            'storeId',
   'storename':          'storeName',

@@ -32,7 +32,7 @@ export const CHAINS = [
     id:       'rami-levy',
     name:     'רמי לוי',
     chainId:  '7290058140886',
-    enabled:  false,
+    enabled:  true,
     // Phase 3 implementation complete 2026-06-22. Enable only after dry-run passes on VPS.
     // To enable: DRY_RUN=true node index.js rami-levy → confirm items > 1000, errors = 0
     //            then set enabled: true, status: 'enabled', lastVerified: today

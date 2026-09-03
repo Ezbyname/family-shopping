@@ -12,6 +12,7 @@
 // v6.3.0: storeCoords index support — lightweight {lat,lng,city} read instead of full stores node
 
 import { restGet, getDbUrl, getAdminToken, haversine, setCors, isValidBarcode, isValidPrice } from './_firebase.js';
+import { translateIngredient } from './normalize-he.js';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const INIT_TIMEOUT_MS  = 8_000;   // admin token fetch budget
@@ -69,33 +70,10 @@ async function getStoreIndex(dbUrl) {
   return _storeCache;
 }
 
-// ── Hebrew → English for Open Food Facts search ──────────────────────────────
-const HE_EN = {
-  'חלב':'milk','חלב 3%':'milk 3%','חלב 1%':'milk 1%','חלב עיזים':'goat milk',
-  'גבינה':'cheese','גבינה לבנה':'white cheese',"קוטג'":'cottage cheese','קוטג':'cottage cheese',
-  'שמנת':'cream','יוגורט':'yogurt','חמאה':'butter','לחם':'bread','פיתה':'pita',
-  'קמח':'flour','ביצים':'eggs','ביצה':'egg','קורנפלקס':'cornflakes',
-  'שיבולת שועל':'oatmeal','גרנולה':'granola','אורז':'rice','פסטה':'pasta',
-  'ספגטי':'spaghetti','מקרוני':'macaroni','שמן':'oil','שמן זית':'olive oil',
-  'שמן חמניות':'sunflower oil','סוכר':'sugar','דבש':'honey','מלח':'salt',
-  'טחינה':'tahini','חומוס':'hummus','קטשופ':'ketchup','מיונז':'mayonnaise',
-  'טונה':'tuna','קפה':'coffee','תה':'tea','מיץ':'juice','מים':'water',
-  'שוקולד':'chocolate','עוגיות':'cookies','במבה':'bamba','ביסלי':'bisli',
-  'גלידה':'ice cream','עוף':'chicken','בשר טחון':'ground beef',
-  'עגבניות':'tomatoes','מלפפון':'cucumber','בצל':'onion','שום':'garlic',
-  'גזר':'carrot','תפוח אדמה':'potato','ברוקולי':'broccoli',
-  'תפוח':'apple','בננה':'banana','תפוז':'orange','לימון':'lemon',
-  'נייר טואלט':'toilet paper','סבון':'soap','שמפו':'shampoo',
-  'אבקת כביסה':'laundry detergent','נוזל כלים':'dish soap',
-};
+const isHebrew = s => /[֐-׿]/.test(s);
 
-const isHebrew  = s => /[֐-׿]/.test(s);
-const translate = q => {
-  const l = q.trim();
-  if (HE_EN[l]) return HE_EN[l];
-  for (const [h, e] of Object.entries(HE_EN)) if (l.includes(h) || h.includes(l)) return e;
-  return null;
-};
+// Delegates to the canonical ingredient catalog + synonym layer.
+const translate = q => translateIngredient(q);
 
 // ── Relevance scoring (Hebrew-aware) ─────────────────────────────────────────
 // Normalizes Hebrew/English product text so that "חלב 3%", "חלב 3 אחוז" and
@@ -153,7 +131,7 @@ function _scoreOne(query, name) {
 }
 
 // Best score across Hebrew query, English query, and the product brand line.
-export function scoreProductMatch(heQuery, enQuery, product) {
+export function scoreProductMatch(heQuery, enQuery, product, _debugOut) {
   const name  = product.name || '';
   const brand = product.brand || '';
   const nameScore = Math.max(
@@ -167,7 +145,16 @@ export function scoreProductMatch(heQuery, enQuery, product) {
   );
   let score = Math.max(nameScore, brandScore * 0.6);
   if (product.isIsraeli) score += 6;   // modest tiebreaker, never dominant
-  return Math.round(Math.min(100, score));
+  const final = Math.round(Math.min(100, score));
+  if (_debugOut) {
+    _debugOut.normalizedQuery = normalizeProductText(heQuery);
+    _debugOut.normalizedName  = normalizeProductText(name);
+    _debugOut.normalizedBrand = normalizeProductText(brand);
+    _debugOut.nameScore  = nameScore;
+    _debugOut.brandScore = brandScore;
+    _debugOut.isIsraeli  = !!product.isIsraeli;
+  }
+  return final;
 }
 
 // ── Main handler ─────────────────────────────────────────────────────────────
@@ -177,8 +164,9 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
 
-  const { barcode, q, lat, lng, radiusKm, groupId, userId, debug } = req.query || {};
-  const isDebug = debug === '1' || debug === 'true';
+  const { barcode, q, lat, lng, radiusKm, groupId, userId, debug, debugScore } = req.query || {};
+  const isDebug      = debug === '1' || debug === 'true';
+  const isDebugScore = debugScore === '1' || debugScore === 'true';
   const timings = { initMs: 0, priceReadMs: 0, storeReadMs: 0, totalMs: 0 };
 
   const userLat = parseFloat(lat  || '');
@@ -246,11 +234,15 @@ export default async function handler(req, res) {
   if (!q || String(q).trim().length < 2)
     return res.status(400).json({ error: 'Provide ?barcode= or ?q=' });
 
-  const query      = String(q).trim();
-  const hebrew     = isHebrew(query);
-  const en         = hebrew ? (translate(query) || query) : query;
-  const debugScore = req.query.debugScore === '1';
-  console.log(`[prices v6.3] search: "${query}" → "${en}"`);
+  const query  = String(q).trim();
+  const hebrew = isHebrew(query);
+  const en     = hebrew ? (translate(query) || query) : query;
+  const translated = hebrew && translate(query) !== null;
+  if (hebrew && !translated) {
+    // Structured log for unmapped query backlog — parse with: jq 'select(.event=="unmapped_query")'
+    console.log(JSON.stringify({ event: 'unmapped_query', query, ts: new Date().toISOString() }));
+  }
+  console.log(`[prices v6.3] search: "${query}" → "${en}" translated=${translated}`);
 
   const dbUrl = getDbUrl();
 
@@ -285,7 +277,11 @@ export default async function handler(req, res) {
     }));
 
     // Relevance score per product (deterministic, Hebrew-aware)
-    for (const p of enriched) p._score = scoreProductMatch(query, en, p);
+    for (const p of enriched) {
+      const dbg = isDebugScore ? {} : undefined;
+      p._score = scoreProductMatch(query, en, p, dbg);
+      if (isDebugScore) p._debug = dbg;
+    }
 
     // Rank: relevance first, then availability (has prices), then source quality.
     // This ensures "חלב תנובה" beats "שוקולד חלב"/"Kinder Chocolate" for query "חלב".
@@ -308,7 +304,7 @@ export default async function handler(req, res) {
                  : hasAny.length  >= 3 ? hasAny
                  : enriched;
 
-    if (debugScore) {
+    if (isDebugScore) {
       console.log(`[search-audit] query="${query}" en="${en}" ` +
         `candidates=${enriched.length} strong=${strong.length} fallback=${hasAny.length}\n` +
         enriched.slice(0, 50).map((p, i) =>
@@ -326,9 +322,14 @@ export default async function handler(req, res) {
     }
 
     timings.totalMs = Date.now() - t0;
+    const results = ranked.slice(0, 20);
+    if (results.length === 0) {
+      console.log(JSON.stringify({ event: 'zero_results', query, englishQuery: en, translated, ts: new Date().toISOString() }));
+    }
+    if (!isDebugScore) results.forEach(p => { delete p._score; delete p._debug; });
     const response = {
       version: '6.3.2', query, englishQuery: en,
-      results: ranked.slice(0, 20), total: ranked.length,
+      results, total: ranked.length,
       syncStatus,
     };
     if (isDebug) response.timings = timings;
@@ -535,10 +536,17 @@ function buildCommunityWarning(reportsData, officialPrices) {
 async function searchOFF(hebrewQuery, englishQuery) {
   const seen = new Set(), results = [];
   const isHeb = isHebrew(hebrewQuery);
+  const FIELDS = 'product_name,product_name_he,brands,quantity,image_small_url,code,countries_tags';
+  const OFF    = 'https://world.openfoodfacts.org/cgi/search.pl';
   const urls = [
-    `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(englishQuery)}&search_simple=1&action=process&json=1&page_size=8&fields=product_name,product_name_he,brands,quantity,image_small_url,code,countries_tags&tagtype_0=countries&tag_contains_0=contains&tag_0=israel`,
-    isHeb ? `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(hebrewQuery)}&search_simple=1&action=process&json=1&page_size=6&fields=product_name,product_name_he,brands,quantity,image_small_url,code` : null,
-    `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(englishQuery)}&search_simple=1&action=process&json=1&page_size=12&fields=product_name,product_name_he,brands,quantity,image_small_url,code,countries_tags`,
+    // 1. Hebrew query with Israel filter — highest precision for Israeli products
+    isHeb ? `${OFF}?search_terms=${encodeURIComponent(hebrewQuery)}&search_simple=1&action=process&json=1&page_size=10&fields=${FIELDS}&tagtype_0=countries&tag_contains_0=contains&tag_0=israel` : null,
+    // 2. English query with Israel filter
+    `${OFF}?search_terms=${encodeURIComponent(englishQuery)}&search_simple=1&action=process&json=1&page_size=8&fields=${FIELDS}&tagtype_0=countries&tag_contains_0=contains&tag_0=israel`,
+    // 3. Hebrew query without filter — catches products with missing country tags
+    isHeb ? `${OFF}?search_terms=${encodeURIComponent(hebrewQuery)}&search_simple=1&action=process&json=1&page_size=8&fields=${FIELDS}` : null,
+    // 4. English query without filter — broadest fallback
+    `${OFF}?search_terms=${encodeURIComponent(englishQuery)}&search_simple=1&action=process&json=1&page_size=12&fields=${FIELDS}`,
   ].filter(Boolean);
 
   for (const url of urls) {
