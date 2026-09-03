@@ -9,6 +9,13 @@ workers/prices/.env.local
 scripts/.env
 scripts/.env.local
 
+# ── Capacitor ─────────────────────────────────────────────────────────────────
+# android-cap/ is the versioned Capacitor Android project (committed).
+# Generated build outputs inside it are excluded:
+android-cap/.gradle/
+android-cap/app/build/
+android-cap/build/
+
 # ── Build artefacts ───────────────────────────────────────────────────────────
 package-lock.json
 *.log
