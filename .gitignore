@@ -34,3 +34,6 @@ tests/test-results/
 # Store snapshot — generated file, updated monthly on VPS
 workers/prices/data/stores-geocoded.json
 apply-import.py
+
+# -- Capacitor www placeholder ------------------------------------------------
+www/
