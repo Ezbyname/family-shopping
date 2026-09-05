@@ -33,6 +33,9 @@
     "node": ">=20.0.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/cli": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
     "dotenv": "^17.4.2"
   }
 }
