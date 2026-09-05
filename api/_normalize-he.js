@@ -22,7 +22,7 @@
 //   so "אגסים" (one token) cannot match the two-token key "... ..." or the
 //   one-token key "אגס" (different string).
 
-import { CATALOG, SYNONYMS } from './ingredients.js';
+import { CATALOG, SYNONYMS } from './_ingredients.js';
 
 // ── Surface normalization ─────────────────────────────────────────────────────
 // Strips decorative quotes/apostrophes that appear in product names:

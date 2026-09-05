@@ -2340,7 +2340,7 @@ function itemHTML(item) {
         aria-label="${isFavSaved?'הסר ממועדפים':'הוסף למועדפים'}"
         title="${isFavSaved?'הסר ממועדפים':'שמור במועדפים'}"
       >${isFavSaved?'⭐':'☆'}</button>
-      <button class="act-btn del" onclick="deleteItem('${item.id}')">✕</button>
+      <button class="act-btn del" onclick="deleteItem('${item.id}')">🗑️</button>
     </div>
   </div>`;
 }
