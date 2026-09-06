@@ -513,8 +513,6 @@ window.setTab=function(tab){
 
 window.onListSearch = function(val) {
   listSearchQuery = val;
-  const clearBtn = document.getElementById('list-search-clear');
-  if (clearBtn) clearBtn.style.display = val ? 'flex' : 'none';
   renderList();
 };
 
