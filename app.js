@@ -5026,11 +5026,21 @@ function _renderGroupSheet() {
   }
 }
 
-// Leave group — confirmation before action
-window.confirmLeaveGroup = function() {
+// Leave group — removes member from Firebase then resets to onboarding
+window.confirmLeaveGroup = async function() {
   if (!confirm(`עזוב את "${groupName}"?\n\nתוכל להצטרף מחדש בעזרת הקוד.`)) return;
   closeGroupSheet();
-  toast('💡 בקרוב: עזיבת קבוצה — בינתיים צור קבוצה חדשה');
+  try {
+    await remove(ref(db, `groups/${groupId}/members/${myId}`));
+  } catch(e) {
+    console.error('[leaveGroup] remove failed:', e.message);
+    toast('שגיאה ביציאה מהקבוצה — נסה שוב');
+    return;
+  }
+  groupId = ''; groupName = '';
+  localStorage.removeItem('fsl_groupId');
+  localStorage.removeItem('fsl_groupName');
+  location.reload();
 };
 
 // Wire: old dropdown toggle → sheet
