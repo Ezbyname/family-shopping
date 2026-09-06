@@ -567,7 +567,7 @@ function renderAvatars(){
   // Update group pill member count
   const cnt = document.getElementById('hdr-grp-cnt');
   if (cnt) {
-    const n = Object.keys(members).length;
+    const n = dedupMembers(Object.values(members)).length;
     cnt.textContent = n > 0 ? n : '';
   }
 }
