@@ -156,6 +156,7 @@ let myName='', myId='', groupId='', groupName='';
 let items={}, members={}, prices={}, favorites={};
 let _membershipOk = false; // set true once ensureGroupMembership succeeds
 let curTab='all', priceRadius=10;
+let listSearchQuery = '';
 const STORES=['שופרסל','רמי לוי','ויקטורי','יינות ביתן','מחסני להב','אושר עד'];
 let activeStores=new Set(STORES);
 
@@ -476,6 +477,7 @@ window.clearBought=function(){Object.entries(items).forEach(([id,i])=>{if(i.boug
 
 window.setTab=function(tab){
   curTab=tab;
+  clearListSearch();
   ['all','fav','bought','price'].forEach(t=>{
     const el=document.getElementById('tab-'+t);if(el)el.classList.toggle('active',t===tab);
   });
@@ -500,9 +502,28 @@ window.setTab=function(tab){
   const pt = document.getElementById('price-tools');
   if (pt) pt.style.display = isPrice && pt.children.length ? 'flex' : 'none';
 
+  // Show search bar only on list tabs (not price tab)
+  const searchBar = document.getElementById('list-search-bar');
+  if (searchBar) searchBar.style.display = (isPrice || isFav) ? 'none' : 'flex';
+
   if (isPrice) renderPrices();
   else if (isFav) renderFavoritesPanel();
   else renderList();
+};
+
+window.onListSearch = function(val) {
+  listSearchQuery = val;
+  const clearBtn = document.getElementById('list-search-clear');
+  if (clearBtn) clearBtn.style.display = val ? 'flex' : 'none';
+  renderList();
+};
+
+window.clearListSearch = function() {
+  listSearchQuery = '';
+  const input = document.getElementById('list-search-input');
+  if (input) input.value = '';
+  const clearBtn = document.getElementById('list-search-clear');
+  if (clearBtn) clearBtn.style.display = 'none';
 };
 
 function renderList(){
@@ -510,10 +531,15 @@ function renderList(){
   let list=Object.entries(items).map(([id,v])=>({...v,id})).sort((a,b)=>(b.ts||0)-(a.ts||0));
   if(curTab==='fav') list=list.filter(i=>i.fav);
   if(curTab==='bought') list=list.filter(i=>i.bought);
+  if(listSearchQuery){
+    const q=listSearchQuery.trim().toLowerCase();
+    list=list.filter(i=>(i.name||'').toLowerCase().includes(q));
+  }
   if(!list.length){
+    const isSearch=!!listSearchQuery;
     const m={all:{e:'🛒',t:'הרשימה ריקה'},fav:{e:'⭐',t:'אין מועדפים'},bought:{e:'✅',t:'עדיין לא קנית'}};
-    const d=m[curTab]||m.all;
-    wrap.innerHTML=`<div class="empty"><div class="em">${d.e}</div><p>${d.t}</p></div>`;return;
+    const d=isSearch?{e:'🔎',t:`לא נמצאו פריטים עבור "${listSearchQuery}"`}:(m[curTab]||m.all);
+    wrap.innerHTML=`<div class="empty"><div class="em">${d.e}</div><p>${esc(d.t)}</p></div>`;return;
   }
   const pending=list.filter(i=>!i.bought), bList=list.filter(i=>i.bought);
   let html='';

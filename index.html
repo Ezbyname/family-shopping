@@ -132,6 +132,15 @@
     <button class="import-btn" id="import-list-btn" onclick="openImportModal()" title="ייבוא רשימה מוואטסאפ">📋</button>
     <button class="add-btn" data-testid="add-item-btn" onclick="addItem()">+</button>
   </div>
+  <div id="list-search-bar" class="list-search-bar" style="display:none">
+    <span class="list-search-icon">🔎</span>
+    <input id="list-search-input" class="list-search-input" type="search"
+      placeholder="חפש ברשימה..."
+      autocomplete="off" dir="rtl"
+      oninput="onListSearch(this.value)">
+    <button class="list-search-clear" id="list-search-clear"
+      onclick="clearListSearch()" style="display:none">✕</button>
+  </div>
   <div id="list-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
     <div class="list-wrap" id="list-content"></div>
     <!-- Basket totals bar — shown when ≥1 item has a cached price -->
