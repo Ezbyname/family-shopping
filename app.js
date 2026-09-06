@@ -416,6 +416,7 @@ function showSyncStaleBanner(ageLabel) {
 
 function connectToGroup(){
   showScreen('main-screen');
+  setTab('all');
   // Cleanup old notifications silently (>30 days)
   setTimeout(() => cleanupOldNotifications(), 5000);
   document.getElementById('hdr-group-name').textContent=groupName;
