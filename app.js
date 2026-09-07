@@ -527,7 +527,17 @@ window.clearListSearch = function() {
 
 function renderList(){
   const wrap=document.getElementById('list-content');
-  let list=Object.entries(items).map(([id,v])=>({...v,id})).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  let list=Object.entries(items).map(([id,v])=>({...v,id}));
+  list.sort((a,b)=>{
+    if(!a.bought&&!b.bought){
+      const ao=a.order,bo=b.order;
+      if(ao!=null&&bo!=null)return ao-bo;
+      if(ao!=null)return -1;
+      if(bo!=null)return 1;
+      return(b.ts||0)-(a.ts||0);
+    }
+    return(b.ts||0)-(a.ts||0);
+  });
   if(curTab==='fav') list=list.filter(i=>i.fav);
   if(curTab==='bought') list=list.filter(i=>i.bought);
   if(listSearchQuery){
@@ -552,6 +562,7 @@ function renderList(){
     if(curTab!=='fav')html+=`<button class="clear-btn" onclick="clearBought()">🗑 מחק את כל הנקנים</button>`;
   }
   wrap.innerHTML=html;
+  initDragDrop();
   // Load cheapest price chips for pending items with barcodes (non-blocking)
   if(curTab==='all') setTimeout(loadItemPricesInBackground, 80);
 }
@@ -2341,7 +2352,10 @@ function itemHTML(item) {
     ? `<div class="price-chip-area" id="price-chip-${item.id}"><div class="price-chip-shimmer"></div></div>`
     : '';
 
-  return `<div class="item-card${(!isFavTab&&item.bought)?' bought':''}${item.fav?' fav':''}">
+  const dragHandle = (!isFavTab && !item.bought && curTab === 'all' && !listSearchQuery)
+    ? `<div class="drag-handle" title="גרור לשינוי סדר">⠿</div>` : '';
+
+  return `<div class="item-card${(!isFavTab&&item.bought)?' bought':''}${item.fav?' fav':''}" data-id="${item.id}">
     ${ipTile}
     <div class="item-body">
       <div class="item-name">${esc(item.name)}</div>
@@ -2367,7 +2381,103 @@ function itemHTML(item) {
       >${isFavSaved?'⭐':'☆'}</button>
       <button class="act-btn del" onclick="deleteItem('${item.id}')">🗑️</button>
     </div>
+    ${dragHandle}
   </div>`;
+}
+
+// ── Drag-and-drop ordering ────────────────────────
+function initDragDrop() {
+  if (curTab !== 'all' || listSearchQuery) return;
+  const content = document.getElementById('list-content');
+  if (!content) return;
+
+  let dragging = null, clone = null, placeholder = null, fingerOffsetY = 0;
+
+  function pendingCards() {
+    return [...content.querySelectorAll('.item-card:not(.bought):not(.dragging)')];
+  }
+
+  function startDrag(card, clientY) {
+    dragging = card;
+    const rect = card.getBoundingClientRect();
+    fingerOffsetY = clientY - rect.top;
+    placeholder = document.createElement('div');
+    placeholder.className = 'drag-placeholder';
+    placeholder.style.height = rect.height + 'px';
+    card.after(placeholder);
+    clone = card.cloneNode(true);
+    Object.assign(clone.style, {
+      position:'fixed', left:rect.left+'px', top:rect.top+'px',
+      width:rect.width+'px', margin:'0', zIndex:'9999',
+      pointerEvents:'none', opacity:'0.88',
+      boxShadow:'0 8px 28px rgba(0,0,0,.28)',
+      transition:'none', animation:'none',
+    });
+    document.body.appendChild(clone);
+    card.classList.add('dragging');
+  }
+
+  function moveDrag(clientY) {
+    if (!dragging) return;
+    clone.style.top = (clientY - fingerOffsetY) + 'px';
+    const cards = pendingCards();
+    let placed = false;
+    for (const c of cards) {
+      const r = c.getBoundingClientRect();
+      if (clientY < r.top + r.height / 2) { c.before(placeholder); placed = true; break; }
+    }
+    if (!placed && cards.length) cards[cards.length - 1].after(placeholder);
+  }
+
+  function endDrag() {
+    if (!dragging) return;
+    placeholder.replaceWith(dragging);
+    dragging.classList.remove('dragging');
+    clone.remove();
+    const ids = [...content.querySelectorAll('.item-card:not(.bought)')]
+      .map(c => c.dataset.id).filter(Boolean);
+    saveDragOrder(ids);
+    dragging = clone = placeholder = null;
+  }
+
+  content.addEventListener('touchstart', e => {
+    if (!e.target.closest('.drag-handle')) return;
+    e.preventDefault();
+    const card = e.target.closest('.item-card');
+    if (!card || card.classList.contains('bought')) return;
+    startDrag(card, e.touches[0].clientY);
+    const onMove = ev => { ev.preventDefault(); moveDrag(ev.touches[0].clientY); };
+    const onEnd = () => {
+      endDrag();
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onEnd);
+    };
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onEnd);
+  }, { passive: false });
+
+  content.addEventListener('mousedown', e => {
+    if (!e.target.closest('.drag-handle')) return;
+    e.preventDefault();
+    const card = e.target.closest('.item-card');
+    if (!card || card.classList.contains('bought')) return;
+    startDrag(card, e.clientY);
+    const onMove = ev => moveDrag(ev.clientY);
+    const onEnd = () => {
+      endDrag();
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onEnd);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onEnd);
+  });
+}
+
+function saveDragOrder(orderedIds) {
+  if (!groupId) return;
+  const updates = {};
+  orderedIds.forEach((id, i) => { updates[`${id}/order`] = i * 100; });
+  update(ref(db, `groups/${groupId}/items`), updates).catch(() => {});
 }
 
 // ══════════════════════════════════════════════════
