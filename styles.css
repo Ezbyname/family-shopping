@@ -1840,3 +1840,16 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
 .import-preview-note{font-size:11px;color:var(--muted);flex-shrink:0}
 
 .bp-fallback-note{font-size:11px;color:var(--muted);text-align:center;padding:6px 10px 2px;opacity:.8}
+
+/* ── DEPARTMENT MODE (Stage 4) ────────────────────────────────────────────── */
+.dept-mode-toggle{display:flex;gap:4px;padding:5px 10px 2px;direction:rtl}
+.dmt-btn{font-size:11px;font-weight:600;padding:3px 11px;border-radius:12px;
+  border:1.5px solid var(--border);background:transparent;color:var(--muted);
+  cursor:pointer;transition:background .15s,color .15s,border-color .15s;line-height:1.6}
+.dmt-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.dept-header{display:flex;align-items:center;gap:6px;padding:13px 3px 4px;direction:rtl}
+.dept-header:first-child{padding-top:5px}
+.dept-icon{font-size:14px;line-height:1;flex-shrink:0}
+.dept-label{font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--text);flex:1}
+.dept-count{font-size:10px;color:var(--muted);background:var(--surface);
+  border-radius:8px;padding:1px 6px;flex-shrink:0}
