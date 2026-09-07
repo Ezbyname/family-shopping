@@ -2391,7 +2391,7 @@ function initDragDrop() {
   const content = document.getElementById('list-content');
   if (!content) return;
 
-  let dragging = null, clone = null, placeholder = null, fingerOffsetY = 0;
+  let dragging = null, clone = null, fingerOffsetY = 0;
 
   function pendingCards() {
     return [...content.querySelectorAll('.item-card:not(.bought):not(.dragging)')];
@@ -2401,10 +2401,6 @@ function initDragDrop() {
     dragging = card;
     const rect = card.getBoundingClientRect();
     fingerOffsetY = clientY - rect.top;
-    placeholder = document.createElement('div');
-    placeholder.className = 'drag-placeholder';
-    placeholder.style.height = rect.height + 'px';
-    card.after(placeholder);
     clone = card.cloneNode(true);
     Object.assign(clone.style, {
       position:'fixed', left:rect.left+'px', top:rect.top+'px',
@@ -2424,20 +2420,19 @@ function initDragDrop() {
     let placed = false;
     for (const c of cards) {
       const r = c.getBoundingClientRect();
-      if (clientY < r.top + r.height / 2) { c.before(placeholder); placed = true; break; }
+      if (clientY < r.top + r.height / 2) { c.before(dragging); placed = true; break; }
     }
-    if (!placed && cards.length) cards[cards.length - 1].after(placeholder);
+    if (!placed && cards.length) cards[cards.length - 1].after(dragging);
   }
 
   function endDrag() {
     if (!dragging) return;
-    placeholder.replaceWith(dragging);
     dragging.classList.remove('dragging');
     clone.remove();
     const ids = [...content.querySelectorAll('.item-card:not(.bought)')]
       .map(c => c.dataset.id).filter(Boolean);
     saveDragOrder(ids);
-    dragging = clone = placeholder = null;
+    dragging = clone = null;
   }
 
   content.addEventListener('touchstart', e => {

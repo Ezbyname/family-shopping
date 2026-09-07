@@ -263,9 +263,7 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
 .drag-handle{cursor:grab;color:var(--muted);font-size:20px;padding:4px 2px;flex-shrink:0;
   opacity:.35;touch-action:none;user-select:none;-webkit-user-select:none;line-height:1}
 .drag-handle:active{cursor:grabbing;opacity:.7}
-.item-card.dragging{display:none}
-.drag-placeholder{border:2px dashed var(--accent);border-radius:var(--radius);
-  margin-bottom:6px;background:rgba(99,102,241,.05)}
+.item-card.dragging{visibility:hidden}
 .act-btn{width:27px;height:27px;border-radius:50%;border:none;cursor:pointer;
   display:flex;align-items:center;justify-content:center;font-size:13px;
   transition:transform .1s,background .15s;background:var(--card2);color:var(--muted);}
