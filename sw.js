@@ -1,7 +1,7 @@
 // sw.js — Family Shopping PWA Service Worker v3
 // Strategy: Network-first for API/Firebase, Cache-first for app shell
 
-const CACHE_VERSION = 'fsl-v17';
+const CACHE_VERSION = 'fsl-v18';
 
 const APP_SHELL = [
   '/',
@@ -45,6 +45,13 @@ self.addEventListener('activate', event => {
       ))
       .then(() => self.clients.claim())
   );
+});
+
+// ── [DIAG] Message handler — replies with cache version for runtime proof ────
+self.addEventListener('message', event => {
+  if (event.data?.type === 'GET_CACHE_VERSION') {
+    event.source?.postMessage({ type: 'CACHE_VERSION_REPLY', version: CACHE_VERSION });
+  }
 });
 
 // ── Fetch: tiered strategy ────────────────────────────────────────────────────
