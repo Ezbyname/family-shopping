@@ -143,6 +143,7 @@ function _renderDeptToggle() {
     `<button class="dmt-btn${deptMode ? ' active' : ''}" data-mode="dept"   onclick="setDeptMode(true)">מחלקות</button>`;
   const panel   = document.getElementById('list-panel');
   const content = document.getElementById('list-content');
+  if (!panel || !content) return;
   panel.insertBefore(bar, content);
 }
 
@@ -2965,7 +2966,7 @@ function _bpSelectName(p, queryLang) {
   const he = (p.product_name_he || '').trim();
   const ar = (p.product_name_ar || '').trim();
   const en = (p.product_name    || '').trim();
-  if (queryLang === 'he') return he || en || ar;
+  if (queryLang === 'he') return he || en;
   if (queryLang === 'ar') return ar || he || en;
   return en || he || ar;
 }
@@ -3097,9 +3098,17 @@ async function _bpRunSearch(query, signal) {
 
     if (signal.aborted) return;
 
+    // Eligibility: name language must be compatible with query language (before scoring)
+    const eligible = raw.filter(p => {
+      const nl = _bpDetectLang(p.name);
+      if (queryLang === 'he') return nl === 'he' || nl === 'latin';
+      if (queryLang === 'ar') return nl === 'ar' || nl === 'he' || nl === 'latin';
+      return true;
+    });
+
     // Score every candidate, filter irrelevant ones, sort by relevance
     const MIN_SCORE = queryLang !== 'latin' ? -10 : -20;
-    const _scored = raw.map(p => ({ ...p, _s: _bpScore(p, normQ, queryLang, enQuery, queryBrand) }));
+    const _scored = eligible.map(p => ({ ...p, _s: _bpScore(p, normQ, queryLang, enQuery, queryBrand) }));
     const topScore = _scored.length ? Math.max(..._scored.map(p => p._s)) : 0;
     _bpProducts = _scored
       .filter(p => p._s > MIN_SCORE)
