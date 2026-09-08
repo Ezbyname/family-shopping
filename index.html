@@ -139,6 +139,10 @@
       autocomplete="off" dir="rtl"
       oninput="onListSearch(this.value)">
   </div>
+  <div id="dept-mode-toggle" class="dept-mode-toggle" style="display:none">
+    <button class="dmt-btn active" data-mode="manual" onclick="setDeptMode(false)">סדר ידני</button>
+    <button class="dmt-btn"       data-mode="dept"   onclick="setDeptMode(true)">מחלקות</button>
+  </div>
   <div id="list-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
     <div class="list-wrap" id="list-content"></div>
     <!-- Basket totals bar — shown when ≥1 item has a cached price -->

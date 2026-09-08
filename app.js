@@ -126,25 +126,13 @@ function setDeptMode(val) {
 window.setDeptMode = setDeptMode;
 
 function _renderDeptToggle() {
-  // Only show on 'all' tab (search-active or not — search + dept are independent)
+  const bar = document.getElementById('dept-mode-toggle');
+  if (!bar) return;
   const show = curTab === 'all';
-  let bar = document.getElementById('dept-mode-toggle');
-  if (!show) { if (bar) bar.remove(); return; }
-  if (bar) {
-    bar.querySelector('[data-mode="manual"]').classList.toggle('active', !deptMode);
-    bar.querySelector('[data-mode="dept"]').classList.toggle('active',   deptMode);
-    return;
-  }
-  bar = document.createElement('div');
-  bar.id = 'dept-mode-toggle';
-  bar.className = 'dept-mode-toggle';
-  bar.innerHTML =
-    `<button class="dmt-btn${deptMode ? '' : ' active'}" data-mode="manual" onclick="setDeptMode(false)">סדר ידני</button>` +
-    `<button class="dmt-btn${deptMode ? ' active' : ''}" data-mode="dept"   onclick="setDeptMode(true)">מחלקות</button>`;
-  const panel   = document.getElementById('list-panel');
-  const content = document.getElementById('list-content');
-  if (!panel || !content) return;
-  panel.insertBefore(bar, content);
+  bar.style.display = show ? 'flex' : 'none';
+  if (!show) return;
+  bar.querySelector('[data-mode="manual"]').classList.toggle('active', !deptMode);
+  bar.querySelector('[data-mode="dept"]').classList.toggle('active',   deptMode);
 }
 
 // ── USER IDENTITY ─────────────────────────────────────────────────────────
