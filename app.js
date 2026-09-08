@@ -125,11 +125,18 @@ function setDeptMode(val) {
 }
 window.setDeptMode = setDeptMode;
 
+// [DIAG] counter to track _renderDeptToggle call sequence
+let _diagToggleCalls = 0;
 function _renderDeptToggle() {
   const bar = document.getElementById('dept-mode-toggle');
+  // [DIAG-BUG3] log every call: element existence, curTab, computed display
+  _diagToggleCalls++;
+  const computed = bar ? window.getComputedStyle(bar).display : 'N/A';
+  console.log(`[diag-toggle #${_diagToggleCalls}] bar=${bar?'found':'MISSING'} curTab=${curTab} deptMode=${deptMode} computedDisplay=${computed} inlineDisplay=${bar?bar.style.display:'N/A'}`);
   if (!bar) return;
   const show = curTab === 'all';
   bar.style.display = show ? 'flex' : 'none';
+  console.log(`[diag-toggle #${_diagToggleCalls}] → set display=${show?'flex':'none'} (show=${show})`);
   if (!show) return;
   bar.querySelector('[data-mode="manual"]').classList.toggle('active', !deptMode);
   bar.querySelector('[data-mode="dept"]').classList.toggle('active',   deptMode);
@@ -529,6 +536,25 @@ function showSyncStaleBanner(ageLabel) {
 }
 
 function connectToGroup(){
+  // [DIAG-BUG3] log asset version proof: SW cache name, index.html toggle presence
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistration().then(reg => {
+      console.log('[diag-version] SW scope=' + (reg ? reg.scope : 'none') +
+        ' SW active state=' + (reg?.active ? reg.active.state : 'none'));
+      if (reg?.active) {
+        // Post message to SW to get cache version — SW must handle it (no-op if not implemented)
+        navigator.serviceWorker.controller?.postMessage({ type: 'GET_CACHE_VERSION' });
+      }
+    });
+  }
+  // Prove toggle exists in loaded DOM right now
+  const toggleEl = document.getElementById('dept-mode-toggle');
+  const searchBarEl = document.getElementById('list-search-bar');
+  console.log('[diag-version] connectToGroup start:' +
+    ' #dept-mode-toggle exists=' + !!toggleEl +
+    ' #dept-mode-toggle.inline=' + (toggleEl ? toggleEl.style.display : 'N/A') +
+    ' #list-search-bar exists=' + !!searchBarEl +
+    ' #list-search-bar.inline=' + (searchBarEl ? searchBarEl.style.display : 'N/A'));
   showScreen('main-screen');
   setTab('all');
   // Cleanup old notifications silently (>30 days)
@@ -627,6 +653,8 @@ window.setTab=function(tab){
 };
 
 window.onListSearch = function(val) {
+  // [DIAG-BUG3] fires when oninput fires on #list-search-input
+  console.log('[diag-search] onListSearch fired val=' + JSON.stringify(val) + ' activeEl=' + (document.activeElement ? document.activeElement.tagName + '#' + (document.activeElement.id || '?') : 'N/A'));
   listSearchQuery = val;
   renderList();
 };
@@ -694,6 +722,25 @@ function renderList(){
   }
   wrap.innerHTML=html;
   initDragDrop();
+  // [DIAG-BUG3] full state snapshot after each renderList — open DevTools console
+  (function _diagRenderListState() {
+    const toggle = document.getElementById('dept-mode-toggle');
+    const searchBar = document.getElementById('list-search-bar');
+    const searchInput = document.getElementById('list-search-input');
+    const cs = s => s ? window.getComputedStyle(s).display : 'N/A';
+    console.log('[diag-renderList] curTab=' + curTab +
+      ' deptMode=' + deptMode +
+      ' listSearchQuery=' + JSON.stringify(listSearchQuery) +
+      ' items=' + Object.keys(items).length +
+      ' | toggle exists=' + !!toggle +
+      ' toggle.inline=' + (toggle ? toggle.style.display : 'N/A') +
+      ' toggle.computed=' + cs(toggle) +
+      ' | searchBar.inline=' + (searchBar ? searchBar.style.display : 'N/A') +
+      ' searchBar.computed=' + cs(searchBar) +
+      ' | searchInput exists=' + !!searchInput +
+      ' searchInput.computed=' + cs(searchInput) +
+      ' activeEl=' + (document.activeElement ? document.activeElement.tagName + '#' + (document.activeElement.id || '?') : 'N/A'));
+  })();
   // Load cheapest price chips for pending items with barcodes (non-blocking)
   if(curTab==='all') setTimeout(loadItemPricesInBackground, 80);
 }
@@ -2517,10 +2564,15 @@ function itemHTML(item, suppressDrag = false) {
 }
 
 // ── Drag-and-drop ordering ────────────────────────
+// [DIAG] count how many times initDragDrop registers a touchstart listener
+let _diagDragDropCalls = 0;
 function initDragDrop() {
   if (curTab !== 'all' || listSearchQuery || deptMode) return;
   const content = document.getElementById('list-content');
   if (!content) return;
+  // [DIAG-BUG3] log each registration — proves whether listeners accumulate
+  _diagDragDropCalls++;
+  console.log(`[diag-dragdrop #${_diagDragDropCalls}] registering touchstart on #list-content (passive:false)`);
 
   let dragging = null, clone = null, fingerOffsetY = 0;
 
@@ -2567,6 +2619,10 @@ function initDragDrop() {
   }
 
   content.addEventListener('touchstart', e => {
+    // [DIAG-BUG3] fires for every touch on #list-content — if this fires on search-input tap,
+    // we have a containment bug. Log target and whether preventDefault will be called.
+    const isHandle = !!e.target.closest('.drag-handle');
+    console.log(`[diag-dragdrop touchstart handler#${_diagDragDropCalls}] target=${e.target.tagName}#${e.target.id||'?'}.${e.target.className||'?'} isHandle=${isHandle}`);
     if (!e.target.closest('.drag-handle')) return;
     e.preventDefault();
     const card = e.target.closest('.item-card');
@@ -3026,6 +3082,9 @@ function _bpScore(p, query, queryLang, enQuery, queryBrand) {
 // ────────────────────────────────────────────────────────────────────────────
 
 async function _bpRunSearch(query, signal) {
+  // [DIAG-BUG5A] instrument full search pipeline
+  const _diagBpSearchSeq = _diagBpSeq; // inherit bp call sequence
+  console.log(`[diag-bp-search #${_diagBpSearchSeq}] _bpRunSearch START query=${JSON.stringify(query)} signal.aborted=${signal.aborted}`);
   const resultsEl = document.getElementById('bp-results');
   const queryEl   = document.getElementById('bp-query-text');
   if (queryEl)   queryEl.textContent = `מחפש "${query}"...`;
@@ -3084,7 +3143,8 @@ async function _bpRunSearch(query, signal) {
       } catch(e) { if (e.name === 'AbortError') return; }
     }
 
-    if (signal.aborted) return;
+    if (signal.aborted) { console.log(`[diag-bp-search #${_diagBpSearchSeq}] ABORTED after fetch loop`); return; }
+    console.log(`[diag-bp-search #${_diagBpSearchSeq}] raw candidates=${raw.length} queryLang=${queryLang} normQ=${JSON.stringify(normQ)}`);
 
     // Eligibility: name language must be compatible with query language (before scoring)
     const eligible = raw.filter(p => {
@@ -3094,6 +3154,7 @@ async function _bpRunSearch(query, signal) {
       return true;
     });
 
+    console.log(`[diag-bp-search #${_diagBpSearchSeq}] eligible (lang-compatible)=${eligible.length} of raw=${raw.length}`);
     // Score every candidate, filter irrelevant ones, sort by relevance
     const MIN_SCORE = queryLang !== 'latin' ? -10 : -20;
     const _scored = eligible.map(p => ({ ...p, _s: _bpScore(p, normQ, queryLang, enQuery, queryBrand) }));
@@ -3109,7 +3170,13 @@ async function _bpRunSearch(query, signal) {
       _bpFallback = true;
       _bpProducts = [..._scored].sort((a, b) => b._s - a._s).slice(0, 8).map(({ _s, ...p }) => p);
     }
+    // [DIAG-BUG5A] final state before DOM render
+    console.log(`[diag-bp-search #${_diagBpSearchSeq}] _bpProducts=${_bpProducts.length} _bpFallback=${_bpFallback} topScore=${topScore} MIN_SCORE=${MIN_SCORE}`);
     console.log('[search-quality]', { rawQuery, normalizedQuery: normQ, translatedQuery: enQuery, topScore, resultCount: _bpProducts.length, candidateCount: raw.length, fallback: _bpFallback });
+    // [DIAG-BUG5A] confirm DOM target exists and overlay is visible
+    const overlayVisible = document.getElementById('bp-overlay')?.classList.contains('show');
+    const resultsVisible = resultsEl ? window.getComputedStyle(resultsEl).display !== 'none' : false;
+    console.log(`[diag-bp-search #${_diagBpSearchSeq}] overlayVisible=${overlayVisible} resultsElExists=${!!resultsEl} resultsVisible=${resultsVisible}`);
 
     if (queryEl) queryEl.textContent = _bpProducts.length
       ? `מצאנו ${_bpProducts.length} מוצרים עבור "${query}"`
@@ -3141,6 +3208,8 @@ async function _bpRunSearch(query, signal) {
       </div>`;
     }).join('');
   } catch(e) {
+    // [DIAG-BUG5A] catch — distinguishes abort from real error
+    console.log(`[diag-bp-search] CAUGHT name=${e.name} message=${e.message}`);
     if (e.name === 'AbortError') return;
     const resultsEl = document.getElementById('bp-results');
     if (resultsEl) resultsEl.innerHTML = `<div class="bp-loading">⚠️ ${esc(e.message)}</div>`;
@@ -3149,20 +3218,27 @@ async function _bpRunSearch(query, signal) {
 
 // openBrandPicker(mode='new')           — from add-bar brand button
 // openBrandPicker('attach', id, name)   — from ip-tile on existing items
+// [DIAG] sequence counter for openBrandPicker calls
+let _diagBpSeq = 0;
 window.openBrandPicker = async function(mode, itemId, itemName) {
+  const seq = ++_diagBpSeq;
+  console.log(`[diag-bp #${seq}] openBrandPicker called mode=${mode} itemId=${itemId} itemName=${itemName}`);
   _bpMode   = (mode === 'attach') ? 'attach' : (mode === 'fav-attach') ? 'fav-attach' : 'new';
   _bpItemId = itemId || null;
   try { itemName = decodeURIComponent(itemName || ''); } catch(_) {}
 
+  const hadPrevCtrl = !!_bpAbortCtrl;
   if (_bpAbortCtrl) _bpAbortCtrl.abort();
   _bpAbortCtrl = new AbortController();
   const signal = _bpAbortCtrl.signal;
+  console.log(`[diag-bp #${seq}] abortedPrev=${hadPrevCtrl} newSignal created`);
 
   const isAttachMode = _bpMode === 'attach' || _bpMode === 'fav-attach';
   const query = isAttachMode
     ? (itemName || '')
     : (document.getElementById('new-item-input')?.value.trim() || '');
-  if (!query) return;
+  console.log(`[diag-bp #${seq}] isAttachMode=${isAttachMode} query=${JSON.stringify(query)}`);
+  if (!query) { console.warn(`[diag-bp #${seq}] EMPTY QUERY — returning early`); return; }
 
   // Show/hide mode-specific controls
   const hintEl      = document.getElementById('bp-item-hint');
@@ -3182,7 +3258,9 @@ window.openBrandPicker = async function(mode, itemId, itemName) {
 
   document.getElementById('bp-overlay')?.classList.add('show');
   document.body.classList.add('sheet-open');
+  console.log(`[diag-bp #${seq}] overlay shown, calling _bpRunSearch`);
   await _bpRunSearch(query, signal);
+  console.log(`[diag-bp #${seq}] _bpRunSearch returned _bpProducts.length=${_bpProducts.length}`);
 };
 
 window._bpOnSearchInput = function() {
@@ -5900,6 +5978,19 @@ onAuthStateChanged(auth, async (user) => {
 
         loadSavedProfile();
         connectToGroup();
+        // [DIAG-BUG3] attach focus/blur/touchstart instrumentation on search input (once)
+        setTimeout(() => {
+          const si = document.getElementById('list-search-input');
+          if (si && !si._diagAttached) {
+            si._diagAttached = true;
+            si.addEventListener('focus', () => console.log('[diag-search] INPUT FOCUSED activeEl=' + document.activeElement?.id));
+            si.addEventListener('blur',  () => console.log('[diag-search] INPUT BLURRED'));
+            si.addEventListener('touchstart', e => console.log('[diag-search] INPUT touchstart target=' + e.target.id), { passive: true });
+            console.log('[diag-search] listeners attached to #list-search-input');
+          } else if (!si) {
+            console.warn('[diag-search] #list-search-input NOT FOUND after connectToGroup');
+          }
+        }, 200);
         setTimeout(updateHeaderAvatar, 300);
         upsertUserProfile(firebaseUid).catch(() => {}); // fire-and-forget
       } catch(_) {
@@ -6543,6 +6634,17 @@ async function _flushOfflineQueue() {
 window.addEventListener('online',  () => { _updateOfflineIndicator(); setTimeout(_flushOfflineQueue, 600); });
 window.addEventListener('offline', _updateOfflineIndicator);
 _updateOfflineIndicator();
+
+// [DIAG-BUG3] receive SW cache version reply — proves which SW version is active
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', event => {
+    if (event.data?.type === 'CACHE_VERSION_REPLY') {
+      console.log('[diag-version] SW CACHE_VERSION=' + event.data.version +
+        ' | expected fsl-v18 or newer | loaded index.html has #dept-mode-toggle=' +
+        !!document.getElementById('dept-mode-toggle'));
+    }
+  });
+}
 
 // ══════════════════════════════════════════════════
 // SHOPPING LIST PRICE CHIPS  (stability-safe)

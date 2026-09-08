@@ -129,11 +129,11 @@
       maxlength="50" onkeydown="if(event.key==='Enter')addItem()"
       oninput="_onAddInputChange()">
     <button class="brand-pick-btn" id="brand-pick-btn" onclick="openBrandPicker()" title="בחר מותג ספציפי">🔍</button>
-    <button class="import-btn" id="import-list-btn" onclick="openImportModal()" title="ייבוא רשימה מוואטסאפ">📋</button>
+    <button class="import-btn" id="import-list-btn" onclick="openImportModal()" title="ייבוא רשימה">📥</button>
     <button class="add-btn" data-testid="add-item-btn" onclick="addItem()">+</button>
   </div>
   <div id="list-search-bar" class="list-search-bar" style="display:none">
-    <span class="list-search-icon">🔎</span>
+    <span class="list-search-icon" aria-hidden="true">🔎</span>
     <input id="list-search-input" class="list-search-input" type="search"
       placeholder="חפש ברשימה..."
       autocomplete="off" dir="rtl"
