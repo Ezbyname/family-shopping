@@ -186,7 +186,7 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
 .bp-search:focus{border-color:var(--accent)}
 
 /* ── ITEM PRODUCT TILE (ip-tile) ── */
-.ip-tile-wrap{position:relative;flex-shrink:0}
+.ip-tile-wrap{position:relative;flex-shrink:0;overflow:visible}
 .ip-tile{width:62px;min-height:62px;border-radius:13px;
   border:1.5px dashed var(--border);background:var(--card2);
   display:flex;flex-direction:column;align-items:center;justify-content:center;
