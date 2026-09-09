@@ -2507,12 +2507,22 @@ function itemHTML(item, suppressDrag = false) {
     const iconHtml = at.image
       ? `<img class="ip-tile-img" src="${esc(at.image)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"><span class="ip-tile-icon" style="display:none">${_ipEmoji(item.name)}</span>`
       : `<span class="ip-tile-icon">${_ipEmoji(item.name)}</span>`;
+    const _encId       = item.id;
+    const _encImg      = encodeURIComponent(at.image||'').replace(/'/g,'%27');
+    const _encAtName   = encodeURIComponent(at.name||'').replace(/'/g,'%27');
+    const _encAtBrand  = encodeURIComponent(at.brand||'').replace(/'/g,'%27');
+    const _encAtSize   = encodeURIComponent(at.size||'').replace(/'/g,'%27');
+    const _encItemName = encodeURIComponent(item.name||'').replace(/'/g,'%27');
+    const _enlargeBtn  = at.image
+      ? `<button class="ip-enlarge-btn" onclick="openIpPreview('${_encId}','${_encImg}','${_encAtName}','${_encAtBrand}','${_encAtSize}','${_encItemName}',event)" title="הגדל תמונה" aria-label="הגדל תמונה">⊕</button>`
+      : '';
     ipTile = `<div class="ip-tile-wrap">
       <button class="ip-tile has-product" onclick="openBrandPicker('attach','${item.id}','${encodeURIComponent(item.name||'').replace(/'/g,'%27')}')" title="${label}">
         ${iconHtml}
         <span class="ip-tile-label">${label}</span>
         ${sub ? `<span class="ip-tile-sub">${sub}</span>` : ''}
       </button>
+      ${_enlargeBtn}
       <button class="ip-clear-btn" onclick="clearItemProduct('${item.id}',event)" title="הסר מוצר">✕</button>
     </div>`;
   } else if (!isFavTab) {
@@ -3346,6 +3356,68 @@ window.clearItemProduct = function(itemId, e) {
   if (e) e.stopPropagation();
   update(ref(db, `groups/${groupId}/items/${itemId}`), { attached: null })
     .catch(e => console.warn('[ip] clear failed:', e.message));
+};
+
+// ── Product image preview overlay ────────────────────────────────────────────
+let _ipPrevItemId = null;
+let _ipPrevEncodedItemName = null;
+
+window.openIpPreview = function(itemId, imageUrl, name, brand, size, encodedItemName, e) {
+  if (e) e.stopPropagation();
+  try { imageUrl = decodeURIComponent(imageUrl); } catch(_){}
+  try { name     = decodeURIComponent(name);     } catch(_){}
+  try { brand    = decodeURIComponent(brand);    } catch(_){}
+  try { size     = decodeURIComponent(size);     } catch(_){}
+
+  _ipPrevItemId = itemId;
+  _ipPrevEncodedItemName = encodedItemName;
+
+  const img     = document.getElementById('ip-preview-img');
+  const nameEl  = document.getElementById('ip-preview-name');
+  const subEl   = document.getElementById('ip-preview-sub');
+  const confirm = document.getElementById('ip-confirm-row');
+
+  if (img)     { img.src = imageUrl; img.alt = name; }
+  if (nameEl)  nameEl.textContent = name;
+  if (subEl)   {
+    const sub = [brand, size].filter(Boolean).join(' · ');
+    subEl.textContent = sub;
+    subEl.hidden = !sub;
+  }
+  if (confirm) confirm.hidden = true;
+
+  document.getElementById('ip-preview-overlay')?.classList.add('show');
+  document.body.classList.add('sheet-open');
+};
+
+window.closeIpPreview = function() {
+  document.getElementById('ip-preview-overlay')?.classList.remove('show');
+  document.body.classList.remove('sheet-open');
+  _ipPrevItemId = null;
+  _ipPrevEncodedItemName = null;
+};
+
+window._ipPrevChooseAnother = function() {
+  const itemId = _ipPrevItemId;
+  const enc    = _ipPrevEncodedItemName;
+  closeIpPreview();
+  if (itemId && enc !== null) openBrandPicker('attach', itemId, enc);
+};
+
+window._ipPrevShowConfirm = function() {
+  const row = document.getElementById('ip-confirm-row');
+  if (row) row.hidden = false;
+};
+
+window._ipPrevCancelRemove = function() {
+  const row = document.getElementById('ip-confirm-row');
+  if (row) row.hidden = true;
+};
+
+window._ipPrevConfirmRemove = function() {
+  const itemId = _ipPrevItemId;
+  closeIpPreview();
+  if (itemId) clearItemProduct(itemId);
 };
 
 // Override addItem to include attribution and activity
