@@ -3395,6 +3395,9 @@ window.closeIpPreview = function() {
   document.body.classList.remove('sheet-open');
   _ipPrevItemId = null;
   _ipPrevEncodedItemName = null;
+  const row = document.getElementById('ip-confirm-row');
+  if (row) row.hidden = true;
+  document.getElementById('ip-preview-remove-btn')?.removeAttribute('hidden');
 };
 
 window._ipPrevChooseAnother = function() {
@@ -3405,6 +3408,7 @@ window._ipPrevChooseAnother = function() {
 };
 
 window._ipPrevShowConfirm = function() {
+  document.getElementById('ip-preview-remove-btn')?.setAttribute('hidden', '');
   const row = document.getElementById('ip-confirm-row');
   if (row) row.hidden = false;
 };
@@ -3412,6 +3416,7 @@ window._ipPrevShowConfirm = function() {
 window._ipPrevCancelRemove = function() {
   const row = document.getElementById('ip-confirm-row');
   if (row) row.hidden = true;
+  document.getElementById('ip-preview-remove-btn')?.removeAttribute('hidden');
 };
 
 window._ipPrevConfirmRemove = function() {
