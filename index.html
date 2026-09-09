@@ -393,15 +393,17 @@
     <div class="ip-preview-img-wrap">
       <img class="ip-preview-img" id="ip-preview-img" src="" alt="" loading="lazy">
     </div>
+    <div class="ip-preview-price-row" id="ip-preview-price-row" hidden>
+      <span class="ip-preview-price-label">מחיר זול ביותר:</span>
+      <span class="ip-preview-price-val" id="ip-preview-price-val"></span>
+      <span class="ip-preview-price-chain" id="ip-preview-price-chain"></span>
+    </div>
     <div class="ip-preview-name" id="ip-preview-name"></div>
     <div class="ip-preview-sub" id="ip-preview-sub"></div>
     <div class="ip-preview-actions">
       <button class="ip-preview-choose-btn" onclick="window._ipPrevChooseAnother()">בחר מוצר אחר</button>
-      <button class="ip-preview-remove-btn" id="ip-preview-remove-btn" onclick="window._ipPrevShowConfirm()">הסר מוצר</button>
-      <div class="ip-confirm-row" id="ip-confirm-row" hidden>
-        <button class="ip-confirm-yes" onclick="window._ipPrevConfirmRemove()">בטוח, הסר</button>
-        <button class="ip-confirm-no" onclick="window._ipPrevCancelRemove()">ביטול</button>
-      </div>
+      <button class="ip-preview-remove-btn" onclick="window._ipPrevAskRemove()">הסר מוצר</button>
+      <button class="ip-preview-cancel-btn" onclick="closeIpPreview()">ביטול</button>
     </div>
   </div>
 </div>

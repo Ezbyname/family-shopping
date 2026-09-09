@@ -3372,10 +3372,10 @@ window.openIpPreview = function(itemId, imageUrl, name, brand, size, encodedItem
   _ipPrevItemId = itemId;
   _ipPrevEncodedItemName = encodedItemName;
 
-  const img     = document.getElementById('ip-preview-img');
-  const nameEl  = document.getElementById('ip-preview-name');
-  const subEl   = document.getElementById('ip-preview-sub');
-  const confirm = document.getElementById('ip-confirm-row');
+  const img    = document.getElementById('ip-preview-img');
+  const nameEl = document.getElementById('ip-preview-name');
+  const subEl  = document.getElementById('ip-preview-sub');
+  const priceRow = document.getElementById('ip-preview-price-row');
 
   if (img)     { img.src = imageUrl; img.alt = name; }
   if (nameEl)  nameEl.textContent = name;
@@ -3384,10 +3384,31 @@ window.openIpPreview = function(itemId, imageUrl, name, brand, size, encodedItem
     subEl.textContent = sub;
     subEl.hidden = !sub;
   }
-  if (confirm) confirm.hidden = true;
+  if (priceRow) priceRow.hidden = true;
 
   document.getElementById('ip-preview-overlay')?.classList.add('show');
   document.body.classList.add('sheet-open');
+
+  // Load cheapest price non-blocking
+  const item = items && _ipPrevItemId ? Object.values(items).find(i => i.id === _ipPrevItemId || (items[_ipPrevItemId] && i === items[_ipPrevItemId])) : null;
+  const barcode = (item && (item.barcode || item.attached?.barcode)) ||
+    (items && items[_ipPrevItemId] && (items[_ipPrevItemId].barcode || items[_ipPrevItemId].attached?.barcode));
+  if (barcode && isValidBarcode(barcode) && typeof _fetchPricesForBarcode === 'function') {
+    _fetchPricesForBarcode(barcode).then(result => {
+      if (!document.getElementById('ip-preview-overlay')?.classList.contains('show')) return;
+      if (!result?.prices?.length) return;
+      const best = result.prices[0];
+      const p = best.displayPrice || best.price;
+      if (!p) return;
+      const chainLabel = best.chainName || best.storeName || '';
+      const valEl   = document.getElementById('ip-preview-price-val');
+      const chainEl = document.getElementById('ip-preview-price-chain');
+      const row     = document.getElementById('ip-preview-price-row');
+      if (valEl)   valEl.textContent = `₪${p.toFixed(2)}`;
+      if (chainEl) chainEl.textContent = chainLabel;
+      if (row)     row.hidden = false;
+    }).catch(() => {});
+  }
 };
 
 window.closeIpPreview = function() {
@@ -3395,9 +3416,6 @@ window.closeIpPreview = function() {
   document.body.classList.remove('sheet-open');
   _ipPrevItemId = null;
   _ipPrevEncodedItemName = null;
-  const row = document.getElementById('ip-confirm-row');
-  if (row) row.hidden = true;
-  document.getElementById('ip-preview-remove-btn')?.removeAttribute('hidden');
 };
 
 window._ipPrevChooseAnother = function() {
@@ -3407,22 +3425,12 @@ window._ipPrevChooseAnother = function() {
   if (itemId && enc !== null) openBrandPicker('attach', itemId, enc);
 };
 
-window._ipPrevShowConfirm = function() {
-  document.getElementById('ip-preview-remove-btn')?.setAttribute('hidden', '');
-  const row = document.getElementById('ip-confirm-row');
-  if (row) row.hidden = false;
-};
-
-window._ipPrevCancelRemove = function() {
-  const row = document.getElementById('ip-confirm-row');
-  if (row) row.hidden = true;
-  document.getElementById('ip-preview-remove-btn')?.removeAttribute('hidden');
-};
-
-window._ipPrevConfirmRemove = function() {
-  const itemId = _ipPrevItemId;
-  closeIpPreview();
-  if (itemId) clearItemProduct(itemId);
+window._ipPrevAskRemove = function() {
+  if (confirm('האם אתה בטוח שברצונך להסיר את המוצר?')) {
+    const itemId = _ipPrevItemId;
+    closeIpPreview();
+    if (itemId) clearItemProduct(itemId);
+  }
 };
 
 // Override addItem to include attribution and activity
