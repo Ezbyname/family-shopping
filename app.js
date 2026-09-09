@@ -2839,7 +2839,14 @@ window._onAddInputChange = function() {
 // Internal search runner — used by both 'new' and 'attach' modes
 // Quick Hebrew→English for OFX search (mirrors server-side HE_EN dict)
 const _BP_HE_EN = {
-  'חלב':'milk','גבינה':'cheese','קוטג':'cottage cheese',"קוטג'":'cottage cheese',
+  'חלב':'milk',
+  // Multi-word cheese phrases must appear before the generic 'גבינה' entry so the
+  // substring fallback in _bpTranslate finds the specific phrase first.
+  'גבינה לבנה':'white cheese','גבינה צהובה':'yellow cheese',
+  'גבינה קוטג':"cottage cheese",'גבינת שמנת':'cream cheese',
+  'גבינה עיזים':'goat cheese','גבינה בולגרית':'bulgarian cheese',
+  'גבינה מלוחה':'salted cheese','גבינה צפתית':'tzfatit cheese',
+  'גבינה':'cheese','קוטג':'cottage cheese',"קוטג'":'cottage cheese',
   'שמנת':'cream','יוגורט':'yogurt','חמאה':'butter','לחם':'bread','פיתה':'pita',
   'קמח':'flour','ביצים':'eggs','ביצה':'egg','קורנפלקס':'cornflakes',
   'שיבולת שועל':'oatmeal','גרנולה':'granola','אורז':'rice','פסטה':'pasta',
