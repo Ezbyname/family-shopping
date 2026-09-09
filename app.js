@@ -2514,7 +2514,7 @@ function itemHTML(item, suppressDrag = false) {
     const _encAtSize   = encodeURIComponent(at.size||'').replace(/'/g,'%27');
     const _encItemName = encodeURIComponent(item.name||'').replace(/'/g,'%27');
     const _enlargeBtn  = at.image
-      ? `<button class="ip-enlarge-btn" onclick="openIpPreview('${_encId}','${_encImg}','${_encAtName}','${_encAtBrand}','${_encAtSize}','${_encItemName}',event)" title="הגדל תמונה" aria-label="הגדל תמונה">⊕</button>`
+      ? `<button class="ip-enlarge-btn" onclick="openIpPreview('${_encId}','${_encImg}','${_encAtName}','${_encAtBrand}','${_encAtSize}','${_encItemName}',event)" title="הגדל תמונה" aria-label="הגדל תמונה">🔍</button>`
       : '';
     ipTile = `<div class="ip-tile-wrap">
       <button class="ip-tile has-product" onclick="openBrandPicker('attach','${item.id}','${encodeURIComponent(item.name||'').replace(/'/g,'%27')}')" title="${label}">
