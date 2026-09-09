@@ -207,7 +207,7 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
   display:flex;align-items:center;justify-content:center;color:var(--muted);
   transition:all .15s;padding:0;font-family:'Rubik',sans-serif}
 .ip-clear-btn:hover{background:var(--card);color:var(--text)}
-.ip-enlarge-btn{position:absolute;bottom:-5px;left:-5px;
+.ip-enlarge-btn{position:absolute;top:-5px;right:-5px;
   background:var(--accent);border:none;border-radius:50%;
   width:18px;height:18px;font-size:9px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;color:#fff;
