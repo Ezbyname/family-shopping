@@ -386,6 +386,27 @@
   </div>
 </div>
 
+<!-- PRODUCT IMAGE PREVIEW OVERLAY -->
+<div class="ip-preview-overlay" id="ip-preview-overlay" onclick="if(event.target===this)closeIpPreview()">
+  <div class="ip-preview-sheet">
+    <button class="ip-preview-close" onclick="closeIpPreview()" aria-label="סגור">✕</button>
+    <div class="ip-preview-img-wrap">
+      <img class="ip-preview-img" id="ip-preview-img" src="" alt="" loading="lazy">
+    </div>
+    <div class="ip-preview-name" id="ip-preview-name"></div>
+    <div class="ip-preview-sub" id="ip-preview-sub"></div>
+    <div class="ip-preview-actions">
+      <button class="ip-preview-choose-btn" onclick="window._ipPrevChooseAnother()">בחר מוצר אחר</button>
+      <button class="ip-preview-remove-btn" id="ip-preview-remove-btn" onclick="window._ipPrevShowConfirm()">הסר מוצר</button>
+      <div class="ip-confirm-row" id="ip-confirm-row" hidden>
+        <span class="ip-confirm-text">בטוח? פעולה בלתי הפיכה</span>
+        <button class="ip-confirm-yes" onclick="window._ipPrevConfirmRemove()">הסר</button>
+        <button class="ip-confirm-no" onclick="window._ipPrevCancelRemove()">ביטול</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- PRODUCT MODAL -->
 <div class="pm-overlay" id="pm-overlay" onclick="if(event.target===this)closeProductModal()">
   <div class="pm-sheet" id="pm-sheet">
