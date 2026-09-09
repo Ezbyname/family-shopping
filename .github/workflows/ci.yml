@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate capacitor.config.json server.url
         env:
-          VERCEL_PRODUCTION_URL: ${{ vars.VERCEL_PRODUCTION_URL }}
+          VERCEL_PRODUCTION_URL: ${{ vars.VERCEL_PRODUCTION_URL || 'https://family-shopping-one.vercel.app' }}
         run: node validate-capacitor-url.js
 
   # ── Job 1: Parser sanity (no Firebase needed) ────────────────────────────
