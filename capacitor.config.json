@@ -1,10 +1,10 @@
-﻿{
+{
   "appId": "com.ezbyname.familyshopping",
   "appName": "Family Shopping",
   "webDir": "www",
   "server": {
     "androidScheme": "https",
-    "url": "https://family-shopping.vercel.app"
+    "url": "https://family-shopping-one.vercel.app"
   },
   "android": {
     "allowMixedContent": false,
