@@ -60,7 +60,15 @@ Edit `app/src/main/AndroidManifest.xml` — replace both occurrences of:
 ```
 family-shopping.vercel.app
 ```
-with your actual domain.
+with the actual production domain:
+```
+family-shopping-one.vercel.app
+```
+
+> **Architecture note**: The APK is a Capacitor remote shell. It loads all web content
+> from `server.url` in `capacitor.config.json` — there are no bundled web assets.
+> A wrong URL causes a white screen. The canonical URL is `https://family-shopping-one.vercel.app`.
+> Run `node validate-capacitor-url.js` to verify before building the APK.
 
 ---
 

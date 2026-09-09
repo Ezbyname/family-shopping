@@ -20,6 +20,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ── Job 0: Capacitor URL guardrail ───────────────────────────────────────
+  capacitor-url-check:
+    name: Capacitor URL Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate capacitor.config.json server.url
+        env:
+          VERCEL_PRODUCTION_URL: ${{ vars.VERCEL_PRODUCTION_URL }}
+        run: node validate-capacitor-url.js
+
   # ── Job 1: Parser sanity (no Firebase needed) ────────────────────────────
   parser-sanity:
     name: Price Parser Sanity
