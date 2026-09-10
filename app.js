@@ -3402,7 +3402,7 @@ window.openIpPreview = function(itemId, imageUrl, name, brand, size, encodedItem
       if (!p) return;
       const chainLabel = best.chainName || best.storeName || '';
       const chainColor = (CHAIN_META[best.chainName] || {}).color || 'var(--green)';
-      const chainCount = new Set(result.prices.map(r => r.chainName || r.storeName).filter(Boolean)).size;
+      const chainCount = new Set(result.prices.map(r => r.chainName).filter(Boolean)).size;
       const valEl   = document.getElementById('ip-preview-price-val');
       const chainEl = document.getElementById('ip-preview-price-chain');
       const row     = document.getElementById('ip-preview-price-row');
@@ -6788,7 +6788,7 @@ async function loadItemPricesInBackground() {
 
         // Stable fingerprint — browsers normalise innerHTML so string compare is unreliable.
         // Instead compare the values that would cause a visible change.
-        const chainCount = new Set(prices.map(p => p.chainName || p.storeName).filter(Boolean)).size;
+        const chainCount = new Set(prices.map(p => p.chainName).filter(Boolean)).size;
         const chainColor = (CHAIN_META[best.chainName] || {}).color || 'var(--accent)';
         const fingerprint = `${totalP.toFixed(2)}|${chainLabel}|${isStale?1:0}|${chainCount}|${qty}`;
         if (chipArea.dataset.fingerprint !== fingerprint) {

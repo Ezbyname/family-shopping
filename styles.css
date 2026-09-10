@@ -1465,7 +1465,7 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
 /* ══ PRICE CHIP — shopping list item price preview ══ */
 .price-chip-area{min-height:0;overflow:hidden;display:block}
 .price-chip-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.price-chip-chain{font-size:11px;font-weight:700}
+.price-chip-chain{font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .price-chip-price{font-size:12px;font-weight:800}
 .price-chip-qty{font-size:10px;opacity:.6}
 .price-chip-more{font-size:9px;opacity:.6;border-right:1px solid currentColor;padding-right:4px;margin-right:0}
