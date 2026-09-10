@@ -3401,12 +3401,21 @@ window.openIpPreview = function(itemId, imageUrl, name, brand, size, encodedItem
       const p = best.displayPrice || best.price;
       if (!p) return;
       const chainLabel = best.chainName || best.storeName || '';
+      const chainColor = (CHAIN_META[best.chainName] || {}).color || 'var(--green)';
+      const chainCount = new Set(result.prices.map(r => r.chainName || r.storeName).filter(Boolean)).size;
       const valEl   = document.getElementById('ip-preview-price-val');
       const chainEl = document.getElementById('ip-preview-price-chain');
       const row     = document.getElementById('ip-preview-price-row');
       if (valEl)   valEl.textContent = `₪${p.toFixed(2)}`;
-      if (chainEl) chainEl.textContent = chainLabel;
-      if (row)     row.hidden = false;
+      if (chainEl) {
+        chainEl.textContent = chainLabel;
+        chainEl.style.color = chainColor;
+      }
+      if (row) {
+        row.hidden = false;
+        const moreEl = row.querySelector('.ip-preview-price-more');
+        if (moreEl) moreEl.textContent = chainCount > 1 ? `מתוך ${chainCount} רשתות` : '';
+      }
     }).catch(() => {});
   }
 };
@@ -6779,14 +6788,18 @@ async function loadItemPricesInBackground() {
 
         // Stable fingerprint — browsers normalise innerHTML so string compare is unreliable.
         // Instead compare the values that would cause a visible change.
-        const fingerprint = `${totalP.toFixed(2)}|${chainLabel}|${isStale?1:0}|${hasMulti?1:0}|${qty}`;
+        const chainCount = new Set(prices.map(p => p.chainName || p.storeName).filter(Boolean)).size;
+        const chainColor = (CHAIN_META[best.chainName] || {}).color || 'var(--accent)';
+        const fingerprint = `${totalP.toFixed(2)}|${chainLabel}|${isStale?1:0}|${chainCount}|${qty}`;
         if (chipArea.dataset.fingerprint !== fingerprint) {
           chipArea.innerHTML = `<button class="price-chip${hasMulti?' best':''}${isStale?' stale':''}"
             onclick="openPriceChipDetail('${item.id}')"
             title="השווה מחירים">
-            <span>₪${totalP.toFixed(2)}</span>
-            <span style="font-size:9px;opacity:.7">${chainLabel}</span>
-            ${qty > 1 ? `<span style="opacity:.55">×${qty}</span>` : ''}
+            <span class="price-chip-dot" style="background:${chainColor}"></span>
+            <span class="price-chip-chain">${chainLabel}</span>
+            <span class="price-chip-price">₪${totalP.toFixed(2)}</span>
+            ${qty > 1 ? `<span class="price-chip-qty">×${qty}</span>` : ''}
+            ${chainCount > 1 ? `<span class="price-chip-more">${chainCount} רשתות</span>` : ''}
             ${isStale ? '<span style="color:var(--red)">⚠</span>' : ''}
           </button>`;
           chipArea.dataset.fingerprint = fingerprint;
