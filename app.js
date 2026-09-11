@@ -667,6 +667,24 @@ window.clearListSearch = function() {
   if (clearBtn) clearBtn.style.display = 'none';
 };
 
+// Pure read-only relevance scorer for shopping-list search.
+// item.name matches outrank attached product/brand fallback matches.
+// Never writes to item.order or Firebase.
+function _listRelevanceScore(item, q) {
+  const n  = (item.name || '').toLowerCase();
+  const an = (item.attached?.name  || '').toLowerCase();
+  const ab = (item.attached?.brand || '').toLowerCase();
+  // item.name tiers (primary)
+  if (n === q)              return 100;
+  if (n.startsWith(q))      return 80;
+  if (n.split(/\s+/).some(w => w.startsWith(q))) return 60;
+  if (n.includes(q))        return 40;
+  // attached product / brand fallback (lower than any name match)
+  if (an.startsWith(q) || ab.startsWith(q)) return 20;
+  if (an.includes(q)   || ab.includes(q))   return 10;
+  return 0;
+}
+
 function renderList(){
   _renderDeptToggle();
   const wrap=document.getElementById('list-content');
@@ -685,10 +703,16 @@ function renderList(){
   // ── Step 2: tab filter ──
   if(curTab==='fav') list=list.filter(i=>i.fav);
   if(curTab==='bought') list=list.filter(i=>i.bought);
-  // ── Step 3: search filter (always runs, even in dept mode) ──
+  // ── Step 3: search filter + relevance sort (always runs, even in dept mode) ──
   if(listSearchQuery){
     const q=listSearchQuery.trim().toLowerCase();
-    list=list.filter(i=>(i.name||'').toLowerCase().includes(q));
+    list=list.filter(i=>{
+      const n=(i.name||'').toLowerCase();
+      const an=(i.attached?.name||'').toLowerCase();
+      const ab=(i.attached?.brand||'').toLowerCase();
+      return n.includes(q)||an.includes(q)||ab.includes(q);
+    });
+    list.sort((a,b)=>_listRelevanceScore(b,q)-_listRelevanceScore(a,q));
   }
   if(!list.length){
     const isSearch=!!listSearchQuery;
@@ -3055,13 +3079,16 @@ function _bpScore(p, query, queryLang, enQuery, queryBrand) {
   if (p.isIsraeli) score += 25;
   if (bLow.split(/[\s,/]+/).some(w => w && _IL_BRANDS_SET.has(w))) score += 15;
 
-  // ── 3. Name contains the query words ────────────────────────────────────
+  // ── 3. Name phrase match — exclusive tiers (highest wins, not additive) ─────
+  if (nLow === qLow)                                          score += 40; // exact full match
+  else if (nLow.startsWith(qLow))                            score += 30; // name starts with query
+  else if (nLow.split(/\s+/).some(w => w.startsWith(qLow))) score += 15; // any word starts with query
+  else if (nLow.includes(qLow))                              score += 20; // contains phrase
+  // Word-level coverage (how many query words appear in name)
   const qWords = qLow.split(/\s+/).filter(w => w.length > 1);
   if (qWords.length) {
     score += (qWords.filter(w => nLow.includes(w)).length / qWords.length) * 25;
   }
-  if (nLow.includes(qLow))   score += 20; // exact phrase in name
-  if (nLow.startsWith(qLow)) score += 10; // name starts with query
 
   // ── 4. English translation match ─────────────────────────────────────────
   if (eLow && eLow !== qLow) {
