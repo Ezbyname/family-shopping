@@ -27,7 +27,7 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
 }
 #splash-overlay img{
   width:100%;height:100%;
-  object-fit:cover;
+  object-fit:contain;
   display:block;
 }
 #splash-overlay.fade-out{opacity:0}
