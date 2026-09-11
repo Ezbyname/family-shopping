@@ -3136,6 +3136,28 @@ function _bpScore(p, query, queryLang, enQuery, queryBrand) {
     if (fuzzyHits > 0) score += (fuzzyHits / qTokens.length) * 12;
   }
 
+  // ── 7. Hebrew-field bonus for Hebrew queries ─────────────────────────────
+  // If the product has a Hebrew name field (nameHe), score it directly against
+  // the query. This catches products whose display name was selected as English
+  // (because product_name_he was absent but product_name_he was later populated),
+  // and ensures Hebrew/local field phrase matches outrank translated English.
+  // Only fires for Hebrew queries; does not change display selection.
+  if (queryLang === 'he' && p.nameHe) {
+    const heLow = p.nameHe.toLowerCase();
+    if (heLow === qLow)              score += 35;
+    else if (heLow.startsWith(qLow)) score += 25;
+    else if (heLow.includes(qLow))   score += 15;
+    else {
+      const heTokens = heLow.split(/\s+/);
+      const qW = qLow.split(/\s+/).filter(w => w.length > 1);
+      if (qW.length) score += (qW.filter(w => heLow.includes(w)).length / qW.length) * 20;
+      if (qW.length >= 2) {
+        const allInOrder = qW.every((w, i) => i < heTokens.length && heTokens[i].startsWith(w));
+        if (allInOrder) score += 15;
+      }
+    }
+  }
+
   return score;
 }
 // ────────────────────────────────────────────────────────────────────────────
@@ -3197,7 +3219,10 @@ async function _bpRunSearch(query, signal, seq) {
           ) || '';
           if (!name) continue;
           raw.push({ name, brand: p.brands || '', size: p.quantity || '',
-                     image: p.image_small_url || '', barcode: code, isIsraeli });
+                     image: p.image_small_url || '', barcode: code, isIsraeli,
+                     nameHe: p.product_name_he || '',
+                     nameAr: p.product_name_ar || '',
+                     nameEn: p.product_name    || '' });
         }
       } catch(e) { if (e.name === 'AbortError') return; }
     }
@@ -3224,11 +3249,14 @@ async function _bpRunSearch(query, signal, seq) {
       .sort((a, b) => b._s - a._s)
       .map(({ _s, ...p }) => p)
       .slice(0, 20);
-    // Layer 5: if strict filter removed everything, show best candidates anyway
+    // Layer 5: if strict filter removed everything, show best non-negative candidates anyway
     let _bpFallback = false;
     if (!_bpProducts.length && raw.length > 0) {
-      _bpFallback = true;
-      _bpProducts = [..._scored].sort((a, b) => b._s - a._s).slice(0, 8).map(({ _s, ...p }) => p);
+      const nonNeg = _scored.filter(p => p._s >= 0);
+      if (nonNeg.length) {
+        _bpFallback = true;
+        _bpProducts = nonNeg.sort((a, b) => b._s - a._s).slice(0, 8).map(({ _s, ...p }) => p);
+      }
     }
     // [DIAG-BUG5A] final state before DOM render
     console.log(`[diag-bp-search #${_diagBpSearchSeq}] _bpProducts=${_bpProducts.length} _bpFallback=${_bpFallback} topScore=${topScore} MIN_SCORE=${MIN_SCORE}`);
@@ -3330,6 +3358,8 @@ window._bpOnSearchInput = function() {
   const clearBtn = document.getElementById('bp-search-clear');
   if (clearBtn) clearBtn.style.display = val ? 'flex' : 'none';
   if (!val) {
+    ++_bpSearchSeq;                                    // invalidate any in-flight request
+    if (_bpAbortCtrl) { _bpAbortCtrl.abort(); _bpAbortCtrl = null; }
     _bpProducts = [];
     const resultsEl = document.getElementById('bp-results');
     if (resultsEl) resultsEl.innerHTML = '';
