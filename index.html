@@ -376,8 +376,13 @@
     </div>
     <div class="bp-item-hint" id="bp-item-hint" style="display:none"></div>
     <div class="bp-search-wrap" id="bp-search-wrap" style="display:none">
-      <input class="bp-search" id="bp-search" placeholder="חפש מותג, גודל, אחוז שומן..." dir="rtl"
-             oninput="_bpOnSearchInput()" autocomplete="off">
+      <div class="bp-search-inner">
+        <input class="bp-search" id="bp-search" placeholder="חפש מותג, גודל, אחוז שומן..." dir="rtl"
+               oninput="_bpOnSearchInput()" autocomplete="off">
+        <button class="bp-search-clear" id="bp-search-clear" style="display:none"
+                ontouchstart="_bpClearSearch(event)" onclick="_bpClearSearch(event)"
+                tabindex="-1" aria-label="נקה חיפוש">✕</button>
+      </div>
     </div>
     <div class="bp-query-bar" id="bp-query-bar"><span class="bp-query-text" id="bp-query-text"></span></div>
     <div class="bp-results" id="bp-results">

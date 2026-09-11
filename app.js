@@ -2859,6 +2859,7 @@ let _bpMode       = 'new';  // 'new' | 'attach'
 let _bpItemId     = null;   // item ID when mode==='attach'
 let _bpProducts   = [];     // current result list (indexed by button onclick)
 let _bpSearchTimer = null;
+let _bpSearchSeq  = 0;      // monotonically increasing; guards against stale async results
 
 function _boldKeyword(text, keyword) {
   if (!keyword || !text) return esc(text);
@@ -3095,6 +3096,14 @@ function _bpScore(p, query, queryLang, enQuery, queryBrand) {
   if (qWords.length) {
     score += (qWords.filter(w => nLow.includes(w)).length / qWords.length) * 25;
   }
+  // Multi-token prefix bonus: query tokens match candidate tokens in order from the start.
+  // Handles partial Hebrew phrases like "גבינה לבנ" → "גבינה לבנה 5%".
+  // Order-preserving: each query token must be a prefix of the candidate token at the same position.
+  if (qWords.length >= 2) {
+    const nTokens = nLow.split(/\s+/);
+    const allInOrder = qWords.every((w, i) => i < nTokens.length && nTokens[i].startsWith(w));
+    if (allInOrder) score += 18;
+  }
 
   // ── 4. English translation match ─────────────────────────────────────────
   if (eLow && eLow !== qLow) {
@@ -3131,10 +3140,10 @@ function _bpScore(p, query, queryLang, enQuery, queryBrand) {
 }
 // ────────────────────────────────────────────────────────────────────────────
 
-async function _bpRunSearch(query, signal) {
+async function _bpRunSearch(query, signal, seq) {
   // [DIAG-BUG5A] instrument full search pipeline
   const _diagBpSearchSeq = _diagBpSeq; // inherit bp call sequence
-  console.log(`[diag-bp-search #${_diagBpSearchSeq}] _bpRunSearch START query=${JSON.stringify(query)} signal.aborted=${signal.aborted}`);
+  console.log(`[diag-bp-search #${_diagBpSearchSeq}] _bpRunSearch START query=${JSON.stringify(query)} seq=${seq} signal.aborted=${signal.aborted}`);
   const resultsEl = document.getElementById('bp-results');
   const queryEl   = document.getElementById('bp-query-text');
   if (queryEl)   queryEl.textContent = `מחפש "${query}"...`;
@@ -3194,6 +3203,7 @@ async function _bpRunSearch(query, signal) {
     }
 
     if (signal.aborted) { console.log(`[diag-bp-search #${_diagBpSearchSeq}] ABORTED after fetch loop`); return; }
+    if (seq !== _bpSearchSeq) { console.log(`[diag-bp-search #${_diagBpSearchSeq}] STALE seq=${seq} current=${_bpSearchSeq} — discarding`); return; }
     console.log(`[diag-bp-search #${_diagBpSearchSeq}] raw candidates=${raw.length} queryLang=${queryLang} normQ=${JSON.stringify(normQ)}`);
 
     // Eligibility: name language must be compatible with query language (before scoring)
@@ -3308,18 +3318,37 @@ window.openBrandPicker = async function(mode, itemId, itemName) {
 
   document.getElementById('bp-overlay')?.classList.add('show');
   document.body.classList.add('sheet-open');
-  console.log(`[diag-bp #${seq}] overlay shown, calling _bpRunSearch`);
-  await _bpRunSearch(query, signal);
+  const bpSeq = ++_bpSearchSeq;
+  console.log(`[diag-bp #${seq}] overlay shown, calling _bpRunSearch bpSeq=${bpSeq}`);
+  await _bpRunSearch(query, signal, bpSeq);
   console.log(`[diag-bp #${seq}] _bpRunSearch returned _bpProducts.length=${_bpProducts.length}`);
 };
 
 window._bpOnSearchInput = function() {
   clearTimeout(_bpSearchTimer);
   const val = document.getElementById('bp-search')?.value.trim();
-  if (!val) return;
+  const clearBtn = document.getElementById('bp-search-clear');
+  if (clearBtn) clearBtn.style.display = val ? 'flex' : 'none';
+  if (!val) {
+    _bpProducts = [];
+    const resultsEl = document.getElementById('bp-results');
+    if (resultsEl) resultsEl.innerHTML = '';
+    const queryEl = document.getElementById('bp-query-text');
+    if (queryEl) queryEl.textContent = '';
+    return;
+  }
   if (_bpAbortCtrl) _bpAbortCtrl.abort();
   _bpAbortCtrl = new AbortController();
-  _bpSearchTimer = setTimeout(() => _bpRunSearch(val, _bpAbortCtrl.signal), 380);
+  const seq = ++_bpSearchSeq;
+  _bpSearchTimer = setTimeout(() => _bpRunSearch(val, _bpAbortCtrl.signal, seq), 380);
+};
+
+window._bpClearSearch = function(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const input = document.getElementById('bp-search');
+  if (input) { input.value = ''; input.focus(); }
+  window._bpOnSearchInput();
 };
 
 window.selectBrandProduct = function(nameOrIdx, barcode) {

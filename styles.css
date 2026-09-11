@@ -179,11 +179,17 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
 .bp-add-btn:active{opacity:.75}
 .bp-item-hint{font-size:11px;color:var(--muted);padding:0 16px 6px;direction:rtl;flex-shrink:0}
 .bp-search-wrap{padding:0 12px 8px;flex-shrink:0}
-.bp-search{width:100%;background:var(--card);border:1.5px solid var(--border);
-  border-radius:12px;padding:9px 12px;font-size:14px;color:var(--text);
+.bp-search-inner{position:relative;display:flex;align-items:center}
+.bp-search{flex:1;width:100%;background:var(--card);border:1.5px solid var(--border);
+  border-radius:12px;padding:9px 12px;padding-inline-start:36px;font-size:14px;color:var(--text);
   font-family:'Rubik',sans-serif;box-sizing:border-box;direction:rtl;outline:none;
   transition:border-color .2s}
 .bp-search:focus{border-color:var(--accent)}
+.bp-search-clear{position:absolute;inset-inline-start:4px;top:50%;transform:translateY(-50%);
+  display:flex;align-items:center;justify-content:center;
+  width:28px;height:28px;border:none;background:transparent;
+  color:var(--muted);font-size:14px;cursor:pointer;border-radius:50%;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation}
 
 /* ── ITEM PRODUCT TILE (ip-tile) ── */
 .ip-tile-wrap{position:relative;flex-shrink:0;overflow:visible}
