@@ -712,7 +712,13 @@ function renderList(){
       const ab=(i.attached?.brand||'').toLowerCase();
       return n.includes(q)||an.includes(q)||ab.includes(q);
     });
-    list.sort((a,b)=>_listRelevanceScore(b,q)-_listRelevanceScore(a,q));
+    // Capture pre-sort index so ties resolve to existing (manual) order.
+    list.forEach((i,idx)=>i._searchIdx=idx);
+    list.sort((a,b)=>{
+      const diff=_listRelevanceScore(b,q)-_listRelevanceScore(a,q);
+      return diff!==0?diff:a._searchIdx-b._searchIdx;
+    });
+    list.forEach(i=>delete i._searchIdx);
   }
   if(!list.length){
     const isSearch=!!listSearchQuery;
