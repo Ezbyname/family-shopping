@@ -2860,6 +2860,10 @@ let _bpItemId     = null;   // item ID when mode==='attach'
 let _bpProducts   = [];     // current result list (indexed by button onclick)
 let _bpSearchTimer = null;
 let _bpSearchSeq  = 0;      // monotonically increasing; guards against stale async results
+// Session corpus cache: keyed by "he:<rootToken>" for Hebrew queries.
+// Populated once per root term per picker session; cleared on picker close.
+// Eliminates per-keystroke OFf variance for progressive Hebrew refinement.
+let _bpCorpusCache = new Map();
 
 function _boldKeyword(text, keyword) {
   if (!keyword || !text) return esc(text);
@@ -3186,50 +3190,76 @@ async function _bpRunSearch(query, signal, seq) {
     const FIELDS = 'product_name,product_name_he,product_name_ar,brands,quantity,image_small_url,code,countries_tags';
     const IL     = '&tagtype_0=countries&tag_contains_0=contains&tag_0=israel';
 
-    const urls = [
-      // 1. Israel-filtered + original normalized query
-      `${BASE}?search_terms=${encOrig}&search_simple=1&action=process&json=1&page_size=20&fields=${FIELDS}${IL}`,
-      // 2. Israel-filtered + translated query (only when translation differs from normalized query)
-      enQuery !== normQ
-        ? `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=15&fields=${FIELDS}${IL}`
-        : null,
-      // 3. Broad fallback — no country filter; low-scored items get filtered by _bpScore
-      `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=20&fields=${FIELDS}`,
-    ].filter(Boolean);
+    // ── Fix C: session corpus cache for Hebrew queries ───────────────────────
+    // For Hebrew queries with a root token of ≥2 chars, acquire the OFf corpus
+    // once per root term per picker session and freeze it. All progressive
+    // refinements (גבינה → גבינה ל → גבינה לבנ → גבינה לבנה) operate on the
+    // same frozen candidate set, eliminating per-keystroke OFf variance.
+    // Non-Hebrew queries and single-char roots always fetch fresh.
+    const _heTokens  = queryLang === 'he' ? normQ.split(/\s+/).filter(w => w.length > 0) : [];
+    const _rootToken = _heTokens.length > 0 ? _heTokens[0] : '';
+    const _cacheKey  = queryLang === 'he' && _rootToken.length >= 2 ? `he:${_rootToken}` : '';
+    let   _cacheHit  = false;
 
-    const seen = new Set();
-    const raw  = [];
+    let raw = [];
+    if (_cacheKey && _bpCorpusCache.has(_cacheKey)) {
+      // Cache hit: reuse frozen corpus for this root term
+      raw = _bpCorpusCache.get(_cacheKey);
+      _cacheHit = true;
+      console.log(`[diag-bp-search #${_diagBpSearchSeq}] corpus cache HIT key=${_cacheKey} size=${raw.length}`);
+    } else {
+      // Cache miss: fetch from OFf (broader page_size for corpus queries)
+      const corpusPageSize = _cacheKey ? 40 : 20;
+      const urls = [
+        // 1. Israel-filtered + original normalized query
+        `${BASE}?search_terms=${encOrig}&search_simple=1&action=process&json=1&page_size=${corpusPageSize}&fields=${FIELDS}${IL}`,
+        // 2. Israel-filtered + translated query (only when translation differs)
+        enQuery !== normQ
+          ? `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=15&fields=${FIELDS}${IL}`
+          : null,
+        // 3. Broad fallback — no country filter
+        `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=20&fields=${FIELDS}`,
+      ].filter(Boolean);
 
-    for (const url of urls) {
-      if (raw.length >= 35) break;
-      if (signal.aborted) return;
-      try {
-        const r = await fetch(url, { headers: { 'User-Agent': 'FamilyShoppingIL/6.3' }, signal });
-        if (!r.ok) continue;
-        const data = await r.json();
-        for (const p of data?.products || []) {
-          const code = p.code || '';
-          if (code && seen.has(code)) continue;
-          if (code) seen.add(code);
-          const isIsraeli = (p.countries_tags || []).some(c => c.includes('israel'));
-          // Use language-aware name selection
-          const name = _bpSelectName(
-            { product_name_he: p.product_name_he, product_name_ar: p.product_name_ar, product_name: p.product_name },
-            queryLang
-          ) || '';
-          if (!name) continue;
-          raw.push({ name, brand: p.brands || '', size: p.quantity || '',
-                     image: p.image_small_url || '', barcode: code, isIsraeli,
-                     nameHe: p.product_name_he || '',
-                     nameAr: p.product_name_ar || '',
-                     nameEn: p.product_name    || '' });
-        }
-      } catch(e) { if (e.name === 'AbortError') return; }
+      const seen = new Set();
+
+      for (const url of urls) {
+        if (raw.length >= 55) break;
+        if (signal.aborted) return;
+        try {
+          const r = await fetch(url, { headers: { 'User-Agent': 'FamilyShoppingIL/6.3' }, signal });
+          if (!r.ok) continue;
+          const data = await r.json();
+          for (const p of data?.products || []) {
+            const code = p.code || '';
+            if (code && seen.has(code)) continue;
+            if (code) seen.add(code);
+            const isIsraeli = (p.countries_tags || []).some(c => c.includes('israel'));
+            // Use language-aware name selection
+            const name = _bpSelectName(
+              { product_name_he: p.product_name_he, product_name_ar: p.product_name_ar, product_name: p.product_name },
+              queryLang
+            ) || '';
+            if (!name) continue;
+            raw.push({ name, brand: p.brands || '', size: p.quantity || '',
+                       image: p.image_small_url || '', barcode: code, isIsraeli,
+                       nameHe: p.product_name_he || '',
+                       nameAr: p.product_name_ar || '',
+                       nameEn: p.product_name    || '' });
+          }
+        } catch(e) { if (e.name === 'AbortError') return; }
+      }
+
+      // Store in session corpus cache (only for cacheable Hebrew root queries)
+      if (_cacheKey && raw.length > 0) {
+        _bpCorpusCache.set(_cacheKey, raw);
+        console.log(`[diag-bp-search #${_diagBpSearchSeq}] corpus cache MISS key=${_cacheKey} stored size=${raw.length}`);
+      }
     }
 
     if (signal.aborted) { console.log(`[diag-bp-search #${_diagBpSearchSeq}] ABORTED after fetch loop`); return; }
     if (seq !== _bpSearchSeq) { console.log(`[diag-bp-search #${_diagBpSearchSeq}] STALE seq=${seq} current=${_bpSearchSeq} — discarding`); return; }
-    console.log(`[diag-bp-search #${_diagBpSearchSeq}] raw candidates=${raw.length} queryLang=${queryLang} normQ=${JSON.stringify(normQ)}`);
+    console.log(`[diag-bp-search #${_diagBpSearchSeq}] raw candidates=${raw.length} queryLang=${queryLang} normQ=${JSON.stringify(normQ)} cacheHit=${_cacheHit}`);
 
     // Eligibility: name language must be compatible with query language (before scoring)
     const eligible = raw.filter(p => {
@@ -3241,12 +3271,23 @@ async function _bpRunSearch(query, signal, seq) {
 
     console.log(`[diag-bp-search #${_diagBpSearchSeq}] eligible (lang-compatible)=${eligible.length} of raw=${raw.length}`);
 
-    // ── Hebrew strict bucket — 2+ token Hebrew queries ───────────────────────
+    // ── Fix B: stable sort comparator ────────────────────────────────────────
+    // Tie-break by barcode (asc) so equal-score products always appear in the
+    // same order regardless of Array.sort's implementation ordering.
+    const _stableSort = (a, b) =>
+      (b._s - a._s) || String(a.barcode || '').localeCompare(String(b.barcode || ''));
+
+    // ── Fix A + Hebrew strict bucket — 2+ token Hebrew queries ───────────────
     // For multi-token Hebrew queries, require that all query tokens appear as
     // whole words in the Hebrew display name or nameHe field (prefix allowed
-    // on the last token). This prevents Israeli products with English display
-    // names (exempt from language penalty) from dominating via Israeli bonus +
-    // EN-translation match alone.
+    // on the last token). Prevents Israeli English-named products from
+    // dominating via Israeli bonus + EN-translation match alone.
+    //
+    // Fix A: when strict mode activates (2+ token Hebrew query), it is ALWAYS
+    // the exclusive result path — even when the bucket is empty. This prevents
+    // fallthrough to the generic scoring pipeline which would show irrelevant
+    // English products (Cream Cheese, Pringles) as normal results.
+    //
     // Activated only for queryLang==='he' and 2+ tokens; single-token queries
     // and Latin queries fall through to the existing scoring pipeline.
     let _bpFallback   = false;
@@ -3254,6 +3295,7 @@ async function _bpRunSearch(query, signal, seq) {
     if (queryLang === 'he') {
       const _hsToks = normQ.split(/\s+/).filter(w => w.length > 0);
       if (_hsToks.length >= 2) {
+        _heStrictUsed = true;  // Fix A: always own this path, even when bucket is empty
         const _hsLead  = _hsToks.slice(0, -1);
         const _hsLast  = _hsToks[_hsToks.length - 1];
         const _hsMatch = field => {
@@ -3265,14 +3307,18 @@ async function _bpRunSearch(query, signal, seq) {
         const _heStrict = eligible.filter(p => _hsMatch(p.name) || _hsMatch(p.nameHe));
         console.log(`[diag-bp-search #${_diagBpSearchSeq}] heStrict bucket=${_heStrict.length} of eligible=${eligible.length}`);
         if (_heStrict.length > 0) {
-          _heStrictUsed = true;
           _bpProducts = _heStrict
             .map(p => ({ ...p, _s: _bpScore(p, normQ, queryLang, enQuery, queryBrand) }))
-            .sort((a, b) => b._s - a._s)
+            .sort(_stableSort)
             .slice(0, 20)
             .map(({ _s, ...p }) => p);
           console.log(`[diag-bp-search #${_diagBpSearchSeq}] heStrict used, _bpProducts=${_bpProducts.length}`);
-          console.log('[search-quality]', { rawQuery, normalizedQuery: normQ, translatedQuery: enQuery, resultCount: _bpProducts.length, candidateCount: raw.length, heStrict: true });
+          console.log('[search-quality]', { rawQuery, normalizedQuery: normQ, translatedQuery: enQuery, resultCount: _bpProducts.length, candidateCount: raw.length, heStrict: true, cacheHit: _cacheHit });
+        } else {
+          // Fix A: strict mode active but no matches → show empty, not garbage
+          _bpProducts = [];
+          console.log(`[diag-bp-search #${_diagBpSearchSeq}] heStrict empty — no results shown (fallthrough blocked)`);
+          console.log('[search-quality]', { rawQuery, normalizedQuery: normQ, translatedQuery: enQuery, resultCount: 0, candidateCount: raw.length, heStrict: true, emptyStrict: true, cacheHit: _cacheHit });
         }
       }
     }
@@ -3284,7 +3330,7 @@ async function _bpRunSearch(query, signal, seq) {
       const topScore = _scored.length ? Math.max(..._scored.map(p => p._s)) : 0;
       _bpProducts = _scored
         .filter(p => p._s > MIN_SCORE)
-        .sort((a, b) => b._s - a._s)
+        .sort(_stableSort)
         .map(({ _s, ...p }) => p)
         .slice(0, 20);
       // Layer 5: if strict filter removed everything, show best non-negative candidates anyway
@@ -3292,7 +3338,7 @@ async function _bpRunSearch(query, signal, seq) {
         const nonNeg = _scored.filter(p => p._s >= 0);
         if (nonNeg.length) {
           _bpFallback = true;
-          _bpProducts = nonNeg.sort((a, b) => b._s - a._s).slice(0, 8).map(({ _s, ...p }) => p);
+          _bpProducts = nonNeg.sort(_stableSort).slice(0, 8).map(({ _s, ...p }) => p);
         }
       }
       console.log(`[diag-bp-search #${_diagBpSearchSeq}] _bpProducts=${_bpProducts.length} _bpFallback=${_bpFallback} topScore=${topScore} MIN_SCORE=${MIN_SCORE}`);
@@ -3451,6 +3497,7 @@ window.closeBrandPicker = function() {
   document.getElementById('bp-overlay')?.classList.remove('show');
   document.body.classList.remove('sheet-open');
   _bpMode = 'new'; _bpItemId = null; _bpProducts = [];
+  _bpCorpusCache.clear();  // fresh corpus on next picker open
 };
 
 // ── ip-tile helpers (emoji + clear; picker reuses bp-overlay) ──
