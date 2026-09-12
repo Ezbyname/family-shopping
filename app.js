@@ -6967,16 +6967,19 @@ async function loadItemPricesInBackground() {
         // Instead compare the values that would cause a visible change.
         const chainCount = new Set(prices.map(p => p.chainName).filter(Boolean)).size;
         const chainColor = (CHAIN_META[best.chainName] || {}).color || 'var(--accent)';
-        const fingerprint = `${totalP.toFixed(2)}|${chainLabel}|${isStale?1:0}|${chainCount}|${qty}`;
+        const distLabel  = best.distanceKm != null ? `${best.distanceKm} ק"מ` : '';
+        const storeLabel = (best.storeName && best.storeName !== best.chainName) ? esc(best.storeName) : '';
+        const fingerprint = `${totalP.toFixed(2)}|${chainLabel}|${isStale?1:0}|${chainCount}|${qty}|${distLabel}`;
         if (chipArea.dataset.fingerprint !== fingerprint) {
           chipArea.innerHTML = `<button class="price-chip${hasMulti?' best':''}${isStale?' stale':''}"
             onclick="openPriceChipDetail('${item.id}')"
             title="השווה מחירים">
             <span class="price-chip-dot" style="background:${chainColor}"></span>
-            <span class="price-chip-chain">${chainLabel}</span>
+            <span class="price-chip-chain">${chainLabel}${storeLabel ? ` · ${storeLabel}` : ''}</span>
             <span class="price-chip-price">₪${totalP.toFixed(2)}</span>
             ${qty > 1 ? `<span class="price-chip-qty">×${qty}</span>` : ''}
             ${chainCount > 1 ? `<span class="price-chip-more">${chainCount} רשתות</span>` : ''}
+            ${distLabel ? `<span class="price-chip-dist">📍${distLabel}</span>` : ''}
             ${isStale ? '<span style="color:var(--red)">⚠</span>' : ''}
           </button>`;
           chipArea.dataset.fingerprint = fingerprint;

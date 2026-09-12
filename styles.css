@@ -1475,9 +1475,10 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
 .price-chip-price{font-size:12px;font-weight:800}
 .price-chip-qty{font-size:10px;opacity:.6}
 .price-chip-more{font-size:9px;opacity:.6;border-right:1px solid currentColor;padding-right:4px;margin-right:0}
+.price-chip-dist{font-size:9px;opacity:.65;white-space:nowrap;border-right:1px solid currentColor;padding-right:4px;margin-right:0}
 .price-chip{display:inline-flex;align-items:center;gap:4px;margin-top:5px;cursor:pointer;
   border-radius:8px;padding:3px 9px;font-family:'Rubik',sans-serif;
-  font-size:11px;font-weight:700;transition:all .15s;max-width:220px;
+  font-size:11px;font-weight:700;transition:all .15s;max-width:250px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   background:var(--card2);border:1px solid var(--border);color:var(--text);}
 .price-chip:active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
