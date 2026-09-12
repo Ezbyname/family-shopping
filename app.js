@@ -3240,27 +3240,65 @@ async function _bpRunSearch(query, signal, seq) {
     });
 
     console.log(`[diag-bp-search #${_diagBpSearchSeq}] eligible (lang-compatible)=${eligible.length} of raw=${raw.length}`);
-    // Score every candidate, filter irrelevant ones, sort by relevance
-    const MIN_SCORE = queryLang !== 'latin' ? -10 : -20;
-    const _scored = eligible.map(p => ({ ...p, _s: _bpScore(p, normQ, queryLang, enQuery, queryBrand) }));
-    const topScore = _scored.length ? Math.max(..._scored.map(p => p._s)) : 0;
-    _bpProducts = _scored
-      .filter(p => p._s > MIN_SCORE)
-      .sort((a, b) => b._s - a._s)
-      .map(({ _s, ...p }) => p)
-      .slice(0, 20);
-    // Layer 5: if strict filter removed everything, show best non-negative candidates anyway
-    let _bpFallback = false;
-    if (!_bpProducts.length && raw.length > 0) {
-      const nonNeg = _scored.filter(p => p._s >= 0);
-      if (nonNeg.length) {
-        _bpFallback = true;
-        _bpProducts = nonNeg.sort((a, b) => b._s - a._s).slice(0, 8).map(({ _s, ...p }) => p);
+
+    // ── Hebrew strict bucket — 2+ token Hebrew queries ───────────────────────
+    // For multi-token Hebrew queries, require that all query tokens appear as
+    // whole words in the Hebrew display name or nameHe field (prefix allowed
+    // on the last token). This prevents Israeli products with English display
+    // names (exempt from language penalty) from dominating via Israeli bonus +
+    // EN-translation match alone.
+    // Activated only for queryLang==='he' and 2+ tokens; single-token queries
+    // and Latin queries fall through to the existing scoring pipeline.
+    let _bpFallback   = false;
+    let _heStrictUsed = false;
+    if (queryLang === 'he') {
+      const _hsToks = normQ.split(/\s+/).filter(w => w.length > 0);
+      if (_hsToks.length >= 2) {
+        const _hsLead  = _hsToks.slice(0, -1);
+        const _hsLast  = _hsToks[_hsToks.length - 1];
+        const _hsMatch = field => {
+          if (!field) return false;
+          const fToks = field.toLowerCase().split(/\s+/);
+          return _hsLead.every(t => fToks.some(ft => ft === t)) &&
+                 fToks.some(ft => ft.startsWith(_hsLast));
+        };
+        const _heStrict = eligible.filter(p => _hsMatch(p.name) || _hsMatch(p.nameHe));
+        console.log(`[diag-bp-search #${_diagBpSearchSeq}] heStrict bucket=${_heStrict.length} of eligible=${eligible.length}`);
+        if (_heStrict.length > 0) {
+          _heStrictUsed = true;
+          _bpProducts = _heStrict
+            .map(p => ({ ...p, _s: _bpScore(p, normQ, queryLang, enQuery, queryBrand) }))
+            .sort((a, b) => b._s - a._s)
+            .slice(0, 20)
+            .map(({ _s, ...p }) => p);
+          console.log(`[diag-bp-search #${_diagBpSearchSeq}] heStrict used, _bpProducts=${_bpProducts.length}`);
+          console.log('[search-quality]', { rawQuery, normalizedQuery: normQ, translatedQuery: enQuery, resultCount: _bpProducts.length, candidateCount: raw.length, heStrict: true });
+        }
       }
     }
-    // [DIAG-BUG5A] final state before DOM render
-    console.log(`[diag-bp-search #${_diagBpSearchSeq}] _bpProducts=${_bpProducts.length} _bpFallback=${_bpFallback} topScore=${topScore} MIN_SCORE=${MIN_SCORE}`);
-    console.log('[search-quality]', { rawQuery, normalizedQuery: normQ, translatedQuery: enQuery, topScore, resultCount: _bpProducts.length, candidateCount: raw.length, fallback: _bpFallback });
+
+    if (!_heStrictUsed) {
+      // Score every candidate, filter irrelevant ones, sort by relevance
+      const MIN_SCORE = queryLang !== 'latin' ? -10 : -20;
+      const _scored = eligible.map(p => ({ ...p, _s: _bpScore(p, normQ, queryLang, enQuery, queryBrand) }));
+      const topScore = _scored.length ? Math.max(..._scored.map(p => p._s)) : 0;
+      _bpProducts = _scored
+        .filter(p => p._s > MIN_SCORE)
+        .sort((a, b) => b._s - a._s)
+        .map(({ _s, ...p }) => p)
+        .slice(0, 20);
+      // Layer 5: if strict filter removed everything, show best non-negative candidates anyway
+      if (!_bpProducts.length && raw.length > 0) {
+        const nonNeg = _scored.filter(p => p._s >= 0);
+        if (nonNeg.length) {
+          _bpFallback = true;
+          _bpProducts = nonNeg.sort((a, b) => b._s - a._s).slice(0, 8).map(({ _s, ...p }) => p);
+        }
+      }
+      console.log(`[diag-bp-search #${_diagBpSearchSeq}] _bpProducts=${_bpProducts.length} _bpFallback=${_bpFallback} topScore=${topScore} MIN_SCORE=${MIN_SCORE}`);
+      console.log('[search-quality]', { rawQuery, normalizedQuery: normQ, translatedQuery: enQuery, topScore, resultCount: _bpProducts.length, candidateCount: raw.length, fallback: _bpFallback });
+    }
+
     // [DIAG-BUG5A] confirm DOM target exists and overlay is visible
     const overlayVisible = document.getElementById('bp-overlay')?.classList.contains('show');
     const resultsVisible = resultsEl ? window.getComputedStyle(resultsEl).display !== 'none' : false;
