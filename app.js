@@ -7279,17 +7279,18 @@ function _renderPriceDetail() {
     const src         = p.source || '';
     const isOverride  = !!p.override;
     const badge       = sourceBadge(p.sourceDisplay || src, p.submittedByDisplayName);
-    const chainName   = p.chainName || p.chainId || '';
-    const storeName   = (p.storeName && p.storeName !== p.chainName) ? p.storeName : '';
-    const chainKey    = `${p.chainId || chainName.replace(/\s/g,'_')}_${p.storeId || '0'}`;
-    const approxMark  = p.approximateLocation ? `<span class="approx-badge">~משוער</span>` : '';
+    const chainName    = p.chainName || p.chainId || '';
+    const chainColor   = (CHAIN_META[chainName] || {}).color || '#7d8590';
+    const primaryName  = p.storeName || chainName;
+    const chainKey     = `${p.chainId || chainName.replace(/\s/g,'_')}_${p.storeId || '0'}`;
+    const approxMark   = p.approximateLocation ? `<span class="approx-badge">~משוער</span>` : '';
+    const addrLine     = [p.address, p.city].filter(Boolean).join(', ');
 
     // Freshness label
     const freshInfo   = _freshnessLabel(p.syncedAt);
     const freshBadge  = `<span class="fresh-label ${freshInfo.cls}">${freshInfo.label}</span>`;
 
     const metaParts = [];
-    if (p.city)            metaParts.push(esc(p.city));
     if (p.distanceKm != null) metaParts.push(`📍 ${p.distanceKm} ק"מ`);
 
     // Cache store data for the details modal (safe index reference, no inline JSON)
@@ -7320,17 +7321,20 @@ function _renderPriceDetail() {
         data-store="${esc(p.storeId||'')}" data-source="${esc(src)}"
         onclick="openStoreDetail(window._sdRows[${sdIdx}])">
       <div class="pd-row-left">
-        ${isBest && filtered.length > 1 ? '<div class="pd-row-trophy">🏆 הכי זול לידך</div>' : ''}
-        <div class="pd-row-chain">${esc(chainName)} ${badge} ${approxMark}</div>
-        ${storeName ? `<div class="pd-row-store">${esc(storeName)}</div>` : ''}
-        <div class="pd-row-meta">${metaParts.join(' · ')}</div>
-        <div class="pd-row-meta">${freshBadge} ${p.isStale ? '<span class="pd-row-stale">⚠ מחיר ישן</span>' : ''}</div>
-        ${isOverride ? '<div style="font-size:10px;color:var(--blue);margin-top:2px">✏️ תיקון אישי שלך · המחיר הרשמי לא השתנה</div>' : ''}
+        ${isBest && filtered.length > 1 ? '<div class="pd-row-trophy">🏆 הכי זול</div>' : ''}
+        <div class="pd-row-chain">
+          <span class="pd-chain-dot" style="background:${chainColor}"></span>
+          ${esc(primaryName)} ${badge} ${approxMark}
+        </div>
+        ${addrLine ? `<div class="pd-row-addr">כתובת: ${esc(addrLine)}</div>` : ''}
+        <div class="pd-row-meta">${[...metaParts, freshBadge].join(' · ')} ${p.isStale ? '<span class="pd-row-stale">⚠ ישן</span>' : ''}</div>
+        ${isOverride ? '<div style="font-size:10px;color:var(--blue);margin-top:2px">✏️ תיקון אישי שלך</div>' : ''}
         ${actionBtns}
       </div>
       <div class="pd-row-right">
         <div class="pd-row-price">₪${totalP.toFixed(2)}</div>
         ${qty > 1 ? `<div class="pd-row-unit">₪${displayP.toFixed(2)} יח'</div>` : ''}
+        <button class="pd-nav-btn" onclick="event.stopPropagation();_sdNav(${sdIdx})" title="נווט לסניף">🧭 נווט</button>
       </div>
     </div>`;
   }).join('');
@@ -7495,6 +7499,12 @@ window.clearPriceSearch = function() {
 // STAGE 1 — STORE DETAILS MODAL
 // ══════════════════════════════════════════════════
 let _sdStore = null;
+
+window._sdNav = function(i) {
+  const s = window._sdRows && window._sdRows[i];
+  if (!s) return;
+  navigateToStoreDirect(s.latitude, s.longitude, s.address || '', s.storeName || s.chainName || '');
+};
 
 window.openStoreDetail = function(storeData) {
   if (!storeData) return;
