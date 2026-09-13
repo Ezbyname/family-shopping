@@ -6955,10 +6955,11 @@ async function loadItemPricesInBackground() {
           continue;
         }
 
-        const prices = result.prices;
-        const best   = prices[0];
-        const qty    = item.qty || 1;
-        const totalP = (best.displayPrice || best.price || 0) * qty;
+        const prices  = result.prices;
+        const best    = prices[0];
+        const qty     = item.qty || 1;
+        const unitP   = best.displayPrice || best.price || 0;
+        const totalP  = unitP * qty;
         const isStale  = best.isStale || result.stale;
         const hasMulti = prices.length > 1;
         const chainLabel = esc(best.chainName || best.storeName || '');
@@ -6969,14 +6970,15 @@ async function loadItemPricesInBackground() {
         const chainColor = (CHAIN_META[best.chainName] || {}).color || 'var(--accent)';
         const distLabel  = best.distanceKm != null ? `${best.distanceKm} ק"מ` : '';
         const storeLabel = (best.storeName && best.storeName !== best.chainName) ? esc(best.storeName) : '';
-        const fingerprint = `${totalP.toFixed(2)}|${chainLabel}|${isStale?1:0}|${chainCount}|${qty}|${distLabel}`;
+        // Chip shows unit price + qty badge so the user can verify: unitP × qty = what the bar totals
+        const fingerprint = `${unitP.toFixed(2)}|${chainLabel}|${isStale?1:0}|${chainCount}|${qty}|${distLabel}`;
         if (chipArea.dataset.fingerprint !== fingerprint) {
           chipArea.innerHTML = `<button class="price-chip${hasMulti?' best':''}${isStale?' stale':''}"
             onclick="openPriceChipDetail('${item.id}')"
             title="השווה מחירים">
             <span class="price-chip-dot" style="background:${chainColor}"></span>
             <span class="price-chip-chain">${chainLabel}${storeLabel ? ` · ${storeLabel}` : ''}</span>
-            <span class="price-chip-price">₪${totalP.toFixed(2)}</span>
+            <span class="price-chip-price">₪${unitP.toFixed(2)}</span>
             ${qty > 1 ? `<span class="price-chip-qty">×${qty}</span>` : ''}
             ${chainCount > 1 ? `<span class="price-chip-more">${chainCount} רשתות</span>` : ''}
             ${distLabel ? `<span class="price-chip-dist">📍${distLabel}</span>` : ''}
