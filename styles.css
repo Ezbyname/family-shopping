@@ -283,7 +283,10 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
   color:var(--text);font-size:14px;cursor:pointer;display:flex;align-items:center;
   justify-content:center;font-weight:700;transition:background .1s,transform .1s;line-height:1;}
 .qty-btn:active{transform:scale(.78);background:var(--accent);color:#fff}
-.qty-num{font-size:13px;font-weight:800;min-width:18px;text-align:center;color:var(--accent)}
+.qty-num{font-size:13px;font-weight:800;min-width:22px;text-align:center;color:var(--accent)}
+.qty-mode-toggle{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-right:2px}
+.qty-mode-btn{padding:2px 7px;font-size:10px;font-weight:700;font-family:inherit;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:background .12s,color .12s;line-height:1.6}
+.qty-mode-btn.active{background:var(--accent);color:#fff}
 /* ── "קניתי" PRIMARY CTA (tap to mark purchased) ── */
 .pending-tag{display:inline-flex;align-items:center;justify-content:center;gap:5px;
   min-height:40px;min-width:104px;padding:9px 18px;

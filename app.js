@@ -115,6 +115,18 @@ function getItemDepartment(item) {
   return DEPARTMENTS.find(d => d.id === 'other');
 }
 
+// ── PRODUCE QTY HELPERS ───────────────────────────────────────────────────────
+function isProduceItem(item) { return getItemDepartment(item).id === 'produce'; }
+function getQtyMode(item) { return item.qtyMode === 'kg' ? 'kg' : 'unit'; }
+function getQtyStep(item) { return getQtyMode(item) === 'kg' ? 0.5 : 1; }
+function normalizeQtyForMode(mode) { return 1; } // always reset to 1 on mode switch
+function formatQty(item) {
+  const mode = getQtyMode(item);
+  const qty  = item.qty || 1;
+  if (mode === 'kg') return `${qty % 1 === 0 ? qty : qty.toFixed(1)} ק״ג`;
+  return `${qty}`;
+}
+
 // ── DEPT MODE STATE — persisted in localStorage, never in Firebase ──────────
 let deptMode = localStorage.getItem('fsl_dept_mode') === '1';
 
@@ -613,7 +625,22 @@ function _warnPermission(){ toast('⚠️ אין הרשאה — רענן את ה
 // Light haptic tap on supported mobile devices (no-op elsewhere)
 function _haptic(ms){ try{ navigator.vibrate && navigator.vibrate(ms||15); }catch(_){} }
 window.toggleFav=function(id){const i=items[id];update(ref(db,`groups/${groupId}/items/${id}`),{fav:!i.fav}).then(()=>toast(i.fav?'הוסר מהמועדפים':'⭐ נוסף למועדפים')).catch(e=>{if((e.message||'').includes('PERMISSION_DENIED'))_warnPermission();else toast('❌ '+e.message);});};
-window.changeQty=function(id,d){const i=items[id];update(ref(db,`groups/${groupId}/items/${id}`),{qty:Math.max(1,(i.qty||1)+d)}).catch(e=>{if((e.message||'').includes('PERMISSION_DENIED'))_warnPermission();});};
+window.changeQty=function(id,d){
+  const i=items[id];
+  const mode=getQtyMode(i);
+  const step=getQtyStep(i);
+  const min=mode==='kg'?0.5:1;
+  const raw=(i.qty||1)+(d*step);
+  const next=Math.max(min,Math.round(raw*10)/10);
+  update(ref(db,`groups/${groupId}/items/${id}`),{qty:next}).catch(e=>{if((e.message||'').includes('PERMISSION_DENIED'))_warnPermission();});
+};
+window.setQtyMode=function(id,mode){
+  const i=items[id];
+  if(!i||getQtyMode(i)===mode)return;
+  const patch={qtyMode:mode,qty:1};
+  if(mode==='unit')patch.qtyMode=null;
+  update(ref(db,`groups/${groupId}/items/${id}`),patch).catch(e=>{if((e.message||'').includes('PERMISSION_DENIED'))_warnPermission();});
+};
 window.clearBought=function(){Object.entries(items).forEach(([id,i])=>{if(i.bought)remove(ref(db,`groups/${groupId}/items/${id}`))});toast('🗑 נקנים נמחקו')};
 
 window.setTab=function(tab){
@@ -2272,8 +2299,8 @@ window.openShare=function(){
   const pending=Object.values(items).filter(i=>!i.bought);
   const bought=Object.values(items).filter(i=>i.bought);
   let text=`🛒 רשימת קניות — ${groupName}\n${'─'.repeat(22)}\n\n`;
-  if(pending.length){text+='📋 לקנות:\n';pending.forEach(i=>{text+=`${i.fav?'⭐ ':'• '}${i.name}  ×${i.qty||1}\n`});}
-  if(bought.length){text+='\n✅ כבר קניתי:\n';bought.forEach(i=>{text+=`✓ ${i.name}  ×${i.qty||1}\n`});}
+  if(pending.length){text+='📋 לקנות:\n';pending.forEach(i=>{text+=`${i.fav?'⭐ ':'• '}${i.name}  ×${formatQty(i)}\n`});}
+  if(bought.length){text+='\n✅ כבר קניתי:\n';bought.forEach(i=>{text+=`✓ ${i.name}  ×${formatQty(i)}\n`});}
   if(!Object.keys(items).length)text+='(הרשימה ריקה)';
   document.getElementById('share-box').textContent=text;
   document.getElementById('share-overlay').classList.add('show');
@@ -2584,8 +2611,11 @@ function itemHTML(item, suppressDrag = false) {
       </div>
       <div class="qty-row">
         <button class="qty-btn" onclick="changeQty('${item.id}',-1)">−</button>
-        <span class="qty-num">${item.qty||1}</span>
+        <span class="qty-num">${formatQty(item)}</span>
         <button class="qty-btn" onclick="changeQty('${item.id}',1)">+</button>
+        ${isProduceItem(item) ? `<span class="qty-mode-toggle">
+          <button class="qty-mode-btn${getQtyMode(item)==='unit'?' active':''}" onclick="setQtyMode('${item.id}','unit')">יח׳</button><button class="qty-mode-btn${getQtyMode(item)==='kg'?' active':''}" onclick="setQtyMode('${item.id}','kg')">ק״ג</button>
+        </span>` : ''}
       </div>
       ${priceChipHTML}
     </div>
@@ -6958,6 +6988,7 @@ async function loadItemPricesInBackground() {
         const prices  = result.prices;
         const best    = prices[0];
         const qty     = item.qty || 1;
+        const qtyLabel = formatQty(item);
         const unitP   = best.displayPrice || best.price || 0;
         const totalP  = unitP * qty;
         const isStale  = best.isStale || result.stale;
@@ -6971,7 +7002,7 @@ async function loadItemPricesInBackground() {
         const distLabel  = best.distanceKm != null ? `${best.distanceKm} ק"מ` : '';
         const storeLabel = (best.storeName && best.storeName !== best.chainName) ? esc(best.storeName) : '';
         // Chip shows unit price + qty badge so the user can verify: unitP × qty = what the bar totals
-        const fingerprint = `${unitP.toFixed(2)}|${chainLabel}|${isStale?1:0}|${chainCount}|${qty}|${distLabel}`;
+        const fingerprint = `${unitP.toFixed(2)}|${chainLabel}|${isStale?1:0}|${chainCount}|${qtyLabel}|${distLabel}`;
         if (chipArea.dataset.fingerprint !== fingerprint) {
           chipArea.innerHTML = `<button class="price-chip${hasMulti?' best':''}${isStale?' stale':''}"
             onclick="openPriceChipDetail('${item.id}')"
@@ -6979,7 +7010,7 @@ async function loadItemPricesInBackground() {
             <span class="price-chip-dot" style="background:${chainColor}"></span>
             <span class="price-chip-chain">${chainLabel}${storeLabel ? ` · ${storeLabel}` : ''}</span>
             <span class="price-chip-price">₪${unitP.toFixed(2)}</span>
-            ${qty > 1 ? `<span class="price-chip-qty">×${qty}</span>` : ''}
+            ${qty > 1 ? `<span class="price-chip-qty">×${qtyLabel}</span>` : ''}
             ${chainCount > 1 ? `<span class="price-chip-more">${chainCount} רשתות</span>` : ''}
             ${distLabel ? `<span class="price-chip-dist">📍${distLabel}</span>` : ''}
             ${isStale ? '<span style="color:var(--red)">⚠</span>' : ''}
