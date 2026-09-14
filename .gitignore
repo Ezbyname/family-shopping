@@ -39,3 +39,4 @@ apply-import.py
 www/
 
 .idea/
+*.bundle
