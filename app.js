@@ -121,10 +121,12 @@ function getQtyMode(item) { return item.qtyMode === 'kg' ? 'kg' : 'unit'; }
 function getQtyStep(item) { return getQtyMode(item) === 'kg' ? 0.5 : 1; }
 function normalizeQtyForMode(mode) { return 1; } // always reset to 1 on mode switch
 function formatQty(item) {
-  const mode = getQtyMode(item);
-  const qty  = item.qty || 1;
-  if (mode === 'kg') return `${qty % 1 === 0 ? qty : qty.toFixed(1)} ק״ג`;
-  return `${qty}`;
+  const mode    = getQtyMode(item);
+  const qty     = item.qty || 1;
+  const qtyStr  = qty % 1 === 0 ? String(qty) : qty.toFixed(1);
+  if (mode === 'kg') return `${qtyStr} ק״ג`;
+  if (isProduceItem(item)) return `${qtyStr} יח׳`;
+  return qtyStr;
 }
 
 // ── DEPT MODE STATE — persisted in localStorage, never in Firebase ──────────
