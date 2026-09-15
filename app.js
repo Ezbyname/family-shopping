@@ -4164,7 +4164,7 @@ function renderPriceRow(p, isFirst, total, warnings) {
   let actions = '';
   if (p.source==='official'||p.source==='user_override') {
     const pname = sanitize(_currentScanProduct?.name||selectedProduct?.name||'');
-    actions = `<div class="override-actions">
+    actions = `<div class="override-actions" onclick="event.stopPropagation()">
       <button class="override-btn primary" onclick="event.stopPropagation();openOverrideModal('${chainKey}','${esc(store)}','${p.price}','${esc(pname)}')">✏️ תקן אישי</button>
       <button class="override-btn" onclick="event.stopPropagation();openReportModal('${chainKey}','${esc(store)}','${p.price}','${esc(pname)}')">🚨 דווח שגיאה</button>
     </div>`;
