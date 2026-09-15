@@ -7322,7 +7322,7 @@ function _renderPriceDetail() {
     window._sdRows.push(normalizeStoreInfo(p));
 
     const actionBtns = (src === 'official' || src === 'user_override') ? `
-      <div class="pd-row-actions">
+      <div class="pd-row-actions" onclick="event.stopPropagation()">
         <button class="pd-row-act"
           onclick="event.stopPropagation();openMp2(${JSON.stringify(_pdBarcode)},${JSON.stringify(_pdName)},true,${JSON.stringify(chainName)},${displayP})">✏️ תקן</button>
         <button class="pd-row-act"
@@ -7538,7 +7538,7 @@ function normalizeStoreInfo(p) {
     price:               p.displayPrice        ?? p.price ?? null,
     unit:                p.unit                || '',
     quantity:            p.quantity            || '',
-    syncedAt:            p.syncedAt            || p.lastUpdated || null,
+    syncedAt:            p.syncedAt            || p.updatedAt || p.lastUpdated || null,
     isStale:             !!p.isStale,
     source:              p.source              || '',
   };
