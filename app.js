@@ -4186,18 +4186,7 @@ function renderPriceRow(p, isFirst, total, warnings) {
   // Cache row data for the store-detail panel (safe index reference, no inline
   // JSON) so the row is tappable → opens existing openStoreDetail.
   const _sdIdx = (window._sdRows = window._sdRows || []).length;
-  window._sdRows.push({
-    chainName: p.chainName || p.chainId || '', chainId: p.chainId || '',
-    storeId: p.storeId || '', storeName: p.storeName || '',
-    city: p.city || '', address: p.address || '',
-    distanceKm: p.distanceKm ?? null,
-    latitude: p.latitude ?? null, longitude: p.longitude ?? null,
-    approximateLocation: p.approximateLocation || false,
-    openingHours: p.openingHours || null,
-    price: p.displayPrice ?? p.price ?? null,
-    unit: p.unit || '', quantity: p.quantity || '',
-    syncedAt: p.syncedAt || p.lastUpdated || null,
-  });
+  window._sdRows.push(normalizeStoreInfo(p));
 
   return `<div class="spr${isBest?' best':''}" style="cursor:pointer"
       onclick="openStoreDetail(window._sdRows[${_sdIdx}])">
@@ -7330,15 +7319,7 @@ function _renderPriceDetail() {
 
     // Cache store data for the details modal (safe index reference, no inline JSON)
     const sdIdx = window._sdRows.length;
-    window._sdRows.push({
-      chainName, chainId: p.chainId || '',
-      storeId: p.storeId || '', storeName: p.storeName || '',
-      city: p.city || '', address: p.address || '',
-      distanceKm: p.distanceKm ?? null,
-      latitude: p.latitude ?? null, longitude: p.longitude ?? null,
-      approximateLocation: p.approximateLocation || false,
-      openingHours: p.openingHours || null,
-    });
+    window._sdRows.push(normalizeStoreInfo(p));
 
     const actionBtns = (src === 'official' || src === 'user_override') ? `
       <div class="pd-row-actions">
@@ -7541,6 +7522,28 @@ window._sdNav = function(i) {
   navigateToStoreDirect(s.latitude, s.longitude, s.address || '', s.storeName || s.chainName || '');
 };
 
+function normalizeStoreInfo(p) {
+  return {
+    chainName:           p.chainName           || p.chainId || '',
+    chainId:             p.chainId             || '',
+    storeId:             p.storeId             || '',
+    storeName:           p.storeName           || '',
+    city:                p.city                || '',
+    address:             p.address             || '',
+    distanceKm:          p.distanceKm          ?? null,
+    latitude:            p.latitude            ?? null,
+    longitude:           p.longitude           ?? null,
+    approximateLocation: p.approximateLocation || false,
+    openingHours:        p.openingHours        || null,
+    price:               p.displayPrice        ?? p.price ?? null,
+    unit:                p.unit                || '',
+    quantity:            p.quantity            || '',
+    syncedAt:            p.syncedAt            || p.lastUpdated || null,
+    isStale:             !!p.isStale,
+    source:              p.source              || '',
+  };
+}
+
 window.openStoreDetail = function(storeData) {
   if (!storeData) return;
   _sdStore = storeData;
@@ -7575,10 +7578,16 @@ window.openStoreDetail = function(storeData) {
       tags.push(`<span class="sd-tag" style="color:var(--muted)">₪${per.toFixed(2)} ל-1 ${esc(storeData.unit)}</span>`);
     }
   }
-  // Last updated (Part 4 fallback when missing)
-  tags.push(storeData.syncedAt
-    ? `<span class="sd-tag" style="color:var(--muted)">🕒 ${_freshnessLabel(storeData.syncedAt).label}</span>`
-    : `<span class="sd-tag" style="color:var(--muted)">🕒 עדכון אחרון לא זמין</span>`);
+  // Last updated — only show tag when we actually have data
+  if (storeData.syncedAt) {
+    const freshInfo = _freshnessLabel(storeData.syncedAt);
+    const staleStyle = storeData.isStale ? 'color:var(--red)' : 'color:var(--muted)';
+    const stalePrefix = storeData.isStale ? '⚠ ישן · ' : '';
+    tags.push(`<span class="sd-tag" style="${staleStyle}">🕒 ${stalePrefix}${freshInfo.label}</span>`);
+  } else if (storeData.isStale) {
+    tags.push(`<span class="sd-tag" style="color:var(--red)">⚠ מחיר ישן</span>`);
+  }
+  // If neither syncedAt nor isStale — omit the tag entirely (no misleading "לא זמין")
   document.getElementById('sd-tags').innerHTML = tags.join('');
 
   // Address section
