@@ -1731,6 +1731,7 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
   font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;
   width:100%;text-align:center}
 .sd-ghost-btn:active{background:var(--card2)}
+.sd-ghost-btn[hidden]{display:none!important}
 /* Tappable row in price detail → opens store modal */
 .pd-row[data-tappable]{cursor:pointer}
 .pd-row[data-tappable]:active{opacity:.88}

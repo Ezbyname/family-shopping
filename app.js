@@ -296,6 +296,7 @@ const STORES=['שופרסל','רמי לוי','ויקטורי','יינות בית
 let activeStores=new Set(STORES);
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function _jsAttr(v){return JSON.stringify(v).replace(/"/g,'&quot;');}
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
 
 function saveLocal(){localStorage.setItem('fsl_v2',JSON.stringify({myName,myId,groupId,groupName}))}
@@ -4165,8 +4166,8 @@ function renderPriceRow(p, isFirst, total, warnings) {
   if (p.source==='official'||p.source==='user_override') {
     const pname = sanitize(_currentScanProduct?.name||selectedProduct?.name||'');
     actions = `<div class="override-actions" onclick="event.stopPropagation()">
-      <button class="override-btn primary" onclick="event.stopPropagation();openOverrideModal('${chainKey}','${esc(store)}','${p.price}','${esc(pname)}')">✏️ תקן אישי</button>
-      <button class="override-btn" onclick="event.stopPropagation();openReportModal('${chainKey}','${esc(store)}','${p.price}','${esc(pname)}')">🚨 דווח שגיאה</button>
+      <button class="override-btn primary" onclick="event.stopPropagation();openOverrideModal(${_jsAttr(chainKey)},${_jsAttr(store)},${p.price},${_jsAttr(pname)})">✏️ תקן אישי</button>
+      <button class="override-btn" onclick="event.stopPropagation();openReportModal(${_jsAttr(chainKey)},${_jsAttr(store)},${p.price},${_jsAttr(pname)})">🚨 דווח שגיאה</button>
     </div>`;
   }
 
@@ -7237,7 +7238,7 @@ function _renderPriceDetail() {
           ${!navigator.onLine ? 'אין חיבור — לא ניתן לחפש מחירים' : 'לא נמצאו מחירים רשמיים. הוסף ידנית:'}
         </div>
       </div>
-      ${navigator.onLine ? `<button class="pd-manual-btn" onclick="openMp2(${JSON.stringify(_pdBarcode)},${JSON.stringify(_pdName)},false,'',0)">📝 הוסף מחיר ידנית</button>` : ''}`;
+      ${navigator.onLine ? `<button class="pd-manual-btn" onclick="openMp2(${_jsAttr(_pdBarcode)},${_jsAttr(_pdName)},false,'',0)">📝 הוסף מחיר ידנית</button>` : ''}`;
     return;
   }
 
@@ -7324,9 +7325,9 @@ function _renderPriceDetail() {
     const actionBtns = (src === 'official' || src === 'user_override') ? `
       <div class="pd-row-actions" onclick="event.stopPropagation()">
         <button class="pd-row-act"
-          onclick="event.stopPropagation();openMp2(${JSON.stringify(_pdBarcode)},${JSON.stringify(_pdName)},true,${JSON.stringify(chainName)},${displayP})">✏️ תקן</button>
+          onclick="event.stopPropagation();openMp2(${_jsAttr(_pdBarcode)},${_jsAttr(_pdName)},true,${_jsAttr(chainName)},${displayP})">✏️ תקן</button>
         <button class="pd-row-act"
-          onclick="event.stopPropagation();openReportModal(${JSON.stringify(chainKey)},${JSON.stringify(chainName)},${displayP},${JSON.stringify(_pdName)})">🚨 דווח</button>
+          onclick="event.stopPropagation();openReportModal(${_jsAttr(chainKey)},${_jsAttr(chainName)},${displayP},${_jsAttr(_pdName)})">🚨 דווח</button>
       </div>` : '';
 
     // Override rows get a distinct background; all rows are tappable → opens store detail
@@ -7357,7 +7358,7 @@ function _renderPriceDetail() {
 
   const hasOfficial = filtered.some(p => p.source === 'official' || p.source === 'user_override');
   body.innerHTML = updateByBanner + offlineBanner + staleBanner + summaryHTML + rowsHTML + `
-    <button class="pd-manual-btn" onclick="openMp2(${JSON.stringify(_pdBarcode)},${JSON.stringify(_pdName)},${hasOfficial},'',0)">
+    <button class="pd-manual-btn" onclick="openMp2(${_jsAttr(_pdBarcode)},${_jsAttr(_pdName)},${hasOfficial},'',0)">
       📝 ${hasOfficial ? 'תקן / הוסף מחיר' : 'הוסף מחיר ידנית'}
     </button>`;
 }
