@@ -4521,7 +4521,7 @@ window.submitReport = async function() {
       note: note||null, evidenceType: 'user_report', status: 'pending',
     });
     closeOL2('report-overlay');
-    toast('📢 תודה! הדיווח נשמר');
+    toast('📢 תודה! הדיווח נשלח לבדיקה');
     if (selectedProduct) window.showProductPricesEnhanced(selectedProduct);
   } catch(e) { console.error('[report]', e.message); toast('❌ '+e.message); }
 };
@@ -6813,6 +6813,8 @@ async function _fetchPricesForBarcode(barcode) {
   }
   try {
     let url = `/api/prices?barcode=${encodeURIComponent(barcode)}`;
+    if (myId)    url += `&userId=${encodeURIComponent(myId)}`;
+    if (groupId) url += `&groupId=${encodeURIComponent(groupId)}`;
     if (_hasLoc()) url += `&lat=${_locLat()}&lng=${_locLng()}&radiusKm=${_nearbyRadius}&includeApproximate=true`;
     const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -7325,7 +7327,7 @@ function _renderPriceDetail() {
     const actionBtns = (src === 'official' || src === 'user_override') ? `
       <div class="pd-row-actions" onclick="event.stopPropagation()">
         <button class="pd-row-act"
-          onclick="event.stopPropagation();openMp2(${_jsAttr(_pdBarcode)},${_jsAttr(_pdName)},true,${_jsAttr(chainName)},${displayP})">✏️ תקן</button>
+          onclick="event.stopPropagation();openMp2(${_jsAttr(_pdBarcode)},${_jsAttr(_pdName)},true,${_jsAttr(chainName)},${displayP},${_jsAttr(chainKey)})">✏️ תקן</button>
         <button class="pd-row-act"
           onclick="event.stopPropagation();openReportModal(${_jsAttr(chainKey)},${_jsAttr(chainName)},${displayP},${_jsAttr(_pdName)})">🚨 דווח</button>
       </div>` : '';
@@ -7366,8 +7368,8 @@ function _renderPriceDetail() {
 let _mp2Context = null;
 let _mp2Tab     = 'override';
 
-window.openMp2 = function(barcode, name, hasOfficial, store, officialPrice) {
-  _mp2Context = { barcode, name, hasOfficial, store: store || '', officialPrice: +officialPrice || 0 };
+window.openMp2 = function(barcode, name, hasOfficial, store, officialPrice, chainKeyOverride) {
+  _mp2Context = { barcode, name, hasOfficial, store: store || '', officialPrice: +officialPrice || 0, chainKeyOverride: chainKeyOverride || null };
   _mp2Tab     = hasOfficial ? 'override' : 'family';
 
   const titleEl   = document.getElementById('mp2-title');
@@ -7428,7 +7430,7 @@ window.saveMp2Price = async function() {
 
   if (_mp2Tab === 'override') {
     const storeName = store || 'לא ידוע';
-    const chainKey  = storeName.replace(/\s/g,'_') + '_0';
+    const chainKey  = _mp2Context.chainKeyOverride || (storeName.replace(/\s/g,'_') + '_0');
     const now       = new Date().toISOString();
     const path      = `userPriceOverrides/${myId}/${barcode}/${chainKey}`;
     const data      = {
