@@ -4506,7 +4506,7 @@ window.submitReport = async function() {
   const price = parseFloat(document.getElementById('report-price-input').value);
   const note  = sanitize(document.getElementById('report-note-input').value, 300);
   if (!isValidPrice(price)) { toast('⚠️ הכנס מחיר שראיתי'); return; }
-  const barcode = _currentScanProduct?.barcode || selectedProduct?.barcode || '';
+  const barcode = _currentScanProduct?.barcode || selectedProduct?.barcode || _pdBarcode || '';
   if (!isValidBarcode(barcode)) { toast('⚠️ ברקוד חסר'); return; }
   const m = myProfile || {};
   const rid = `r_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
@@ -7357,10 +7357,7 @@ function _renderPriceDetail() {
   }).join('');
 
   const hasOfficial = filtered.some(p => p.source === 'official' || p.source === 'user_override');
-  body.innerHTML = updateByBanner + offlineBanner + staleBanner + summaryHTML + rowsHTML + `
-    <button class="pd-manual-btn" onclick="openMp2(${_jsAttr(_pdBarcode)},${_jsAttr(_pdName)},${hasOfficial},'',0)">
-      📝 ${hasOfficial ? 'תקן / הוסף מחיר' : 'הוסף מחיר ידנית'}
-    </button>`;
+  body.innerHTML = updateByBanner + offlineBanner + staleBanner + summaryHTML + rowsHTML;
 }
 
 // ══════════════════════════════════════════════════
