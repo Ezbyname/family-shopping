@@ -7309,7 +7309,7 @@ function _renderPriceDetail() {
     const chainName    = p.chainName || p.chainId || '';
     const chainColor   = (CHAIN_META[chainName] || {}).color || '#7d8590';
     const primaryName  = p.storeName || chainName;
-    const chainKey     = `${p.chainId || chainName.replace(/\s/g,'_')}_${p.storeId || '0'}`;
+    const chainKey     = p._key || `${p.chainId || chainName.replace(/\s/g,'_')}_${p.storeId || '0'}`;
     const approxMark   = p.approximateLocation ? `<span class="approx-badge">~משוער</span>` : '';
     const addrLine     = [p.address, p.city].filter(Boolean).join(', ');
 
@@ -7381,7 +7381,7 @@ window.openMp2 = function(barcode, name, hasOfficial, store, officialPrice, chai
   if (titleEl)   titleEl.textContent   = hasOfficial ? '✏️ תיקון / הוספת מחיר' : '📝 הוסף מחיר';
   if (productEl) productEl.textContent = name || '';
   if (storeEl)   storeEl.value  = store || '';
-  if (priceEl)   priceEl.value  = '';
+  if (priceEl)   priceEl.value  = _mp2Context.officialPrice ? (+_mp2Context.officialPrice).toFixed(2) : '';
   if (tabOvr)    tabOvr.style.display  = hasOfficial ? '' : 'none';
 
   setMp2Tab(_mp2Tab);

@@ -385,8 +385,9 @@ async function buildLayeredPrices(
       .filter(([, p]) => p?.price > 0)
       .map(([key, p]) => ({
         ...p, _key: key, source: 'official',
-        displayPrice: overrides[key]?.overridePrice ?? p.price,
-        override:     overrides[key] ?? null,
+        displayPrice:  overrides[key]?.overridePrice ?? p.price,
+        override:      overrides[key] ?? null,
+        sourceDisplay: overrides[key] ? 'user_override' : 'official',
       }));
 
     // Radius filter — use cached store index (prefers storeCoords, falls back to stores/)
