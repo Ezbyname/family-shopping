@@ -7479,12 +7479,25 @@ window.saveMp2Price = async function() {
 };
 
 // Refresh price detail sheet after a save — without full loading spinner
-async function _refreshPdAfterSave(barcode) {
+async function _refreshPdAfterSave(barcode, _isDelayed) {
   const overlay = document.getElementById('price-detail-overlay');
   if (!overlay?.classList.contains('show') || _pdBarcode !== barcode) return;
   // Fetch fresh data (cache already invalidated)
-  const res  = await _fetchPricesForBarcode(barcode).catch(() => null);
+  const res = await _fetchPricesForBarcode(barcode).catch(() => null);
+  console.log(`[refresh-pd${_isDelayed ? '-delayed' : ''}]`, {
+    barcode,
+    hasOverride: res?.prices?.some(p => p.override),
+    overrideKeys: res?.prices?.filter(p => p.override).map(p => p._key),
+    displayPrices: res?.prices?.slice(0,3).map(p => ({ _key: p._key, displayPrice: p.displayPrice, sourceDisplay: p.sourceDisplay })),
+  });
   if (res?.prices) { _pdPrices = res.prices; _renderPriceDetail(); }
+  // Timing test: schedule a second fetch at +2s to detect propagation delay
+  if (!_isDelayed) {
+    setTimeout(() => {
+      _pcInvalidate(barcode);
+      _refreshPdAfterSave(barcode, true);
+    }, 2000);
+  }
 }
 
 // ══════════════════════════════════════════════════
