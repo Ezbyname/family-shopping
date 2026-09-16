@@ -7439,9 +7439,11 @@ window.saveMp2Price = async function() {
       overridePrice: Math.round(price * 100) / 100,
       reason: null, createdAt: now, updatedAt: now, source: 'user_override',
     };
+    console.log('[mp2-save]', { barcode, myId, storeName, chainKeyOverride: _mp2Context?.chainKeyOverride, chainKey, path, overridePrice: data.overridePrice });
     if (!navigator.onLine) { _queueOfflineEdit(path, data); closeMp2(); return; }
     try {
       await set(ref(db, path), data);
+      console.log('[mp2-save-ok]', path);
       closeMp2();
       _pcInvalidate(barcode);
       toast(`✏️ תיקון אישי נשמר ב${storeName}`);
