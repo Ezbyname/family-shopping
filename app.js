@@ -7231,19 +7231,7 @@ function _renderPriceDetail() {
   const staleBanner    = _pdFromCache && _pcGet(_pdBarcode)?.ts && (Date.now() - _pcGet(_pdBarcode).ts > PRICE_CACHE_TTL * 0.9)
     ? `<div class="pd-warn-banner">⚠ ייתכן שהמחירים אינם עדכניים לחלוטין</div>` : '';
 
-  // De-dup by _key (each Firebase store key should appear once)
-  const _seenKeys = new Set();
-  const _pdPricesDeduped = _pdPrices.filter(p => {
-    if (!p._key) return true;
-    if (_seenKeys.has(p._key)) return false;
-    _seenKeys.add(p._key);
-    return true;
-  });
-  if (_pdPricesDeduped.length !== _pdPrices.length) {
-    console.warn('[renderPD] deduped', _pdPrices.length, '→', _pdPricesDeduped.length, 'rows');
-  }
-
-  if (!_pdPricesDeduped.length) {
+  if (!_pdPrices.length) {
     body.innerHTML = updateByBanner + offlineBanner + `
       <div class="pd-empty">
         <div class="pe-icon">🔍</div>
@@ -7257,7 +7245,7 @@ function _renderPriceDetail() {
   }
 
   // ── Filter ───────────────────────────────────────────────────────────────
-  let filtered = [..._pdPricesDeduped];
+  let filtered = [..._pdPrices];
   if (_pdFilters.size > 0) {
     filtered = filtered.filter(p => {
       const src = p.source || '';
@@ -7496,16 +7484,25 @@ async function _refreshPdAfterSave(barcode, _isDelayed) {
   if (!overlay?.classList.contains('show') || _pdBarcode !== barcode) return;
   // Fetch fresh data (cache already invalidated)
   const res = await _fetchPricesForBarcode(barcode).catch(() => null);
-  const _dbgPrices = res?.prices || [];
-  const _dbgKeys   = _dbgPrices.map(p => p._key).filter(Boolean);
-  const _dbgDupKeys = _dbgKeys.filter((k, i) => _dbgKeys.indexOf(k) !== i);
+  const _d = res?.prices || [];
+  const _dKeys = _d.map(p => p._key).filter(Boolean);
   console.log(`[refresh-pd${_isDelayed ? '-delayed' : ''}]`, {
     barcode,
-    total: _dbgPrices.length,
-    hasOverride: _dbgPrices.some(p => p.override),
-    overrideKeys: _dbgPrices.filter(p => p.override).map(p => p._key),
-    dupKeys: _dbgDupKeys,
-    displayPrices: _dbgPrices.slice(0,3).map(p => ({ _key: p._key, displayPrice: p.displayPrice, sourceDisplay: p.sourceDisplay })),
+    total: _d.length,
+    dupKeys: _dKeys.filter((k, i) => _dKeys.indexOf(k) !== i),
+    overrideCount: _d.filter(p => p.override).length,
+    rows: _d.map(p => ({
+      _key:          p._key,
+      price:         p.price,
+      displayPrice:  p.displayPrice,
+      sourceDisplay: p.sourceDisplay,
+      hasOverride:   !!p.override,
+      overridePrice: p.override?.overridePrice ?? null,
+      chainId:       p.chainId,
+      chainName:     p.chainName,
+      storeId:       p.storeId,
+      storeName:     p.storeName,
+    })),
   });
   if (res?.prices) { _pdPrices = res.prices; _renderPriceDetail(); }
   // Timing test: schedule a second fetch at +2s to detect propagation delay
