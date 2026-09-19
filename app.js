@@ -1,3 +1,4 @@
+import { pdHasLoc as _pdHasLocFn, pdInitialMode, pdEffectiveRadius as pdEffR, pdCacheKey as pdCKFn, pdRowEligible, pdBuildRequestUrl, pdExtractRows, pdNameFallbackUrl, pdShouldUseFallback } from './js/pd-location.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, push, onValue, update, remove }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -998,15 +999,18 @@ const CHAIN_META = {
 // Enabled: stores/{key}.latitude/longitude are populated from the 422-store sync.
 const NEARBY_COORDS_READY = true;
 
-let _nearbyMode       = false;
-let _selectedLocation = null;  // { label, lat, lng, source: 'gps'|'manual' }
-let _nearbyRadius     = 3;     // km, persisted in localStorage
-let _recentLocations  = [];    // up to 5 manual locations, persisted in localStorage
+let _nearbyMode           = false;
+let _selectedLocation     = null;  // { label, lat, lng, source: 'gps'|'manual' }
+let _nearbyRadius         = 3;     // km, persisted in localStorage
+let _radiusExplicitlySet  = localStorage.getItem('nearbyRadius') !== null;
+let _recentLocations      = [];    // up to 5 manual locations, persisted in localStorage
 
 // Convenience helpers (replaces raw _userLat / _userLng access)
-const _locLat  = () => _selectedLocation?.lat  ?? null;
-const _locLng  = () => _selectedLocation?.lng  ?? null;
-const _hasLoc  = () => Boolean(_nearbyMode && _selectedLocation?.lat);
+const _locLat    = () => _selectedLocation?.lat  ?? null;
+const _locLng    = () => _selectedLocation?.lng  ?? null;
+const _hasLoc    = () => Boolean(_nearbyMode && _selectedLocation?.lat);
+// Price-detail location helper — independent of _nearbyMode toggle (delegates to js/pd-location.js)
+const _pdHasLoc  = () => _pdHasLocFn(_selectedLocation);
 
 (function _initNearbyState() {
   const r = parseInt(localStorage.getItem('nearbyRadius') || '3', 10);
@@ -1072,6 +1076,7 @@ window.toggleNearbyMode = function() {
 
 window.setNearbyRadius = function(km) {
   _nearbyRadius = km;
+  _radiusExplicitlySet = true;
   localStorage.setItem('nearbyRadius', String(km));
   _syncNearbyUI();
   if (_hasLoc() && lastSearchQuery) searchPrices();
@@ -1084,6 +1089,12 @@ function _setLocation(loc) {
   _selectedLocation = loc;
   try { localStorage.setItem('selectedLocation', JSON.stringify(loc)); } catch(_) {}
   _syncNearbyUI();
+  // Refresh price-detail sheet if it is open and in radius mode — location change affects radius results.
+  // Do NOT reset _pdMode: user may have explicitly switched mode; _pdInitMode() is only called on sheet open.
+  if (_pdBarcode && document.getElementById('price-detail-overlay')?.classList.contains('show')) {
+    _syncPdLocationUI();
+    if (_pdMode === 'radius') _pdRefreshPrices();
+  }
 }
 
 // Clear the active location
@@ -6985,15 +6996,270 @@ function _updateListTotals() {
 // ══════════════════════════════════════════════════
 // PRICE DETAIL BOTTOM SHEET  (cache-first + real-time)
 // ══════════════════════════════════════════════════
-let _pdBarcode   = null;
-let _pdName      = '';
-let _pdQty       = 1;
-let _pdSort      = 'cheapest';
-let _pdFilters   = new Set();
-let _pdPrices    = [];
-let _pdFromCache = false;
-let _pdUnsub     = null;   // Firebase real-time unsub
-let _pdLastUpdateBy = null; // track who just updated for notification
+let _pdBarcode      = null;
+let _pdName         = '';
+let _pdQty          = 1;
+let _pdSort         = 'cheapest';
+let _pdFilters      = new Set();
+let _pdPrices       = [];
+let _pdFromCache    = false;
+let _pdUnsub        = null;   // Firebase real-time unsub
+let _pdLastUpdateBy = null;   // track who just updated for notification
+let _pdMode         = 'all';  // 'city' | 'radius' | 'all' — recomputed on each open
+
+// ── PD LOCATION SYSTEM ────────────────────────────────────────────────────────
+
+function _pdEffectiveRadius() {
+  return pdEffR(_radiusExplicitlySet, _nearbyRadius);
+}
+
+function _pdInitMode() {
+  return pdInitialMode(_selectedCities, _selectedLocation);
+}
+
+function _pdSetMode(mode) {
+  _pdMode = mode;
+  _syncPdLocationUI();
+  _pdRefreshPrices();
+}
+
+function _pdCacheKey(barcode) {
+  return pdCKFn(barcode, _pdMode, _selectedLocation, _selectedCities, _radiusExplicitlySet, _nearbyRadius);
+}
+
+const _pdCache = {};
+const PD_CACHE_TTL = 30 * 60 * 1000; // 30 min
+
+function _pdCacheGet(barcode) {
+  const key = _pdCacheKey(barcode);
+  const m = _pdCache[key];
+  if (m && Date.now() - m.ts < PD_CACHE_TTL) return m;
+  return null;
+}
+
+function _pdCacheSet(barcode, prices) {
+  const key = _pdCacheKey(barcode);
+  _pdCache[key] = { prices, ts: Date.now() };
+}
+
+function _pdCacheInvalidate(barcode) {
+  const prefix = `pd_${barcode}_`;
+  for (const k of Object.keys(_pdCache)) {
+    if (k.startsWith(prefix)) delete _pdCache[k];
+  }
+}
+
+async function _pdFetchPrices(barcode, forceRefresh = false) {
+  if (!forceRefresh) {
+    const cached = _pdCacheGet(barcode);
+    if (cached) return { prices: cached.prices, ts: cached.ts, fromCache: true };
+  }
+  if (!navigator.onLine) return null;
+
+  try {
+    let prices;
+    const { url: reqUrl, isCityMode, blocked } = pdBuildRequestUrl(
+      barcode, _pdMode, _selectedLocation, _selectedCities,
+      _radiusExplicitlySet, _nearbyRadius, myId, groupId
+    );
+    // Blocked filtered mode (city with no cities, radius with no location):
+    // return empty without issuing a national request.
+    if (!reqUrl) return { prices: [], ts: Date.now(), fromCache: false, blocked };
+    const res = await fetch(reqUrl, { signal: AbortSignal.timeout(12000) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    prices = pdExtractRows(data, isCityMode)
+      .filter(p => (p.displayPrice || p.price || 0) > 0)
+      .filter(p => pdRowEligible(p, _pdMode));
+
+    // Fallback: name search when barcode returns empty results and product name is known.
+    // Skipped in city mode — the name search endpoint is national and would silently
+    // replace a city-filtered view with unrelated national results.
+    if (pdShouldUseFallback(prices, _pdName, _pdMode)) {
+      try {
+        const fallbackUrl = pdNameFallbackUrl(_pdName, _pdMode, _selectedLocation, _radiusExplicitlySet, _nearbyRadius);
+        if (fallbackUrl) {
+          const res  = await fetch(fallbackUrl, { signal: AbortSignal.timeout(10000) });
+          const data = await res.json();
+          const match = (data.results || []).find(r => r.barcode === barcode) || data.results?.[0];
+          prices = (match?.prices || [])
+            .filter(p => (p.displayPrice || p.price || 0) > 0)
+            .filter(p => pdRowEligible(p, _pdMode));
+        }
+      } catch(_) {}
+    }
+
+    _pdCacheSet(barcode, prices);
+    return { prices, ts: Date.now(), fromCache: false };
+  } catch(e) {
+    console.warn('[pdFetch] failed:', barcode, e.message);
+    return null;
+  }
+}
+
+function _pdAddCity(city) {
+  if (!city || _selectedCities.includes(city)) return;
+  _selectedCities.push(city);
+  try { localStorage.setItem('priceFilterCities', JSON.stringify(_selectedCities)); } catch(_) {}
+  _syncCityUI();
+  _syncPdLocationUI();
+  _pdRefreshPrices();
+}
+
+function _pdRemoveCity(city) {
+  _selectedCities = _selectedCities.filter(c => c !== city);
+  try { localStorage.setItem('priceFilterCities', JSON.stringify(_selectedCities)); } catch(_) {}
+  _syncCityUI();
+  _syncPdLocationUI();
+  _pdRefreshPrices();
+}
+
+function _pdSetRadius(km) {
+  _nearbyRadius = km;
+  _radiusExplicitlySet = true;
+  localStorage.setItem('nearbyRadius', String(km));
+  _syncNearbyUI();
+  _syncPdLocationUI();
+  _pdRefreshPrices();
+}
+
+function _pdSelectGPS() {
+  openManualAddressModal();
+}
+
+function _pdRefreshPrices() {
+  if (!_pdBarcode) return;
+  _pdCacheInvalidate(_pdBarcode);
+  const body = document.getElementById('pd-body');
+  if (body) body.innerHTML = `<div class="pd-loading"><div class="spin"></div><p>טוען מחירים...</p></div>`;
+  _pdFetchPrices(_pdBarcode).then(result => {
+    _pdPrices    = result?.prices || [];
+    _pdFromCache = result?.fromCache || false;
+    _renderPriceDetail();
+  }).catch(() => { _pdPrices = []; _renderPriceDetail(); });
+}
+
+function _syncPdLocationUI() {
+  const container = document.getElementById('pd-loc-controls');
+  if (!container) return;
+
+  const tabs = [
+    { id: 'all',    label: '🌍 הכל' },
+    { id: 'city',   label: '🏙 עיר' },
+    { id: 'radius', label: '📍 מרחק' },
+  ];
+  const tabsHtml = `<div class="pd-mode-tabs">${
+    tabs.map(t => `<button class="pd-tab${_pdMode === t.id ? ' active' : ''}"
+      onclick="_pdSetMode('${t.id}')">${t.label}</button>`).join('')
+  }</div>`;
+
+  let panelHtml = '';
+
+  if (_pdMode === 'city') {
+    // Chips row is populated via DOM after innerHTML assignment — dataset.city
+    // assignment bypasses HTML parsing entirely, safe for any city name including
+    // apostrophes (ג'סר א-זרקא) and double quotes (עיר "בדיקה").
+    panelHtml = `<div class="pd-city-panel">
+      <div class="pd-city-chips-row"></div>
+      <div class="pd-city-input-wrap">
+        <input class="pd-city-input" id="pd-city-input" type="text" placeholder="הוסף עיר..."
+          oninput="_pdOnCityInput(this.value)" onkeydown="_pdOnCityKeydown(event)">
+        <div class="pd-city-sug" id="pd-city-sug"></div>
+      </div>
+    </div>`;
+  } else if (_pdMode === 'radius') {
+    const locLabel = _pdHasLoc()
+      ? `<span class="pd-loc-label">${esc(_selectedLocation.label)}</span>`
+      : `<span class="pd-loc-label pd-loc-missing">לא נבחר מיקום</span>`;
+    const radii = [1, 3, 5, 10, 25, 50];
+    const r = _pdEffectiveRadius();
+    const segs = radii.map(v =>
+      `<button class="radius-seg-btn${v === r ? ' active' : ''}" onclick="_pdSetRadius(${v})">${v} ק"מ</button>`
+    ).join('');
+    panelHtml = `<div class="pd-radius-panel">
+      <div class="pd-radius-loc-row">
+        ${locLabel}
+        <button class="pd-change-loc-btn" onclick="_pdSelectGPS()">שנה מיקום</button>
+      </div>
+      <div class="pd-radius-seg">${segs}</div>
+    </div>`;
+  }
+
+  container.innerHTML = tabsHtml + panelHtml;
+
+  // Build city chips via DOM — dataset.city assignment is HTML-injection-safe
+  // for any city name including apostrophes and double quotes.
+  if (_pdMode === 'city') {
+    const chipsRow = container.querySelector('.pd-city-chips-row');
+    if (chipsRow) {
+      _selectedCities.forEach(c => {
+        const span = document.createElement('span');
+        span.className = 'city-chip';
+        span.textContent = c;
+        const btn = document.createElement('button');
+        btn.className = 'pd-remove-city';
+        btn.setAttribute('aria-label', 'הסר עיר');
+        btn.textContent = '×';
+        btn.dataset.city = c;
+        span.appendChild(btn);
+        chipsRow.appendChild(span);
+      });
+    }
+  }
+
+  // Delegated handler for chip remove — named property prevents accumulation across re-renders
+  if (container._pdChipHandler) container.removeEventListener('click', container._pdChipHandler);
+  container._pdChipHandler = function(e) {
+    const btn = e.target.closest('.pd-remove-city');
+    if (btn) _pdRemoveCity(btn.dataset.city);
+  };
+  container.addEventListener('click', container._pdChipHandler);
+}
+
+window._pdSetMode      = _pdSetMode;
+window._pdAddCity      = _pdAddCity;
+window._pdRemoveCity   = _pdRemoveCity;
+window._pdSetRadius    = _pdSetRadius;
+window._pdSelectGPS    = _pdSelectGPS;
+
+window._pdOnCityInput = function(val) {
+  const sug = document.getElementById('pd-city-sug');
+  if (!sug) return;
+  const q = (val || '').trim();
+  if (!q) { sug.innerHTML = ''; sug.style.display = 'none'; return; }
+  const matches = _citySugItems
+    .filter(c => c.city.includes(q) && !_selectedCities.includes(c.city))
+    .slice(0, 6);
+  if (!matches.length) { sug.innerHTML = ''; sug.style.display = 'none'; return; }
+  sug.style.display = 'block';
+  sug.innerHTML = '';
+  // Build suggestion items via DOM — dataset.city is HTML-injection-safe
+  matches.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'pd-city-sug-item';
+    div.textContent = c.city;
+    div.dataset.city = c.city;
+    sug.appendChild(div);
+  });
+  // Delegated — named property prevents accumulation when suggestions update
+  if (sug._pdSugHandler) sug.removeEventListener('click', sug._pdSugHandler);
+  sug._pdSugHandler = function(e) {
+    const item = e.target.closest('.pd-city-sug-item');
+    if (item) {
+      _pdAddCity(item.dataset.city);
+      const inp = document.getElementById('pd-city-input');
+      if (inp) inp.value = '';
+    }
+  };
+  sug.addEventListener('click', sug._pdSugHandler);
+};
+
+window._pdOnCityKeydown = function(e) {
+  if (e.key === 'Enter') {
+    const val = e.target.value.trim();
+    if (val) { _pdAddCity(val); e.target.value = ''; }
+  }
+};
 
 // Stable-key entry from the list price chip. Looks the item up by its Firebase
 // id (safe inline) so a product NAME — single- or multi-word, with quotes,
@@ -7016,6 +7282,7 @@ window.openPriceDetailModal = async function(barcode, name, qty) {
   _pdSort      = 'cheapest';
   _pdFilters   = new Set();
   _pdLastUpdateBy = null;
+  _pdMode      = _pdInitMode();
 
   const overlay = document.getElementById('price-detail-overlay');
   const body    = document.getElementById('pd-body');
@@ -7030,6 +7297,9 @@ window.openPriceDetailModal = async function(barcode, name, qty) {
   document.querySelectorAll('.pd-filter-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('pd-sort-cheapest')?.classList.add('active');
 
+  // Render in-sheet location controls
+  _syncPdLocationUI();
+
   // Detach previous real-time listener
   if (_pdUnsub) { _pdUnsub(); _pdUnsub = null; }
 
@@ -7037,39 +7307,25 @@ window.openPriceDetailModal = async function(barcode, name, qty) {
   document.body.classList.add('sheet-open');
 
   // ── Cache-first: render immediately if cached ────────────────────────────
-  const cached = _pcGet(barcode);
+  const cached = _pdCacheGet(barcode);
   if (cached?.prices?.length) {
     _pdPrices    = cached.prices;
     _pdFromCache = true;
     _renderPriceDetail();
-    // Background refresh — do NOT show loading spinner
-    _fetchPricesForBarcode(barcode).then(result => {
+    // Background refresh — bypass cache so a real network request is made
+    _pdFetchPrices(barcode, true).then(result => {
       if (result && !result.fromCache && _pdBarcode === barcode) {
         _pdPrices    = result.prices;
         _pdFromCache = false;
         _renderPriceDetail();
       }
-    }).catch(() => {}); // silently ignore — cached data stays visible
+    }).catch(() => {});
   } else {
     // No cache — show loading spinner and wait
     if (body) body.innerHTML = `<div class="pd-loading"><div class="spin"></div><p>טוען מחירים...</p></div>`;
-    const result = await _fetchPricesForBarcode(barcode).catch(() => null);
+    const result = await _pdFetchPrices(barcode).catch(() => null);
     _pdPrices    = result?.prices || [];
     _pdFromCache = result?.fromCache || false;
-    const isOffline = !navigator.onLine;
-
-    // Fallback: search by name if barcode returns nothing and we're online
-    if (!_pdPrices.length && _pdName && !isOffline) {
-      try {
-        let url = `/api/prices?q=${encodeURIComponent(_pdName)}`;
-        if (_hasLoc()) url += `&lat=${_locLat()}&lng=${_locLng()}&radiusKm=${_nearbyRadius}`;
-        const res  = await fetch(url, { signal: AbortSignal.timeout(10000) });
-        const data = await res.json();
-        const match = (data.results || []).find(r => r.barcode === barcode) || data.results?.[0];
-        _pdPrices = (match?.prices || []).filter(p => (p.displayPrice || p.price || 0) > 0);
-        if (_pdPrices.length) _pcSet(barcode, _pdPrices);
-      } catch(_) {}
-    }
     _renderPriceDetail();
   }
 
@@ -7082,12 +7338,10 @@ window.openPriceDetailModal = async function(barcode, name, qty) {
       if (!document.getElementById('price-detail-overlay')?.classList.contains('show')) return;
       if (_pdBarcode !== barcode) return;
       // A family member updated — invalidate cache and refresh
-      _pcInvalidate(barcode);
-      _fetchPricesForBarcode(barcode).then(result => {
+      _pdCacheInvalidate(barcode);
+      _pdFetchPrices(barcode).then(result => {
         if (!result) return;
-        const prevBest = _pdPrices[0]?.displayPrice;
         _pdPrices = result.prices || [];
-        // Detect who updated (last submittedByDisplayName from manual entries)
         if (snap.exists()) {
           const vals = Object.values(snap.val() || {});
           const latest = vals.sort((a,b) => (b.submittedAt||'') > (a.submittedAt||'') ? 1 : -1)[0];
@@ -7096,7 +7350,6 @@ window.openPriceDetailModal = async function(barcode, name, qty) {
           }
         }
         _renderPriceDetail();
-        // Animate updated rows
         setTimeout(() => {
           document.querySelectorAll('.pd-row').forEach(r => {
             r.classList.add('price-updated');

@@ -1520,6 +1520,32 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
   font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap}
 .pd-sort-btn.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
 .pd-filter-btn.active{background:rgba(99,102,241,.15);border-color:#6366f1;color:#6366f1}
+/* ── Price-detail in-sheet location controls ── */
+.pd-loc-controls{padding:0 0 8px;border-bottom:1px solid var(--border);flex-shrink:0}
+.pd-loc-controls:empty{display:none}
+.pd-mode-tabs{display:flex;gap:5px;padding:8px 0 6px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.pd-mode-tabs::-webkit-scrollbar{height:0}
+.pd-tab{flex-shrink:0;background:var(--card);border:1.5px solid var(--border);
+  border-radius:20px;padding:4px 11px;font-family:'Rubik',sans-serif;
+  font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .15s}
+.pd-tab.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+.pd-city-panel,.pd-radius-panel{padding:4px 0 2px}
+.pd-city-chips-row{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px}
+.pd-city-input-wrap{position:relative}
+.pd-city-input{width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:10px;
+  padding:5px 10px;font-family:'Rubik',sans-serif;font-size:13px;background:var(--card);color:var(--text)}
+.pd-city-sug{display:none;position:absolute;top:100%;right:0;left:0;background:var(--card);
+  border:1.5px solid var(--border);border-radius:10px;z-index:10;overflow:hidden;margin-top:3px}
+.pd-city-sug-item{padding:7px 12px;font-size:13px;cursor:pointer}
+.pd-city-sug-item:hover{background:var(--accent-dim)}
+.pd-radius-loc-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.pd-loc-label{font-size:13px;font-weight:600;color:var(--text);flex:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pd-loc-label.pd-loc-missing{color:var(--muted)}
+.pd-change-loc-btn{flex-shrink:0;background:none;border:1.5px solid var(--border);
+  border-radius:14px;padding:3px 9px;font-family:'Rubik',sans-serif;
+  font-size:11px;color:var(--muted);cursor:pointer}
+.pd-radius-seg{display:flex;gap:4px;flex-wrap:wrap}
 .pd-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
   padding:10px 14px calc(16px + var(--safe-b))}
 .pd-summary{display:flex;align-items:center;gap:8px;
