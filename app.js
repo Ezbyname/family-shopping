@@ -1,4 +1,5 @@
 import { pdHasLoc as _pdHasLocFn, pdInitialMode, pdEffectiveRadius as pdEffR, pdCacheKey as pdCKFn, pdRowEligible, pdBuildRequestUrl, pdExtractRows, pdNameFallbackUrl, pdShouldUseFallback } from './js/pd-location.js';
+import { bpSelectName, bpConsumeBatches, bpFetchCorpus } from './js/bp-search.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, push, onValue, update, remove }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -2815,8 +2816,8 @@ let _bpSearchTimer = null;
 let _bpSearchSeq  = 0;      // monotonically increasing; guards against stale async results
 // Session corpus cache: keyed by "he:<rootToken>" for Hebrew queries.
 // Populated once per root term per picker session; cleared on picker close.
-// Eliminates per-keystroke OFf variance for progressive Hebrew refinement.
-let _bpCorpusCache = new Map();
+// bpSelectName, bpConsumeBatches, bpFetchCorpus imported from js/bp-search.js
+const _bpSelectName = bpSelectName;
 
 function _boldKeyword(text, keyword) {
   if (!keyword || !text) return esc(text);
@@ -3135,83 +3136,37 @@ async function _bpRunSearch(query, signal, seq) {
     const productQ  = meta.product;                    // query with qty/brand stripped
     const queryLang = _bpDetectLang(normQ);            // lang detection on clean text
     const enQuery   = queryLang === 'he' ? (_bpTranslate(productQ) || normQ) : normQ;
-    const enc       = encodeURIComponent(enQuery);
-    const encOrig   = encodeURIComponent(normQ);       // normalized (not raw) for URL 1
+    // ── Corpus: same-origin OFF proxy with root-token cache (dfb0623 semantics) ──
+    const _heTokens    = queryLang === 'he' ? normQ.split(/\s+/).filter(w => w.length > 0) : [];
+    const _rootToken   = _heTokens.length > 0 ? _heTokens[0] : '';
+    const cacheKey     = (queryLang === 'he' && _rootToken.length >= 2) ? `he:${_rootToken}` : '';
+    const corpusPageSize = cacheKey ? 40 : 20;
+    let _cacheHit = false;
 
-    const BASE   = 'https://world.openfoodfacts.org/cgi/search.pl';
-    // Added product_name_ar so Arabic product names are available for ranking
-    const FIELDS = 'product_name,product_name_he,product_name_ar,brands,quantity,image_small_url,code,countries_tags';
-    const IL     = '&tagtype_0=countries&tag_contains_0=contains&tag_0=israel';
-
-    // ── Fix C: session corpus cache for Hebrew queries ───────────────────────
-    // For Hebrew queries with a root token of ≥2 chars, acquire the OFf corpus
-    // once per root term per picker session and freeze it. All progressive
-    // refinements (גבינה → גבינה ל → גבינה לבנ → גבינה לבנה) operate on the
-    // same frozen candidate set, eliminating per-keystroke OFf variance.
-    // Non-Hebrew queries and single-char roots always fetch fresh.
-    const _heTokens  = queryLang === 'he' ? normQ.split(/\s+/).filter(w => w.length > 0) : [];
-    const _rootToken = _heTokens.length > 0 ? _heTokens[0] : '';
-    const _cacheKey  = queryLang === 'he' && _rootToken.length >= 2 ? `he:${_rootToken}` : '';
-    let   _cacheHit  = false;
-
+    if (signal.aborted) return;
     let raw = [];
-    if (_cacheKey && _bpCorpusCache.has(_cacheKey)) {
-      // Cache hit: reuse frozen corpus for this root term
-      raw = _bpCorpusCache.get(_cacheKey);
-      _cacheHit = true;
-      console.log(`[diag-bp-search #${_diagBpSearchSeq}] corpus cache HIT key=${_cacheKey} size=${raw.length}`);
-    } else {
-      // Cache miss: fetch from OFf (broader page_size for corpus queries)
-      const corpusPageSize = _cacheKey ? 40 : 20;
-      const urls = [
-        // 1. Israel-filtered + original normalized query
-        `${BASE}?search_terms=${encOrig}&search_simple=1&action=process&json=1&page_size=${corpusPageSize}&fields=${FIELDS}${IL}`,
-        // 2. Israel-filtered + translated query (only when translation differs)
-        enQuery !== normQ
-          ? `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=15&fields=${FIELDS}${IL}`
-          : null,
-        // 3. Broad fallback — no country filter
-        `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=20&fields=${FIELDS}`,
-      ].filter(Boolean);
+    const _corpusResult = await bpFetchCorpus(normQ, enQuery, cacheKey, corpusPageSize, { signal });
 
-      const seen = new Set();
-
-      for (const url of urls) {
-        if (raw.length >= 55) break;
-        if (signal.aborted) return;
-        try {
-          const r = await fetch(url, { headers: { 'User-Agent': 'FamilyShoppingIL/6.3' }, signal });
-          if (!r.ok) continue;
-          const data = await r.json();
-          for (const p of data?.products || []) {
-            const code = p.code || '';
-            if (code && seen.has(code)) continue;
-            if (code) seen.add(code);
-            const isIsraeli = (p.countries_tags || []).some(c => c.includes('israel'));
-            // Use language-aware name selection
-            const name = _bpSelectName(
-              { product_name_he: p.product_name_he, product_name_ar: p.product_name_ar, product_name: p.product_name },
-              queryLang
-            ) || '';
-            if (!name) continue;
-            raw.push({ name, brand: p.brands || '', size: p.quantity || '',
-                       image: p.image_small_url || '', barcode: code, isIsraeli,
-                       nameHe: p.product_name_he || '',
-                       nameAr: p.product_name_ar || '',
-                       nameEn: p.product_name    || '' });
-          }
-        } catch(e) { if (e.name === 'AbortError') return; }
-      }
-
-      // Store in session corpus cache (only for cacheable Hebrew root queries)
-      if (_cacheKey && raw.length > 0) {
-        _bpCorpusCache.set(_cacheKey, raw);
-        console.log(`[diag-bp-search #${_diagBpSearchSeq}] corpus cache MISS key=${_cacheKey} stored size=${raw.length}`);
-      }
-    }
-
-    if (signal.aborted) { console.log(`[diag-bp-search #${_diagBpSearchSeq}] ABORTED after fetch loop`); return; }
+    if (signal.aborted) { console.log(`[diag-bp-search #${_diagBpSearchSeq}] ABORTED after corpus fetch`); return; }
     if (seq !== _bpSearchSeq) { console.log(`[diag-bp-search #${_diagBpSearchSeq}] STALE seq=${seq} current=${_bpSearchSeq} — discarding`); return; }
+
+    if (_corpusResult.status === 'REMOTE_FAILURE') {
+      console.log(`[diag-bp-search #${_diagBpSearchSeq}] OFF proxy REMOTE_FAILURE stale=${_corpusResult.stale}`);
+      _bpProducts = [];
+      if (queryEl)   queryEl.textContent  = 'לא ניתן לחפש כרגע — נסה שוב';
+      if (resultsEl) resultsEl.innerHTML  = '<div class="bp-loading">⚠️ שגיאה בחיפוש, נסה שוב</div>';
+      return;
+    }
+    _cacheHit = _corpusResult.fromCache || false;
+    bpConsumeBatches(_corpusResult.batches, new Set(), raw, queryLang);
+    if (raw.length === 0 && _corpusResult.partialFailure) {
+      console.log(`[diag-bp-search #${_diagBpSearchSeq}] OFF partial failure with zero usable corpus — unavailable`);
+      _bpProducts = [];
+      if (queryEl)   queryEl.textContent  = 'לא ניתן לחפש כרגע — נסה שוב';
+      if (resultsEl) resultsEl.innerHTML  = '<div class="bp-loading">⚠️ שגיאה בחיפוש, נסה שוב</div>';
+      return;
+    }
+    console.log(`[diag-bp-search #${_diagBpSearchSeq}] corpus ${_cacheHit ? 'cache HIT' : 'cache MISS'} size=${raw.length} partial=${_corpusResult.partialFailure || false}`);
     console.log(`[diag-bp-search #${_diagBpSearchSeq}] raw candidates=${raw.length} queryLang=${queryLang} normQ=${JSON.stringify(normQ)} cacheHit=${_cacheHit}`);
 
     // Eligibility: name language must be compatible with query language (before scoring)
@@ -3450,7 +3405,6 @@ window.closeBrandPicker = function() {
   document.getElementById('bp-overlay')?.classList.remove('show');
   document.body.classList.remove('sheet-open');
   _bpMode = 'new'; _bpItemId = null; _bpProducts = [];
-  _bpCorpusCache.clear();  // fresh corpus on next picker open
 };
 
 // ── ip-tile helpers (emoji + clear; picker reuses bp-overlay) ──
