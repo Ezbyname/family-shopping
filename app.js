@@ -3011,16 +3011,6 @@ const _IL_BRANDS_SET = new Set([
   'tnuva','strauss','elite','osem','tara','wissotzky','telma','angel','yotvata',
 ]);
 
-// Pick the most appropriate name field based on the query's language
-function _bpSelectName(p, queryLang) {
-  const he = (p.product_name_he || '').trim();
-  const ar = (p.product_name_ar || '').trim();
-  const en = (p.product_name    || '').trim();
-  if (queryLang === 'he') return he || en;
-  if (queryLang === 'ar') return ar || he || en;
-  return en || he || ar;
-}
-
 // Score a candidate product for a given query.
 // Higher = more relevant. Negative = should be filtered out.
 // queryBrand (optional): extracted brand token — gives a ranking boost.
