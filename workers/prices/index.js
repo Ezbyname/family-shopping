@@ -699,10 +699,26 @@ async function main() {
     try {
       let result;
       if (storesOnly) {
-        // --stores-only: skip price sync, run store metadata only
-        result = await syncChainStores(chain, writer, config);
-        result = { chainId: chain.id, chainName: chain.name, count: result.count || 0,
-                   failed: result.failed, failReason: result.failReason };
+        // --stores-only: dedicated chains may provide their own store ingestion path.
+        if (chain.syncModule) {
+          const mod = await import(new URL(chain.syncModule, import.meta.url));
+          if (typeof mod.syncStores === 'function') {
+            result = await mod.syncStores(chain, writer, config);
+          } else {
+            result = await syncChainStores(chain, writer, config);
+          }
+        } else {
+          result = await syncChainStores(chain, writer, config);
+        }
+
+        result = {
+          chainId: chain.id,
+          chainName: chain.name,
+          count: result.count || 0,
+          storeCount: result.storeCount ?? result.count ?? 0,
+          failed: result.failed,
+          failReason: result.failReason,
+        };
       } else if (chain.syncModule) {
         // Chain has a dedicated sync module (e.g. rami-levy.js for auth-gated portals)
         const mod = await import(new URL(chain.syncModule, import.meta.url));

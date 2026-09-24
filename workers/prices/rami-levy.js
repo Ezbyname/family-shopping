@@ -6,6 +6,8 @@ import { createReadStream, createWriteStream, statSync } from 'fs';
 import { unlink }   from 'fs/promises';
 import { pipeline } from 'stream/promises';
 import { createGunzip } from 'zlib';
+import { Transform } from 'stream';
+import { TextDecoder } from 'util';
 import { tmpdir }   from 'os';
 import { join }     from 'path';
 import https        from 'https';
@@ -13,10 +15,13 @@ import { execFile } from 'child_process';
 
 const SSL_AGENT = new https.Agent({ rejectUnauthorized: false });
 
-import { discoverPriceFullFiles } from './rami-levy-discovery.js';
+import {
+  discoverPriceFullFiles,
+  discoverLatestStoresFile,
+} from './rami-levy-discovery.js';
 import { parseXMLStream }         from './parseXml.js';
 import { safeKey }                from './normalizeProduct.js';
-import { getDB }                  from './firebaseWriter.js';
+import { buildStorePayload, buildStoreCoordsPayload } from './storeWritePayload.js';
 import { logger }                 from './logger.js';
 
 const DOWNLOAD_TIMEOUT = 120_000;
@@ -41,6 +46,153 @@ async function downloadFTP(url, label, timeoutMs) {
 }
 
 
+class Utf16LeDecoder extends Transform {
+  constructor() {
+    super();
+    this.decoder = new TextDecoder('utf-16le');
+  }
+
+  _transform(chunk, _encoding, callback) {
+    try {
+      this.push(this.decoder.decode(chunk, { stream: true }));
+      callback();
+    } catch (err) {
+      callback(err);
+    }
+  }
+
+  _flush(callback) {
+    try {
+      const tail = this.decoder.decode();
+      if (tail) this.push(tail);
+      callback();
+    } catch (err) {
+      callback(err);
+    }
+  }
+}
+
+export async function syncStores(chain, writer, config) {
+  const label = `[${chain.name}] [stores]`;
+  const result = {
+    chainId: chain.id,
+    chainName: chain.name,
+    count: 0,
+    unresolved: 0,
+    failed: false,
+    failReason: null,
+  };
+
+  logger.info(`${label} Starting Rami Levy store metadata sync`, {
+    dryRun: config.dryRun,
+  });
+
+  let fileInfo;
+  try {
+    fileInfo = await discoverLatestStoresFile(null, chain.chainId, { retries: 3 });
+  } catch (err) {
+    result.failed = true;
+    result.failReason = `Store discovery failed: ${err.message}`;
+    logger.warn(`${label} Discovery failed`, { error: err.message });
+    return result;
+  }
+
+  try {
+    const rawStream = await downloadFTP(
+      fileInfo.url,
+      'rami-levy-stores',
+      config.worker?.downloadTimeout || DOWNLOAD_TIMEOUT,
+    );
+
+    const decodedStream = rawStream.pipe(new Utf16LeDecoder());
+    const stores = [];
+
+    const parsed = await parseXMLStream(
+      decodedStream,
+      null,
+      (store) => stores.push(store),
+      { chainId: chain.chainId, chainName: chain.name },
+    );
+
+    const uniqueIds = new Set(stores.map(store => store.storeId));
+    const unresolved = stores.filter(
+      store => store.cityResolutionSource === 'unresolved',
+    );
+    const numericCityLeaks = stores.filter(
+      store => typeof store.city === 'string' && /^\d+$/.test(store.city),
+    );
+
+    logger.info(`${label} ── STORE VALIDATION REPORT ──`);
+    logger.info(`${label}   Source file        : ${fileInfo.filename}`);
+    logger.info(`${label}   Parsed stores      : ${stores.length}`);
+    logger.info(`${label}   Unique StoreIDs    : ${uniqueIds.size}`);
+    logger.info(`${label}   Unresolved cities  : ${unresolved.length}`);
+    logger.info(`${label}   Numeric city leaks : ${numericCityLeaks.length}`);
+    logger.info(`${label}   Parser errors      : ${parsed.errors}`);
+
+    if (
+      stores.length === 0 ||
+      uniqueIds.size !== stores.length ||
+      numericCityLeaks.length > 0 ||
+      parsed.errors > 0
+    ) {
+      const issues = [];
+      if (stores.length === 0) issues.push('0 stores parsed');
+      if (uniqueIds.size !== stores.length) issues.push('duplicate StoreIDs');
+      if (numericCityLeaks.length > 0) issues.push('numeric city leak');
+      if (parsed.errors > 0) issues.push(`${parsed.errors} parser errors`);
+
+      result.failed = true;
+      result.failReason = issues.join('; ');
+      logger.fail(`${label} STORE VALIDATION FAILED`, { issues });
+      return result;
+    }
+
+    result.count = stores.length;
+    result.unresolved = unresolved.length;
+
+    if (config.dryRun) {
+      logger.ok(`${label} STORE VALIDATION PASSED`, {
+        stores: stores.length,
+        unresolved: unresolved.length,
+        dryRun: true,
+      });
+      logger.info(`${label} DRY-RUN COMPLETE — store data NOT written to Firebase`);
+      return result;
+    }
+
+    for (const store of stores) {
+      const storeKey = safeKey(`${chain.id}_${store.storeId}`);
+
+      await writer.queue(
+        `stores/${storeKey}`,
+        buildStorePayload(store, chain),
+      );
+
+      if (store.hasCoords) {
+        await writer.queue(
+          `storeCoords/${storeKey}`,
+          buildStoreCoordsPayload(store),
+        );
+      }
+    }
+
+    await writer.flush();
+
+    logger.ok(`${label} STORE SYNC COMPLETE`, {
+      stores: stores.length,
+      unresolved: unresolved.length,
+    });
+
+    return result;
+  } catch (err) {
+    result.failed = true;
+    result.failReason = err.message;
+    logger.warn(`${label} Store sync failed`, { error: err.message });
+    return result;
+  }
+}
+
 export async function sync(chain, writer, config) {
   const label = `[${chain.name}]`;
   const result = {
@@ -50,6 +202,21 @@ export async function sync(chain, writer, config) {
   };
 
   logger.info(`${label} Starting Rami Levy sync`, { dryRun: config.dryRun });
+
+  try {
+    const storesResult = await syncStores(chain, writer, config);
+    if (storesResult.failed) {
+      logger.warn(`${label} Store metadata sync failed — continuing price sync`, {
+        error: storesResult.failReason,
+      });
+    } else {
+      result.storeCount = storesResult.count;
+    }
+  } catch (err) {
+    logger.warn(`${label} Store metadata sync failed — continuing price sync`, {
+      error: err.message,
+    });
+  }
 
   let byStore, metrics;
   try {
@@ -61,14 +228,13 @@ export async function sync(chain, writer, config) {
   }
 
   if (byStore.size === 0) {
-    result.failed = true; result.failReason = 'No PriceFull files found in Cerberus listing';
+    result.failed = true; result.failReason = 'No PriceFull files found via FTP';
     logger.fail(`${label} No PriceFull files found`);
     return result;
   }
 
   logger.info(`${label} Found ${byStore.size} stores with PriceFull files`, metrics);
 
-  const db        = getDB();
   const chainMeta = { chainId: chain.chainId, chainName: chain.name };
   const _perStore       = {};
   const _uniqueBarcodes = new Set();
@@ -88,12 +254,9 @@ export async function sync(chain, writer, config) {
       );
 
       if (!_perStore[storeId]) _perStore[storeId] = { count: 0, sampleBarcode: null };
-      let storeNameSeen = '';
-
       const { count, skipped, errors } = await parseXMLStream(
         stream,
         async (product) => {
-          if (!storeNameSeen && product.storeName) storeNameSeen = product.storeName;
           const sid      = product.storeId ? String(parseInt(product.storeId, 10) || product.storeId) : storeId;
           const storeKey = safeKey(`${chain.id}_${sid}`);
           const row = {
@@ -120,15 +283,6 @@ export async function sync(chain, writer, config) {
       result.skipped += skipped;
       result.errors  += errors;
       storeIdsSynced.push(storeId);
-
-      if (!config.dryRun) {
-        const storeKey = safeKey(`${chain.id}_${storeId}`);
-        await db.ref(`stores/${storeKey}`).update({
-          chainId: chain.chainId, chainName: chain.name,
-          storeId, storeName: storeNameSeen || '', updatedAt: new Date().toISOString(),
-        });
-        result.storeCount++;
-      }
 
       logger.ok(`${storeLabel} Done`, { items: count, skipped, errors });
     } catch (err) {
