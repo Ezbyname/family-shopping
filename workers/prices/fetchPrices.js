@@ -12,8 +12,9 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { logger } from './logger.js';
 
-const DEFAULT_TIMEOUT_MS = 120_000; // 2 minutes per file
-const INDEX_TIMEOUT_MS   = 20_000;  // 20 seconds for index page
+const DEFAULT_TIMEOUT_MS     = 120_000; // 2 minutes per file
+const INDEX_TIMEOUT_MS       = 20_000;  // 20 seconds for general index pages
+const STORE_INDEX_TIMEOUT_MS = 30_000;  // Shufersal store index can exceed 20s
 const SAS_EXPIRY_PATTERN = /AuthenticationFailed|Signed expiry time/i; // SAS token expired
 
 const HEADERS = {
@@ -254,16 +255,23 @@ export async function resolveStoreMetaUrls(chain, maxPages = 20) {
         .replace(/catID=\d+/, `catID=${catId}`);
 
       try {
-        const res = await fetch(pageUrl, {
-          headers:  HEADERS,
-          signal:   AbortSignal.timeout(INDEX_TIMEOUT_MS),
-          redirect: 'follow',
+        const body = await withRetry(async () => {
+          const res = await fetch(pageUrl, {
+            headers:  HEADERS,
+            signal:   AbortSignal.timeout(STORE_INDEX_TIMEOUT_MS),
+            redirect: 'follow',
+          });
+
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
+
+          return await res.text();
+        }, {
+          retries: 3,
+          delayMs: 2000,
+          label: `[${chain.name}] stores catID=${catId} page ${page}`,
         });
-        if (!res.ok) {
-          logger.warn(`[${chain.name}] stores catID=${catId} page ${page}: HTTP ${res.status}`);
-          break;
-        }
-        const body = await res.text();
 
         let m, newStore = 0;
         azureStoreRe.lastIndex = 0;
