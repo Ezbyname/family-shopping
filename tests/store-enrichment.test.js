@@ -436,6 +436,226 @@ console.log('\n── QA: four distinct branch keys, no deduplication ──');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// I. Legacy numeric store city — known locality code resolves for API clients
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n── I. Legacy numeric store city resolves to human-readable city ──');
+{
+  const legacyStores = {
+    'rami-levy_203': {
+      chainId: 'rami-levy', chainName: 'Rami Levy', storeId: '203',
+      storeName: 'Legacy Branch', address: 'Legacy Address',
+      city: '5000',
+    },
+  };
+
+  const customFetch = async (url) => {
+    if (url.includes('oauth2.googleapis.com'))
+      return { ok: true, json: async () => ({ access_token: 'tok' }) };
+    if (url.includes('/stores.json'))
+      return { ok: true, json: async () => legacyStores };
+    if (url.match(/\/prices\/\d+\.json/)) {
+      return { ok: true, json: async () => ({
+        'rami-levy_203': {
+          barcode: '7290010935007', name: 'Test', price: 5.5,
+          chainId: 'rami-levy', chainName: 'Rami Levy', storeId: '203',
+          storeName: '', address: '', city: '',
+          syncedAt: Date.now(),
+        },
+      }) };
+    }
+    if (url.includes('/priceReports/'))
+      return { ok: true, json: async () => null };
+    return { ok: false, status: 404, json: async () => null };
+  };
+
+  const body = await withMock(customFetch, () =>
+    callHandler({ barcode: '7290010935007' })
+  );
+
+  expect(
+    'legacy store city 5000 resolved',
+    body?.prices?.[0]?.city,
+    'תל אביב -יפו'
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// J. Unknown numeric city must never leak through the public API
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n── J. Unknown numeric city is suppressed ──');
+{
+  const unresolvedStores = {
+    'rami-levy_203': {
+      chainId: 'rami-levy', chainName: 'Rami Levy', storeId: '203',
+      storeName: 'Unknown Locality Branch', address: 'Unknown Address',
+      city: '10098',
+    },
+  };
+
+  const customFetch = async (url) => {
+    if (url.includes('oauth2.googleapis.com'))
+      return { ok: true, json: async () => ({ access_token: 'tok' }) };
+    if (url.includes('/stores.json'))
+      return { ok: true, json: async () => unresolvedStores };
+    if (url.match(/\/prices\/\d+\.json/)) {
+      return { ok: true, json: async () => ({
+        'rami-levy_203': {
+          barcode: '7290010935007', name: 'Test', price: 5.5,
+          chainId: 'rami-levy', chainName: 'Rami Levy', storeId: '203',
+          storeName: '', address: '', city: '10098',
+          syncedAt: Date.now(),
+        },
+      }) };
+    }
+    if (url.includes('/priceReports/'))
+      return { ok: true, json: async () => null };
+    return { ok: false, status: 404, json: async () => null };
+  };
+
+  const body = await withMock(customFetch, () =>
+    callHandler({ barcode: '7290010935007' })
+  );
+
+  expect(
+    'unresolved numeric city not exposed',
+    body?.prices?.[0]?.city,
+    ''
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// K. Canonical store city overrides legacy numeric city on the price row
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n── K. Canonical store city overrides legacy numeric price city ──');
+{
+  const customFetch = async (url) => {
+    if (url.includes('oauth2.googleapis.com'))
+      return { ok: true, json: async () => ({ access_token: 'tok' }) };
+    if (url.includes('/stores.json'))
+      return { ok: true, json: async () => STORES_NODE };
+    if (url.match(/\/prices\/\d+\.json/)) {
+      return { ok: true, json: async () => ({
+        'rami-levy_203': {
+          barcode: '7290010935007', name: 'Test', price: 5.5,
+          chainId: 'rami-levy', chainName: 'Rami Levy', storeId: '203',
+          storeName: '', address: '',
+          city: '5000',
+          syncedAt: Date.now(),
+        },
+      }) };
+    }
+    if (url.includes('/priceReports/'))
+      return { ok: true, json: async () => null };
+    return { ok: false, status: 404, json: async () => null };
+  };
+
+  const body = await withMock(customFetch, () =>
+    callHandler({ barcode: '7290010935007' })
+  );
+
+  expect(
+    'canonical store city replaces legacy numeric price city',
+    body?.prices?.[0]?.city,
+    'Rishon LeZion'
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// L. Proxy path — known numeric city resolves without radius
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n── L. Proxy numeric city resolves without radius ──');
+{
+  const customFetch = async (url) => {
+    if (url.includes('oauth2.googleapis.com'))
+      return { ok: true, json: async () => ({ access_token: 'tok' }) };
+
+    if (url.match(/\/prices\/\d+\.json/))
+      return { ok: true, json: async () => ({}) };
+
+    if (url.includes('/proxyCache/')) {
+      return {
+        ok: true,
+        json: async () => ({
+          'proxy-1': {
+            barcode: '7290010935007',
+            name: 'Proxy Test',
+            price: 5.5,
+            city: '5000',
+            fetchedAt: Date.now(),
+          },
+        }),
+      };
+    }
+
+    if (url.includes('/manualPrices/'))
+      return { ok: true, json: async () => null };
+
+    return { ok: false, status: 404, json: async () => null };
+  };
+
+  const body = await withMock(customFetch, () =>
+    callHandler({ barcode: '7290010935007' })
+  );
+
+  expect('proxy source returned', body?.source, 'proxy');
+  expect(
+    'proxy numeric city 5000 resolved',
+    body?.prices?.[0]?.city,
+    'תל אביב -יפו'
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M. Manual path — unresolved numeric city must not leak
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n── M. Manual unresolved numeric city is suppressed ──');
+{
+  const customFetch = async (url) => {
+    if (url.includes('oauth2.googleapis.com'))
+      return { ok: true, json: async () => ({ access_token: 'tok' }) };
+
+    if (url.match(/\/prices\/\d+\.json/))
+      return { ok: true, json: async () => ({}) };
+
+    if (url.includes('/proxyCache/'))
+      return { ok: true, json: async () => null };
+
+    if (url.includes('/manualPrices/')) {
+      return {
+        ok: true,
+        json: async () => ({
+          'manual-1': {
+            barcode: '7290010935007',
+            name: 'Manual Test',
+            price: 5.5,
+            chainName: 'Manual Chain',
+            storeName: 'Manual Store',
+            city: '10098',
+            submittedAt: new Date().toISOString(),
+          },
+        }),
+      };
+    }
+
+    return { ok: false, status: 404, json: async () => null };
+  };
+
+  const body = await withMock(customFetch, () =>
+    callHandler({
+      barcode: '7290010935007',
+      groupId: 'test-group',
+    })
+  );
+
+  expect('manual source returned', body?.source, 'manual');
+  expect(
+    'manual unresolved numeric city not exposed',
+    body?.prices?.[0]?.city,
+    ''
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Summary
 // ─────────────────────────────────────────────────────────────────────────────
 console.log(`\n── Results: ${pass} passed, ${fail} failed ──`);

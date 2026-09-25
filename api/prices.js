@@ -13,6 +13,7 @@
 
 import { restGet, getDbUrl, getAdminToken, haversine, setCors, isValidBarcode, isValidPrice } from './_firebase.js';
 import { translateIngredient } from './_normalize-he.js';
+import { resolveLocality } from '../workers/prices/localityResolver.js';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const INIT_TIMEOUT_MS  = 8_000;   // admin token fetch budget
@@ -21,6 +22,48 @@ const BUILD_TIMEOUT_MS = 10_000;  // whole buildLayeredPrices budget
 const STALE_MS         = 36 * 3_600_000; // 36 h
 const MAX_PRICES       = 50;      // cap price list per barcode response
 const STORE_CACHE_MS   = 5 * 60_000;     // 5 min store index cache
+
+// ── City compatibility ───────────────────────────────────────────────────────
+// Historical price/store rows may contain supplier locality codes in `city`.
+// API responses must expose a human-readable city only:
+//   1. preserve an existing human-readable value,
+//   2. prefer canonical store metadata over a legacy numeric price-row value,
+//   3. resolve known numeric locality codes through the canonical resolver,
+//   4. suppress unresolved numeric codes instead of leaking them to clients.
+function cleanCity(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+}
+
+function isNumericCity(value) {
+  const city = cleanCity(value);
+  return city !== '' && /^\d+$/.test(city);
+}
+
+function cityForApi(record = {}, preferredCity = '') {
+  const current = cleanCity(record?.city);
+
+  // Existing human-readable metadata remains authoritative.
+  if (current && !isNumericCity(current)) return current;
+
+  // When the price row contains a legacy numeric value, canonical store
+  // metadata takes precedence if available.
+  const preferred = cleanCity(preferredCity);
+  if (preferred && !isNumericCity(preferred)) return preferred;
+
+  // Canonical records may already carry cityName even if city is absent/legacy.
+  const cityName = cleanCity(record?.cityName);
+  if (cityName && !isNumericCity(cityName)) return cityName;
+
+  // Last compatibility path: resolve the supplier locality code.
+  const rawCode =
+    record?.rawCityCode ??
+    record?.cityId ??
+    current;
+
+  const resolved = resolveLocality(rawCode);
+  return resolved.resolved ? resolved.city : '';
+}
 
 // ── Timeout helper ───────────────────────────────────────────────────────────
 function withTimeout(promise, ms, label = '') {
@@ -61,7 +104,7 @@ async function getStoreIndex(dbUrl) {
           longitude:  v.longitude ?? v.lng ?? null,
           storeName:  v.storeName  || '',
           address:    v.address    || '',
-          city:       v.city       || '',
+          city:       cityForApi(v),
         }])
       );
       _storeCacheExp = now + STORE_CACHE_MS;
@@ -82,7 +125,7 @@ async function getStoreIndex(dbUrl) {
           longitude:  v.lng ?? v.longitude ?? null,
           storeName:  '',
           address:    '',
-          city:       v.city || '',
+          city:       cityForApi(v),
         }])
       );
       _storeCacheExp = now + STORE_CACHE_MS;
@@ -431,14 +474,18 @@ async function buildLayeredPrices(
         timings.storeReadMs = Date.now() - tStore;
       }
 
-      // Fill only missing values — never overwrite non-empty price-row metadata.
+      // Fill missing metadata while normalizing historical numeric city values.
+      // Human-readable price-row metadata is preserved. A legacy numeric city
+      // may be replaced by canonical store metadata or resolved locally.
       for (const p of official) {
         const store = idx[p._key] ?? idx[`${p.chainId || ''}_${p.storeId || ''}`];
+
         if (store) {
           if (!p.storeName) p.storeName = store.storeName || '';
           if (!p.address)   p.address   = store.address   || '';
-          if (!p.city)      p.city      = store.city      || '';
         }
+
+        p.city = cityForApi(p, store?.city || '');
       }
 
       // Radius filter — uses the same already-loaded index.
@@ -488,7 +535,12 @@ async function buildLayeredPrices(
   if (proxyData && typeof proxyData === 'object') {
     proxy = Object.values(proxyData)
       .filter(p => p?.price > 0 && (now - (p.fetchedAt || 0)) < 3_600_000)
-      .map(p => ({ ...p, source: 'proxy', displayPrice: p.price }));
+      .map(p => ({
+        ...p,
+        source: 'proxy',
+        displayPrice: p.price,
+        city: cityForApi(p),
+      }));
     if (hasLoc) {
       const idx = storeIndex ?? {};
       proxy = filterByRadius(proxy, lat, lng, radius, idx);
@@ -506,7 +558,12 @@ async function buildLayeredPrices(
     const seen = new Set();
     manual = Object.values(manualData)
       .filter(p => p?.price > 0)
-      .map(p => ({ ...p, source: 'manual', displayPrice: p.price }))
+      .map(p => ({
+        ...p,
+        source: 'manual',
+        displayPrice: p.price,
+        city: cityForApi(p),
+      }))
       .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))
       .filter(p => {
         const k = p.chainName || p.storeName || '';
@@ -528,6 +585,11 @@ function filterByRadius(prices, lat, lng, radius, storeIndex) {
   return prices.filter(p => {
     const key   = `${p.chainId || ''}_${p.storeId || ''}`;
     const store = storeIndex[key];
+
+    // Keep the API contract safe even when radius filtering receives legacy
+    // rows directly (for example proxy rows).
+    p.city = cityForApi(p, store?.city || '');
+
     if (!store?.hasCoords) return true; // include if no coords yet (pre-geocoding)
     const dist  = haversine(lat, lng, store.latitude, store.longitude);
     if (dist <= radius) {
@@ -535,7 +597,6 @@ function filterByRadius(prices, lat, lng, radius, storeIndex) {
       p.latitude    = store.latitude  ?? null;
       p.longitude   = store.longitude ?? null;
       p.address     = p.address  || store.address  || '';
-      p.city        = p.city     || store.city     || '';
       return true;
     }
     return false;
