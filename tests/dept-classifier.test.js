@@ -1,80 +1,9 @@
-// Department classifier regression tests (Stage 4)
+// Department classifier regression tests (Stage 4 — Commit 2)
 // Run with: node tests/dept-classifier.test.js
 // No test framework required — plain Node.js assertions.
 'use strict';
 
-// ── Inline the classifier (no browser globals needed) ──────────────────────
-const DEPARTMENTS = [
-  { id:'produce',  label:'פירות וירקות',                order:1  },
-  { id:'bakery',   label:'מאפייה',                      order:2  },
-  { id:'seasonal', label:'פרחים ועונתי',                order:3  },
-  { id:'deli',     label:'מעדנייה וגבינות',             order:4  },
-  { id:'meat',     label:'בשר ודגים',                   order:5  },
-  { id:'dairy',    label:'חלב וביצים',                  order:6  },
-  { id:'pantry',   label:'בישול, שימורים ומזווה',       order:7  },
-  { id:'snacks',   label:'חטיפים ומתוקים',              order:8  },
-  { id:'drinks',   label:'משקאות',                      order:9  },
-  { id:'frozen',   label:'קפואים ומוכנים',              order:10 },
-  { id:'cleaning', label:'ניקיון וטואלטיקה',            order:11 },
-  { id:'baby',     label:'תינוקות',                     order:12 },
-  { id:'home',     label:'כלי בית ושונות',              order:13 },
-  { id:'impulse',  label:'קו קופות / קטן ואימפולסיבי', order:14 },
-  { id:'other',    label:'אחר',                         order:15 },
-];
-
-const DEPT_OVERRIDES = [
-  ['מיץ תפוזים','drinks'], ['מיץ תפוז','drinks'], ['מיץ ענבים','drinks'],
-  ['מיץ תפוחים','drinks'], ['מיץ אשכוליות','drinks'],
-  ['שניצל קפוא','frozen'], ['פיצה קפואה','frozen'], ['ירקות קפואים','frozen'],
-  ['בורקס קפוא','frozen'], ['ארוחה מוכנה','frozen'], ['מנה מוכנה','frozen'],
-  ['ממרח חומוס','deli'], ['סלט חומוס','deli'], ['חומוס מוכן','deli'],
-  ['חומוס יבש','pantry'], ['גרגרי חומוס','pantry'], ['חומוס שימורים','pantry'],
-  ['גבינה צהובה','deli'], ['גבינה לבנה','deli'], ['גבינה עיזים','deli'],
-  ['ממרח גבינה','deli'],
-  ['נייר טואלט','cleaning'], ['מגבות נייר','cleaning'], ['נוזל כלים','cleaning'],
-  ['שקיות אשפה','cleaning'], ['משחת שיניים','cleaning'],
-  ['נייר אפייה','home'], ['נייר כסף','home'], ['ניילון נצמד','home'],
-  ['שוקולד קטן','impulse'], ['חטיף קטן','impulse'],
-  ['שוקולד','snacks'],
-  ['גלידה','frozen'],
-  ['מסטיק','impulse'],
-].sort((a,b) => b[0].length - a[0].length);
-
-const DEPT_KEYWORDS = {
-  produce:  ['עגבניה','עגבנייה','מלפפון','תפוח','בננה','חסה','בצל','תפוח אדמה','גזר','פלפל','אבוקדו','לימון','פטרוזיליה','כוסברה','שמיר','קישוא','סלק','כרוב','שום','תפוז','קלמנטינה','מנגו','ענבים','רימון','ירק','פרי'],
-  bakery:   ['לחם','לחמניה','לחמנייה','פיתה','בגט','חלה','עוגה','עוגייה','עוגיות','מאפה','קרואסון','רוגלך','מאפינס'],
-  seasonal: ['פרח','פרחים','עציץ','צמח','זר פרחים','זר','קישוט','קישוטים'],
-  deli:     ['גבינה','מוצרלה','קשקבל','פרמזן','ריקוטה','בולגרית','צפתית','גאודה','קולבי','פסטרמה','נקניק פרוס','סלמי','קוטג','סלטים'],
-  meat:     ['עוף','בשר','שניצל','קציצות','דג','דגים','סלמון','טונה טרייה','הודו','פרגית','כנפיים','שוקיים','סטייק','קבב','בשר טחון','פילה','כבד','לברק','קרפיון','פורל','בקלה'],
-  dairy:    ['חלב','ביצים','ביצה','יוגורט','שמנת','חמאה','שוקו','מעדן','אשל','מרגרינה'],
-  pantry:   ['אורז','פסטה','פתיתים','קוסקוס','שמן','רוטב','עגבניות מרוסקות','קמח','סוכר','מלח','תבלין','תבלינים','קטניות','עדשים','שעועית','שימורים','טונה שימורים','מיונז','דבש','ריבה','זיתים','פסטו','קמח תפוח אדמה','אטריות','קינואה'],
-  snacks:   ['במבה','ביסלי','תפוציפס','שוקולד','עוגיות','חטיף','סוכריות','קרמבו','ופל','חלבה','פופקורן','אגוזים','שקדים','בוטנים','פיסטוק','גרנולה'],
-  drinks:   ['מים','קולה','ספרייט','מיץ','שתייה','בירה','סודה','משקה','קפה','תה','יין','רד בול','טוויסטר'],
-  frozen:   ['קפוא','קפואים','מלאווח','גחנון','ג׳חנון','פיש סטיקס','כופתאות','פלאפל קפוא'],
-  cleaning: ['סבון','שמפו','מרכך','אקונומיקה','כביסה','אבקת כביסה','מרכך כביסה','חומר ניקוי','ניקוי','ספוג','דיאודורנט','קרם','תחליב','גילוח','מברשת שיניים','מגבונים'],
-  baby:     ['חיתולים','חיתול','מטרנה','סימילאק','מגבונים לתינוק','מוצץ','בקבוק תינוק','פורמולה','מזון לתינוק','קרם תינוק','שמפו תינוק'],
-  home:     ['נרות','חד פעמי','כוסות','צלחות','שקיות','שקיות ניילון','אלומיניום','תבנית','מפיות','קופסאות','כלי בית'],
-  impulse:  ['מצית','גפרורים'],
-  other:    [],
-};
-
-function _normText(s) { return (s || '').toLowerCase().trim(); }
-
-function getItemDepartment(item) {
-  const text = _normText(
-    [item.name, item.attached && item.attached.name, item.attached && item.attached.brand]
-      .filter(Boolean).join(' ')
-  );
-  for (const [phrase, deptId] of DEPT_OVERRIDES) {
-    if (text.includes(_normText(phrase))) return DEPARTMENTS.find(d => d.id === deptId);
-  }
-  for (const dept of DEPARTMENTS) {
-    if (dept.id === 'other') continue;
-    const kws = DEPT_KEYWORDS[dept.id] || [];
-    if (kws.some(kw => text.includes(_normText(kw)))) return dept;
-  }
-  return DEPARTMENTS.find(d => d.id === 'other');
-}
+import { DEPARTMENTS, DEPT_OVERRIDES, DEPT_KEYWORDS, _normText, getItemDepartment } from '../js/product-taxonomy.js';
 
 // ── Test harness ────────────────────────────────────────────────────────────
 let pass = 0, fail = 0;
@@ -91,6 +20,7 @@ function classify(name, attached) {
   return getItemDepartment({ name, attached: attached || null }).id;
 }
 
+// ── Original 73 cases (must all still pass) ──────────────────────────────────
 console.log('\n── Standard examples ──');
 expect('תפוחים',     classify('תפוחים'),        'produce');
 expect('בננה',       classify('בננה'),           'produce');
@@ -173,6 +103,181 @@ expect('null attached → safe fallback',
   classify('תפוח', null), 'produce');
 expect('empty attached → safe',
   classify('תפוח', {}), 'produce');
+
+// ── Commit 2: new produce items (previously classified wrong or as other) ─────
+console.log('\n── New produce: previously missing items ──');
+expect('נקטרינה → פירות',          classify('נקטרינה'),          'produce');
+expect('נקטרינות → פירות',         classify('נקטרינות'),         'produce');
+expect('בזיליקום → פירות/ירקות',   classify('בזיליקום'),         'produce');
+expect('שורש סלרי → פירות/ירקות',  classify('שורש סלרי'),        'produce');
+expect('עגבניות שרי → פירות',      classify('עגבניות שרי'),      'produce');
+expect('עגבנייה שרי → פירות',      classify('עגבנייה שרי'),      'produce');
+expect('עגבניות מיני → פירות',     classify('עגבניות מיני'),     'produce');
+expect('ברוקולי → פירות/ירקות',    classify('ברוקולי'),          'produce');
+expect('כרובית → פירות/ירקות',     classify('כרובית'),           'produce');
+expect('אפרסק → פירות',            classify('אפרסק'),            'produce');
+expect('מישמיש → פירות',           classify('מישמיש'),           'produce');
+expect('דובדבן → פירות',           classify('דובדבן'),           'produce');
+expect('אבטיח → פירות',            classify('אבטיח'),            'produce');
+expect('מלון → פירות',             classify('מלון'),             'produce');
+expect('תות שדה → פירות',          classify('תות שדה'),          'produce');
+expect('תותים → פירות',            classify('תותים'),            'produce');
+expect('אוכמניות → פירות',         classify('אוכמניות'),         'produce');
+expect('פטל → פירות',              classify('פטל'),              'produce');
+expect('פפאיה → פירות',            classify('פפאיה'),            'produce');
+expect('מנגו → פירות',             classify('מנגו'),             'produce');
+expect('אננס → פירות',             classify('אננס'),             'produce');
+expect('קיווי → פירות',            classify('קיווי'),            'produce');
+expect('לימון → פירות',            classify('לימון'),            'produce');
+expect('ליים → פירות',             classify('ליים'),             'produce');
+expect('אשכולית → פירות',          classify('אשכולית'),          'produce');
+expect('פומלה → פירות',            classify('פומלה'),            'produce');
+expect('תמר → פירות',              classify('תמר'),              'produce');
+expect('תאנה → פירות',             classify('תאנה'),             'produce');
+expect('ענבים → פירות',            classify('ענבים'),            'produce');
+expect('רימון → פירות',            classify('רימון'),            'produce');
+expect('שזיף → פירות',             classify('שזיף'),             'produce');
+expect('אגס → פירות',              classify('אגס'),              'produce');
+expect('חבוש → פירות',             classify('חבוש'),             'produce');
+expect('שסק → פירות',              classify('שסק'),              'produce');
+
+console.log('\n── New produce: vegetables ──');
+expect('חציל → ירקות',             classify('חציל'),             'produce');
+expect('חצילים → ירקות',           classify('חצילים'),           'produce');
+expect('קישוא → ירקות',            classify('קישוא'),            'produce');
+expect('קישואים → ירקות',          classify('קישואים'),          'produce');
+expect('דלעת → ירקות',             classify('דלעת'),             'produce');
+expect('דלורית → ירקות',           classify('דלורית'),           'produce');
+expect('תירס → ירקות',             classify('תירס'),             'produce');
+expect('אפונה → ירקות',            classify('אפונה'),            'produce');
+expect('שעועית ירוקה → ירקות',     classify('שעועית ירוקה'),     'produce');
+expect('אספרגוס → ירקות',          classify('אספרגוס'),          'produce');
+expect('ארטישוק → ירקות',          classify('ארטישוק'),          'produce');
+expect('שומר → ירקות',             classify('שומר'),             'produce');
+expect('בטטה → ירקות',             classify('בטטה'),             'produce');
+expect('לפת → ירקות',              classify('לפת'),              'produce');
+expect('צנון → ירקות',             classify('צנון'),             'produce');
+expect('פטריות → ירקות',           classify('פטריות'),           'produce');
+expect('שמפיניון → ירקות',         classify('שמפיניון'),         'produce');
+expect('פטרייה → ירקות',           classify('פטרייה'),           'produce');
+expect('פטריות ממולאות → ירקות',   classify('פטריות ממולאות'),   'produce');
+expect('כרוב → ירקות',             classify('כרוב'),             'produce');
+expect('כרוב אדום → ירקות',        classify('כרוב אדום'),        'produce');
+expect('כרוב ניצנים → ירקות',      classify('כרוב ניצנים'),      'produce');
+expect('קולרבי → ירקות',           classify('קולרבי'),           'produce');
+expect('מנגולד → ירקות',           classify('מנגולד'),           'produce');
+expect('תרד → ירקות',              classify('תרד'),              'produce');
+expect('קייל → ירקות',             classify('קייל'),             'produce');
+expect('חסה גלילית → ירקות',       classify('חסה גלילית'),       'produce');
+expect('רוקט → ירקות',             classify('רוקט'),             'produce');
+expect('סלרי → ירקות',             classify('סלרי'),             'produce');
+expect('כרישה → ירקות',            classify('כרישה'),            'produce');
+expect('שאלוט → ירקות',            classify('שאלוט'),            'produce');
+expect('בצל ירוק → ירקות',         classify('בצל ירוק'),         'produce');
+expect('בצל סגול → ירקות',         classify('בצל סגול'),         'produce');
+expect('שורש פטרוזיליה → ירקות',   classify('שורש פטרוזיליה'),   'produce');
+expect('סלק → ירקות',              classify('סלק'),              'produce');
+
+console.log('\n── New produce: fresh herbs ──');
+expect('פטרוזיליה → ירקות',        classify('פטרוזיליה'),        'produce');
+expect('כוסברה → ירקות',           classify('כוסברה'),           'produce');
+expect('שמיר → ירקות',             classify('שמיר'),             'produce');
+expect('נענע → ירקות',             classify('נענע'),             'produce');
+expect('עירית → ירקות',            classify('עירית'),            'produce');
+expect('מרווה → ירקות',            classify('מרווה'),            'produce');
+expect('טימין → ירקות',            classify('טימין'),            'produce');
+expect('רוזמרין → ירקות',          classify('רוזמרין'),          'produce');
+expect('עשבי תיבול → ירקות',       classify('עשבי תיבול'),       'produce');
+
+console.log('\n── False positive regression: these must NOT be produce ──');
+expect('מיץ גזר → drinks (not produce)',       classify('מיץ גזר'),         'drinks');
+expect('מיץ תפוחים → drinks (not produce)',    classify('מיץ תפוחים'),      'drinks');
+expect('ריבת תפוחים → pantry (not produce)',   classify('ריבת תפוחים'),     'pantry');
+expect('תה לימון → drinks (not produce)',      classify('תה לימון'),        'drinks');
+expect('עוגת גזר → bakery (not produce)',      classify('עוגת גזר'),        'bakery');
+expect('ממרח אבוקדו → deli (not produce)',     classify('ממרח אבוקדו'),     'deli');
+expect('קמח תפוח אדמה → pantry (not produce)',classify('קמח תפוח אדמה'),   'pantry');
+expect('פלפל שחור → pantry (spice, not fresh)',classify('פלפל שחור'),       'pantry');
+expect('פלפל לבן → pantry (spice, not fresh)', classify('פלפל לבן'),        'pantry');
+expect('כורכום → pantry (spice, not produce)', classify('כורכום'),          'pantry');
+expect('שייק בננה → drinks (not produce)',     classify('שייק בננה'),       'drinks');
+expect('שייק → drinks (not produce)',          classify('שייק'),            'drinks');
+
+console.log('\n── New overrides ──');
+expect('ממרח אבוקדו → deli',        classify('ממרח אבוקדו'),      'deli');
+expect('פלפל שחור → pantry',        classify('פלפל שחור'),        'pantry');
+expect('פלפל לבן → pantry',         classify('פלפל לבן'),         'pantry');
+
+console.log('\n── Spelling variants / plurals ──');
+expect('עגבניות (plural) → produce', classify('עגבניות'),          'produce');
+expect('עגבנייה (variant) → produce',classify('עגבנייה'),          'produce');
+expect('מלפפונים → produce',         classify('מלפפונים'),         'produce');
+expect('אגסים → produce',            classify('אגסים'),            'produce');
+expect('אפרסקים → produce',          classify('אפרסקים'),          'produce');
+expect('שזיפים → produce',           classify('שזיפים'),           'produce');
+expect('קלמנטינה → produce',         classify('קלמנטינה'),         'produce');
+expect('מנדרינה → produce',          classify('מנדרינה'),          'produce');
+expect('בננות → produce',            classify('בננות'),            'produce');
+expect('תמרים → produce',            classify('תמרים'),            'produce');
+expect('תאנים → produce',            classify('תאנים'),            'produce');
+
+console.log('\n── Commit 2 corrections: item.name-only Produce matching ──');
+// Bug 1: attached.brand must NOT break alias match on item.name
+expect('נקטרינה + attached.brand=שופרסל → produce',
+  classify('נקטרינה', {brand:'שופרסל'}), 'produce');
+expect('בזיליקום + attached.brand=כרמל → produce',
+  classify('בזיליקום', {brand:'כרמל'}), 'produce');
+expect('עגבניות + attached.brand=רמי לוי → produce',
+  classify('עגבניות', {brand:'רמי לוי'}), 'produce');
+expect('תפוח + attached.brand=תנובה → produce',
+  classify('תפוח', {brand:'תנובה'}), 'produce');
+expect('גזר + attached.brand=שופרסל + attached.name=גזר ישראלי → produce',
+  classify('גזר', {name:'גזר ישראלי',brand:'שופרסל'}), 'produce');
+
+// Bug 1: attached.name must NOT override item.name classification
+expect('מיץ גזר + attached.name=גזר → drinks (not produce)',
+  classify('מיץ גזר', {name:'גזר',brand:'תנובה'}), 'drinks');
+expect('שייק בננה + attached.name=בננה → drinks (not produce)',
+  classify('שייק בננה', {name:'בננה',brand:'תנובה'}), 'drinks');
+expect('עגבניות מרוסקות + attached.name=עגבניות → pantry (not produce)',
+  classify('עגבניות מרוסקות', {name:'עגבניות',brand:'שופרסל'}), 'pantry');
+expect('ריבת תפוחים + attached.name=תפוח → pantry (not produce)',
+  classify('ריבת תפוחים', {name:'תפוח',brand:'תנובה'}), 'pantry');
+
+console.log('\n── Commit 2 corrections: generic Produce exact aliases ──');
+// Bug 2: generic terms must classify as produce (exact alias, not substring)
+expect('ירק → produce',          classify('ירק'),          'produce');
+expect('ירקות → produce',        classify('ירקות'),        'produce');
+expect('ירק טרי → produce',      classify('ירק טרי'),      'produce');
+expect('פרי → produce',          classify('פרי'),          'produce');
+expect('פירות → produce',        classify('פירות'),        'produce');
+expect('פירות טריים → produce',  classify('פירות טריים'),  'produce');
+
+// Generic terms: substring must NOT produce false positives
+expect('סלט ירק → other (not produce)',  classify('סלט ירק'),   'other');
+expect('מיץ פרי → drinks (not produce)', classify('מיץ פרי'),   'drinks');
+
+console.log('\n── Commit 2 corrections: numeric normalization (unit required) ──');
+// With recognized unit → produce (weight stripped, alias matches)
+expect('עגבניות שרי 500 גרם → produce', classify('עגבניות שרי 500 גרם'), 'produce');
+expect('מלפפון 3 יחידות → produce',     classify('מלפפון 3 יחידות'),     'produce');
+expect('תפוח 1 ק"ג → produce',          classify('תפוח 1 ק"ג'),          'produce');
+// Without unit → bare number NOT stripped → not in alias set → other
+expect('מנגו 2 → other (no unit)',       classify('מנגו 2'),               'other');
+expect('תפוח 12 → other (no unit)',      classify('תפוח 12'),              'other');
+expect('פלפל 3 → other (no unit)',       classify('פלפל 3'),               'other');
+
+console.log('\n── Commit 2 corrections: confirmed conflict protections ──');
+expect('ממרח אבוקדו → deli',             classify('ממרח אבוקדו'),          'deli');
+expect('פלפל שחור → pantry',            classify('פלפל שחור'),            'pantry');
+expect('פלפל לבן → pantry',             classify('פלפל לבן'),             'pantry');
+expect('פלפל אדום טחון → pantry',       classify('פלפל אדום טחון'),       'pantry');
+expect('מיץ גזר → drinks',              classify('מיץ גזר'),              'drinks');
+expect('שייק בננה → drinks',            classify('שייק בננה'),            'drinks');
+expect('תה לימון → drinks',             classify('תה לימון'),             'drinks');
+expect('ריבת תפוחים → pantry',          classify('ריבת תפוחים'),          'pantry');
+expect('עגבניות מרוסקות → pantry',      classify('עגבניות מרוסקות'),      'pantry');
+expect('ירקות קפואים → frozen',         classify('ירקות קפואים'),         'frozen');
 
 console.log(`\n── Results: ${pass} passed, ${fail} failed ──\n`);
 if (fail > 0) process.exit(1);

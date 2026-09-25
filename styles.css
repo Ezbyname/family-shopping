@@ -283,7 +283,10 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
   color:var(--text);font-size:14px;cursor:pointer;display:flex;align-items:center;
   justify-content:center;font-weight:700;transition:background .1s,transform .1s;line-height:1;}
 .qty-btn:active{transform:scale(.78);background:var(--accent);color:#fff}
-.qty-num{font-size:13px;font-weight:800;min-width:18px;text-align:center;color:var(--accent)}
+.qty-num{font-size:13px;font-weight:800;min-width:22px;text-align:center;color:var(--accent)}
+.qty-mode-toggle{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-right:2px}
+.qty-mode-btn{padding:2px 7px;font-size:10px;font-weight:700;font-family:inherit;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:background .12s,color .12s;line-height:1.6}
+.qty-mode-btn.active{background:var(--accent);color:#fff}
 /* ── "קניתי" PRIMARY CTA (tap to mark purchased) ── */
 .pending-tag{display:inline-flex;align-items:center;justify-content:center;gap:5px;
   min-height:40px;min-width:104px;padding:9px 18px;
@@ -1475,9 +1478,10 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
 .price-chip-price{font-size:12px;font-weight:800}
 .price-chip-qty{font-size:10px;opacity:.6}
 .price-chip-more{font-size:9px;opacity:.6;border-right:1px solid currentColor;padding-right:4px;margin-right:0}
+.price-chip-dist{font-size:9px;opacity:.65;white-space:nowrap;border-right:1px solid currentColor;padding-right:4px;margin-right:0}
 .price-chip{display:inline-flex;align-items:center;gap:4px;margin-top:5px;cursor:pointer;
   border-radius:8px;padding:3px 9px;font-family:'Rubik',sans-serif;
-  font-size:11px;font-weight:700;transition:all .15s;max-width:220px;
+  font-size:11px;font-weight:700;transition:all .15s;max-width:250px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   background:var(--card2);border:1px solid var(--border);color:var(--text);}
 .price-chip:active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
@@ -1516,6 +1520,32 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
   font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap}
 .pd-sort-btn.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
 .pd-filter-btn.active{background:rgba(99,102,241,.15);border-color:#6366f1;color:#6366f1}
+/* ── Price-detail in-sheet location controls ── */
+.pd-loc-controls{padding:0 0 8px;border-bottom:1px solid var(--border);flex-shrink:0}
+.pd-loc-controls:empty{display:none}
+.pd-mode-tabs{display:flex;gap:5px;padding:8px 0 6px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.pd-mode-tabs::-webkit-scrollbar{height:0}
+.pd-tab{flex-shrink:0;background:var(--card);border:1.5px solid var(--border);
+  border-radius:20px;padding:4px 11px;font-family:'Rubik',sans-serif;
+  font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .15s}
+.pd-tab.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+.pd-city-panel,.pd-radius-panel{padding:4px 0 2px}
+.pd-city-chips-row{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px}
+.pd-city-input-wrap{position:relative}
+.pd-city-input{width:100%;box-sizing:border-box;border:1.5px solid var(--border);border-radius:10px;
+  padding:5px 10px;font-family:'Rubik',sans-serif;font-size:13px;background:var(--card);color:var(--text)}
+.pd-city-sug{display:none;position:absolute;top:100%;right:0;left:0;background:var(--card);
+  border:1.5px solid var(--border);border-radius:10px;z-index:10;overflow:hidden;margin-top:3px}
+.pd-city-sug-item{padding:7px 12px;font-size:13px;cursor:pointer}
+.pd-city-sug-item:hover{background:var(--accent-dim)}
+.pd-radius-loc-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.pd-loc-label{font-size:13px;font-weight:600;color:var(--text);flex:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pd-loc-label.pd-loc-missing{color:var(--muted)}
+.pd-change-loc-btn{flex-shrink:0;background:none;border:1.5px solid var(--border);
+  border-radius:14px;padding:3px 9px;font-family:'Rubik',sans-serif;
+  font-size:11px;color:var(--muted);cursor:pointer}
+.pd-radius-seg{display:flex;gap:4px;flex-wrap:wrap}
 .pd-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
   padding:10px 14px calc(16px + var(--safe-b))}
 .pd-summary{display:flex;align-items:center;gap:8px;
@@ -1532,6 +1562,12 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
 .pd-row-left{flex:1;min-width:0}
 .pd-row-trophy{font-size:10px;font-weight:800;color:var(--green);margin-bottom:2px}
 .pd-row-chain{font-size:13px;font-weight:800;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.pd-chain-dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.pd-row-addr{font-size:11px;color:var(--muted);margin-top:3px;white-space:normal;line-height:1.4}
+.pd-nav-btn{display:block;width:100%;margin-top:7px;padding:5px 6px;font-size:11px;font-weight:700;
+  background:var(--card2);border:1px solid var(--border);border-radius:8px;cursor:pointer;
+  color:var(--text);font-family:inherit;transition:all .15s}
+.pd-nav-btn:active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
 .pd-row-store{font-size:11px;color:var(--muted);margin-top:2px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pd-row-meta{font-size:10px;color:var(--muted);margin-top:3px;
@@ -1721,6 +1757,7 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
   font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;
   width:100%;text-align:center}
 .sd-ghost-btn:active{background:var(--card2)}
+.sd-ghost-btn[hidden]{display:none!important}
 /* Tappable row in price detail → opens store modal */
 .pd-row[data-tappable]{cursor:pointer}
 .pd-row[data-tappable]:active{opacity:.88}

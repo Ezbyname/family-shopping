@@ -1,3 +1,5 @@
+import { pdHasLoc as _pdHasLocFn, pdInitialMode, pdEffectiveRadius as pdEffR, pdCacheKey as pdCKFn, pdRowEligible, pdBuildRequestUrl, pdExtractRows, pdNameFallbackUrl, pdShouldUseFallback } from './js/pd-location.js';
+import { bpSelectName, bpConsumeBatches, bpFetchCorpus } from './js/bp-search.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, push, onValue, update, remove }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -22,97 +24,20 @@ const db  = getDatabase(app);
 const APP_VERSION = '3.2.0';   // 2026-09: department grouping mode (Stage 4)
 
 // ── DEPARTMENT GROUPING (Stage 4) ──────────────────────────────────────────
-// Presentation-only. No Firebase writes. Department is derived at render time.
-const DEPARTMENTS = [
-  { id:'produce',  label:'פירות וירקות',                    order:1,  icon:'🥦' },
-  { id:'bakery',   label:'מאפייה',                          order:2,  icon:'🍞' },
-  { id:'seasonal', label:'פרחים ועונתי',                    order:3,  icon:'🌸' },
-  { id:'deli',     label:'מעדנייה וגבינות',                 order:4,  icon:'🧀' },
-  { id:'meat',     label:'בשר ודגים',                       order:5,  icon:'🥩' },
-  { id:'dairy',    label:'חלב וביצים',                      order:6,  icon:'🥛' },
-  { id:'pantry',   label:'בישול, שימורים ומזווה',           order:7,  icon:'🥫' },
-  { id:'snacks',   label:'חטיפים ומתוקים',                  order:8,  icon:'🍫' },
-  { id:'drinks',   label:'משקאות',                          order:9,  icon:'🧃' },
-  { id:'frozen',   label:'קפואים ומוכנים',                  order:10, icon:'🧊' },
-  { id:'cleaning', label:'ניקיון וטואלטיקה',                order:11, icon:'🧹' },
-  { id:'baby',     label:'תינוקות',                         order:12, icon:'👶' },
-  { id:'home',     label:'כלי בית ושונות',                  order:13, icon:'🏠' },
-  { id:'impulse',  label:'קו קופות / קטן ואימפולסיבי',     order:14, icon:'🛍' },
-  { id:'other',    label:'אחר',                             order:15, icon:'🛒' },
-];
+import { DEPARTMENTS, DEPT_OVERRIDES, DEPT_KEYWORDS, _normText, getItemDepartment } from './js/product-taxonomy.js';
 
-// Explicit phrase overrides — checked before keyword scanning. More-specific wins.
-// Sorted by phrase length descending so longer phrases match before shorter ones.
-const DEPT_OVERRIDES = [
-  // Drinks disambiguation (juice beats produce)
-  ['מיץ תפוזים','drinks'], ['מיץ תפוז','drinks'], ['מיץ ענבים','drinks'],
-  ['מיץ תפוחים','drinks'], ['מיץ אשכוליות','drinks'],
-  // Frozen beats everything (explicit "קפוא" in phrase)
-  ['שניצל קפוא','frozen'], ['פיצה קפואה','frozen'], ['ירקות קפואים','frozen'],
-  ['בורקס קפוא','frozen'], ['ארוחה מוכנה','frozen'], ['מנה מוכנה','frozen'],
-  // Hummus disambiguation: prepared/spread → deli; dry/canned → pantry
-  ['ממרח חומוס','deli'], ['סלט חומוס','deli'], ['חומוס מוכן','deli'],
-  ['חומוס יבש','pantry'], ['גרגרי חומוס','pantry'], ['חומוס שימורים','pantry'],
-  // Cheese disambiguation — specific phrases → deli (before generic גבינה)
-  ['גבינה צהובה','deli'], ['גבינה לבנה','deli'], ['גבינה עיזים','deli'],
-  ['ממרח גבינה','deli'],
-  // Cleaning specifics (override generic words)
-  ['נייר טואלט','cleaning'], ['מגבות נייר','cleaning'], ['נוזל כלים','cleaning'],
-  ['שקיות אשפה','cleaning'], ['משחת שיניים','cleaning'],
-  // Home specifics
-  ['נייר אפייה','home'], ['נייר כסף','home'], ['ניילון נצמד','home'],
-  // Impulse: only very explicit phrases
-  ['שוקולד קטן','impulse'], ['חטיף קטן','impulse'],
-  // Chocolate bar → snacks (prevents dairy "שוקו" substring match on "שוקולד")
-  // שוקולד קטן (longer) is checked first due to sort-by-length, so impulse still wins there.
-  ['שוקולד','snacks'],
-  // Ice cream → frozen (prevent snacks match on גלידה keyword)
-  ['גלידה','frozen'],
-  // Chewing gum → impulse only
-  ['מסטיק','impulse'],
-].sort((a,b) => b[0].length - a[0].length); // longest phrase first
-
-const DEPT_KEYWORDS = {
-  produce:  ['עגבניה','עגבנייה','מלפפון','תפוח','בננה','חסה','בצל','תפוח אדמה','גזר','פלפל','אבוקדו','לימון','פטרוזיליה','כוסברה','שמיר','קישוא','סלק','כרוב','שום','תפוז','קלמנטינה','מנגו','ענבים','רימון','ירק','פרי'],
-  bakery:   ['לחם','לחמניה','לחמנייה','פיתה','בגט','חלה','עוגה','עוגייה','עוגיות','מאפה','קרואסון','רוגלך','מאפינס'],
-  seasonal: ['פרח','פרחים','עציץ','צמח','זר פרחים','זר','קישוט','קישוטים'],
-  deli:     ['גבינה','מוצרלה','קשקבל','פרמזן','ריקוטה','בולגרית','צפתית','גאודה','קולבי','פסטרמה','נקניק פרוס','סלמי','קוטג','סלטים'],
-  meat:     ['עוף','בשר','שניצל','קציצות','דג','דגים','סלמון','טונה טרייה','הודו','פרגית','כנפיים','שוקיים','סטייק','קבב','בשר טחון','פילה','כבד','לברק','קרפיון','פורל','בקלה'],
-  dairy:    ['חלב','ביצים','ביצה','יוגורט','שמנת','חמאה','שוקו','מעדן','אשל','מרגרינה'],
-  pantry:   ['אורז','פסטה','פתיתים','קוסקוס','שמן','רוטב','עגבניות מרוסקות','קמח','סוכר','מלח','תבלין','תבלינים','קטניות','עדשים','שעועית','שימורים','טונה שימורים','מיונז','דבש','ריבה','זיתים','פסטו','קמח תפוח אדמה','אטריות','קינואה'],
-  snacks:   ['במבה','ביסלי','תפוציפס','שוקולד','עוגיות','חטיף','סוכריות','קרמבו','ופל','חלבה','פופקורן','אגוזים','שקדים','בוטנים','פיסטוק','גרנולה'],
-  drinks:   ['מים','קולה','ספרייט','מיץ','שתייה','בירה','סודה','משקה','קפה','תה','יין','רד בול','טוויסטר'],
-  frozen:   ['קפוא','קפואים','מלאווח','גחנון','ג׳חנון','פיש סטיקס','כופתאות','פלאפל קפוא'],
-  cleaning: ['סבון','שמפו','מרכך','אקונומיקה','כביסה','אבקת כביסה','מרכך כביסה','חומר ניקוי','ניקוי','ספוג','דיאודורנט','קרם','תחליב','גילוח','מברשת שיניים','מגבונים'],
-  baby:     ['חיתולים','חיתול','מטרנה','סימילאק','מגבונים לתינוק','מוצץ','בקבוק תינוק','פורמולה','מזון לתינוק','קרם תינוק','שמפו תינוק'],
-  home:     ['נרות','חד פעמי','כוסות','צלחות','שקיות','שקיות ניילון','אלומיניום','תבנית','מפיות','קופסאות','כלי בית'],
-  impulse:  ['מצית','גפרורים'],
-  other:    [],
-};
-
-// Normalize text for classification: lowercase, trim
-function _normText(s) { return (s || '').toLowerCase().trim(); }
-
-// Classify a single item to a DEPARTMENTS entry. Never writes to Firebase or item.order.
-function getItemDepartment(item) {
-  const text = _normText(
-    [item.name, item.attached && item.attached.name, item.attached && item.attached.brand]
-      .filter(Boolean).join(' ')
-  );
-  // 1. Explicit phrase overrides (longest-first, deterministic)
-  for (const [phrase, deptId] of DEPT_OVERRIDES) {
-    if (text.includes(_normText(phrase))) {
-      return DEPARTMENTS.find(d => d.id === deptId);
-    }
-  }
-  // 2. Keyword rules in department order (deterministic: DEPARTMENTS array order)
-  for (const dept of DEPARTMENTS) {
-    if (dept.id === 'other') continue;
-    const kws = DEPT_KEYWORDS[dept.id] || [];
-    if (kws.some(kw => text.includes(_normText(kw)))) return dept;
-  }
-  // 3. Fallback
-  return DEPARTMENTS.find(d => d.id === 'other');
+// ── PRODUCE QTY HELPERS ───────────────────────────────────────────────────────
+function isProduceItem(item) { return getItemDepartment(item).id === 'produce'; }
+function getQtyMode(item) { return item.qtyMode === 'kg' ? 'kg' : 'unit'; }
+function getQtyStep(item) { return getQtyMode(item) === 'kg' ? 0.5 : 1; }
+function normalizeQtyForMode(mode) { return 1; } // always reset to 1 on mode switch
+function formatQty(item) {
+  const mode    = getQtyMode(item);
+  const qty     = item.qty || 1;
+  const qtyStr  = qty % 1 === 0 ? String(qty) : qty.toFixed(1);
+  if (mode === 'kg') return `${qtyStr} ק״ג`;
+  if (isProduceItem(item)) return `${qtyStr} יח׳`;
+  return qtyStr;
 }
 
 // ── DEPT MODE STATE — persisted in localStorage, never in Firebase ──────────
@@ -282,6 +207,7 @@ const STORES=['שופרסל','רמי לוי','ויקטורי','יינות בית
 let activeStores=new Set(STORES);
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function _jsAttr(v){return JSON.stringify(v).replace(/"/g,'&quot;');}
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
 
 function saveLocal(){localStorage.setItem('fsl_v2',JSON.stringify({myName,myId,groupId,groupName}))}
@@ -613,7 +539,22 @@ function _warnPermission(){ toast('⚠️ אין הרשאה — רענן את ה
 // Light haptic tap on supported mobile devices (no-op elsewhere)
 function _haptic(ms){ try{ navigator.vibrate && navigator.vibrate(ms||15); }catch(_){} }
 window.toggleFav=function(id){const i=items[id];update(ref(db,`groups/${groupId}/items/${id}`),{fav:!i.fav}).then(()=>toast(i.fav?'הוסר מהמועדפים':'⭐ נוסף למועדפים')).catch(e=>{if((e.message||'').includes('PERMISSION_DENIED'))_warnPermission();else toast('❌ '+e.message);});};
-window.changeQty=function(id,d){const i=items[id];update(ref(db,`groups/${groupId}/items/${id}`),{qty:Math.max(1,(i.qty||1)+d)}).catch(e=>{if((e.message||'').includes('PERMISSION_DENIED'))_warnPermission();});};
+window.changeQty=function(id,d){
+  const i=items[id];
+  const mode=getQtyMode(i);
+  const step=getQtyStep(i);
+  const min=mode==='kg'?0.5:1;
+  const raw=(i.qty||1)+(d*step);
+  const next=Math.max(min,Math.round(raw*10)/10);
+  update(ref(db,`groups/${groupId}/items/${id}`),{qty:next}).catch(e=>{if((e.message||'').includes('PERMISSION_DENIED'))_warnPermission();});
+};
+window.setQtyMode=function(id,mode){
+  const i=items[id];
+  if(!i||getQtyMode(i)===mode)return;
+  const patch={qtyMode:mode,qty:1};
+  if(mode==='unit')patch.qtyMode=null;
+  update(ref(db,`groups/${groupId}/items/${id}`),patch).catch(e=>{if((e.message||'').includes('PERMISSION_DENIED'))_warnPermission();});
+};
 window.clearBought=function(){Object.entries(items).forEach(([id,i])=>{if(i.bought)remove(ref(db,`groups/${groupId}/items/${id}`))});toast('🗑 נקנים נמחקו')};
 
 window.setTab=function(tab){
@@ -1059,15 +1000,18 @@ const CHAIN_META = {
 // Enabled: stores/{key}.latitude/longitude are populated from the 422-store sync.
 const NEARBY_COORDS_READY = true;
 
-let _nearbyMode       = false;
-let _selectedLocation = null;  // { label, lat, lng, source: 'gps'|'manual' }
-let _nearbyRadius     = 3;     // km, persisted in localStorage
-let _recentLocations  = [];    // up to 5 manual locations, persisted in localStorage
+let _nearbyMode           = false;
+let _selectedLocation     = null;  // { label, lat, lng, source: 'gps'|'manual' }
+let _nearbyRadius         = 3;     // km, persisted in localStorage
+let _radiusExplicitlySet  = localStorage.getItem('nearbyRadius') !== null;
+let _recentLocations      = [];    // up to 5 manual locations, persisted in localStorage
 
 // Convenience helpers (replaces raw _userLat / _userLng access)
-const _locLat  = () => _selectedLocation?.lat  ?? null;
-const _locLng  = () => _selectedLocation?.lng  ?? null;
-const _hasLoc  = () => Boolean(_nearbyMode && _selectedLocation?.lat);
+const _locLat    = () => _selectedLocation?.lat  ?? null;
+const _locLng    = () => _selectedLocation?.lng  ?? null;
+const _hasLoc    = () => Boolean(_nearbyMode && _selectedLocation?.lat);
+// Price-detail location helper — independent of _nearbyMode toggle (delegates to js/pd-location.js)
+const _pdHasLoc  = () => _pdHasLocFn(_selectedLocation);
 
 (function _initNearbyState() {
   const r = parseInt(localStorage.getItem('nearbyRadius') || '3', 10);
@@ -1133,6 +1077,7 @@ window.toggleNearbyMode = function() {
 
 window.setNearbyRadius = function(km) {
   _nearbyRadius = km;
+  _radiusExplicitlySet = true;
   localStorage.setItem('nearbyRadius', String(km));
   _syncNearbyUI();
   if (_hasLoc() && lastSearchQuery) searchPrices();
@@ -1145,6 +1090,12 @@ function _setLocation(loc) {
   _selectedLocation = loc;
   try { localStorage.setItem('selectedLocation', JSON.stringify(loc)); } catch(_) {}
   _syncNearbyUI();
+  // Refresh price-detail sheet if it is open and in radius mode — location change affects radius results.
+  // Do NOT reset _pdMode: user may have explicitly switched mode; _pdInitMode() is only called on sheet open.
+  if (_pdBarcode && document.getElementById('price-detail-overlay')?.classList.contains('show')) {
+    _syncPdLocationUI();
+    if (_pdMode === 'radius') _pdRefreshPrices();
+  }
 }
 
 // Clear the active location
@@ -2272,8 +2223,8 @@ window.openShare=function(){
   const pending=Object.values(items).filter(i=>!i.bought);
   const bought=Object.values(items).filter(i=>i.bought);
   let text=`🛒 רשימת קניות — ${groupName}\n${'─'.repeat(22)}\n\n`;
-  if(pending.length){text+='📋 לקנות:\n';pending.forEach(i=>{text+=`${i.fav?'⭐ ':'• '}${i.name}  ×${i.qty||1}\n`});}
-  if(bought.length){text+='\n✅ כבר קניתי:\n';bought.forEach(i=>{text+=`✓ ${i.name}  ×${i.qty||1}\n`});}
+  if(pending.length){text+='📋 לקנות:\n';pending.forEach(i=>{text+=`${i.fav?'⭐ ':'• '}${i.name}  ×${formatQty(i)}\n`});}
+  if(bought.length){text+='\n✅ כבר קניתי:\n';bought.forEach(i=>{text+=`✓ ${i.name}  ×${formatQty(i)}\n`});}
   if(!Object.keys(items).length)text+='(הרשימה ריקה)';
   document.getElementById('share-box').textContent=text;
   document.getElementById('share-overlay').classList.add('show');
@@ -2584,8 +2535,11 @@ function itemHTML(item, suppressDrag = false) {
       </div>
       <div class="qty-row">
         <button class="qty-btn" onclick="changeQty('${item.id}',-1)">−</button>
-        <span class="qty-num">${item.qty||1}</span>
+        <span class="qty-num">${formatQty(item)}</span>
         <button class="qty-btn" onclick="changeQty('${item.id}',1)">+</button>
+        ${isProduceItem(item) ? `<span class="qty-mode-toggle">
+          <button class="qty-mode-btn${getQtyMode(item)==='unit'?' active':''}" onclick="setQtyMode('${item.id}','unit')">יח׳</button><button class="qty-mode-btn${getQtyMode(item)==='kg'?' active':''}" onclick="setQtyMode('${item.id}','kg')">ק״ג</button>
+        </span>` : ''}
       </div>
       ${priceChipHTML}
     </div>
@@ -2862,8 +2816,8 @@ let _bpSearchTimer = null;
 let _bpSearchSeq  = 0;      // monotonically increasing; guards against stale async results
 // Session corpus cache: keyed by "he:<rootToken>" for Hebrew queries.
 // Populated once per root term per picker session; cleared on picker close.
-// Eliminates per-keystroke OFf variance for progressive Hebrew refinement.
-let _bpCorpusCache = new Map();
+// bpSelectName, bpConsumeBatches, bpFetchCorpus imported from js/bp-search.js
+const _bpSelectName = bpSelectName;
 
 function _boldKeyword(text, keyword) {
   if (!keyword || !text) return esc(text);
@@ -3057,16 +3011,6 @@ const _IL_BRANDS_SET = new Set([
   'tnuva','strauss','elite','osem','tara','wissotzky','telma','angel','yotvata',
 ]);
 
-// Pick the most appropriate name field based on the query's language
-function _bpSelectName(p, queryLang) {
-  const he = (p.product_name_he || '').trim();
-  const ar = (p.product_name_ar || '').trim();
-  const en = (p.product_name    || '').trim();
-  if (queryLang === 'he') return he || en;
-  if (queryLang === 'ar') return ar || he || en;
-  return en || he || ar;
-}
-
 // Score a candidate product for a given query.
 // Higher = more relevant. Negative = should be filtered out.
 // queryBrand (optional): extracted brand token — gives a ranking boost.
@@ -3182,83 +3126,37 @@ async function _bpRunSearch(query, signal, seq) {
     const productQ  = meta.product;                    // query with qty/brand stripped
     const queryLang = _bpDetectLang(normQ);            // lang detection on clean text
     const enQuery   = queryLang === 'he' ? (_bpTranslate(productQ) || normQ) : normQ;
-    const enc       = encodeURIComponent(enQuery);
-    const encOrig   = encodeURIComponent(normQ);       // normalized (not raw) for URL 1
+    // ── Corpus: same-origin OFF proxy with root-token cache (dfb0623 semantics) ──
+    const _heTokens    = queryLang === 'he' ? normQ.split(/\s+/).filter(w => w.length > 0) : [];
+    const _rootToken   = _heTokens.length > 0 ? _heTokens[0] : '';
+    const cacheKey     = (queryLang === 'he' && _rootToken.length >= 2) ? `he:${_rootToken}` : '';
+    const corpusPageSize = cacheKey ? 40 : 20;
+    let _cacheHit = false;
 
-    const BASE   = 'https://world.openfoodfacts.org/cgi/search.pl';
-    // Added product_name_ar so Arabic product names are available for ranking
-    const FIELDS = 'product_name,product_name_he,product_name_ar,brands,quantity,image_small_url,code,countries_tags';
-    const IL     = '&tagtype_0=countries&tag_contains_0=contains&tag_0=israel';
-
-    // ── Fix C: session corpus cache for Hebrew queries ───────────────────────
-    // For Hebrew queries with a root token of ≥2 chars, acquire the OFf corpus
-    // once per root term per picker session and freeze it. All progressive
-    // refinements (גבינה → גבינה ל → גבינה לבנ → גבינה לבנה) operate on the
-    // same frozen candidate set, eliminating per-keystroke OFf variance.
-    // Non-Hebrew queries and single-char roots always fetch fresh.
-    const _heTokens  = queryLang === 'he' ? normQ.split(/\s+/).filter(w => w.length > 0) : [];
-    const _rootToken = _heTokens.length > 0 ? _heTokens[0] : '';
-    const _cacheKey  = queryLang === 'he' && _rootToken.length >= 2 ? `he:${_rootToken}` : '';
-    let   _cacheHit  = false;
-
+    if (signal.aborted) return;
     let raw = [];
-    if (_cacheKey && _bpCorpusCache.has(_cacheKey)) {
-      // Cache hit: reuse frozen corpus for this root term
-      raw = _bpCorpusCache.get(_cacheKey);
-      _cacheHit = true;
-      console.log(`[diag-bp-search #${_diagBpSearchSeq}] corpus cache HIT key=${_cacheKey} size=${raw.length}`);
-    } else {
-      // Cache miss: fetch from OFf (broader page_size for corpus queries)
-      const corpusPageSize = _cacheKey ? 40 : 20;
-      const urls = [
-        // 1. Israel-filtered + original normalized query
-        `${BASE}?search_terms=${encOrig}&search_simple=1&action=process&json=1&page_size=${corpusPageSize}&fields=${FIELDS}${IL}`,
-        // 2. Israel-filtered + translated query (only when translation differs)
-        enQuery !== normQ
-          ? `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=15&fields=${FIELDS}${IL}`
-          : null,
-        // 3. Broad fallback — no country filter
-        `${BASE}?search_terms=${enc}&search_simple=1&action=process&json=1&page_size=20&fields=${FIELDS}`,
-      ].filter(Boolean);
+    const _corpusResult = await bpFetchCorpus(normQ, enQuery, cacheKey, corpusPageSize, { signal });
 
-      const seen = new Set();
-
-      for (const url of urls) {
-        if (raw.length >= 55) break;
-        if (signal.aborted) return;
-        try {
-          const r = await fetch(url, { headers: { 'User-Agent': 'FamilyShoppingIL/6.3' }, signal });
-          if (!r.ok) continue;
-          const data = await r.json();
-          for (const p of data?.products || []) {
-            const code = p.code || '';
-            if (code && seen.has(code)) continue;
-            if (code) seen.add(code);
-            const isIsraeli = (p.countries_tags || []).some(c => c.includes('israel'));
-            // Use language-aware name selection
-            const name = _bpSelectName(
-              { product_name_he: p.product_name_he, product_name_ar: p.product_name_ar, product_name: p.product_name },
-              queryLang
-            ) || '';
-            if (!name) continue;
-            raw.push({ name, brand: p.brands || '', size: p.quantity || '',
-                       image: p.image_small_url || '', barcode: code, isIsraeli,
-                       nameHe: p.product_name_he || '',
-                       nameAr: p.product_name_ar || '',
-                       nameEn: p.product_name    || '' });
-          }
-        } catch(e) { if (e.name === 'AbortError') return; }
-      }
-
-      // Store in session corpus cache (only for cacheable Hebrew root queries)
-      if (_cacheKey && raw.length > 0) {
-        _bpCorpusCache.set(_cacheKey, raw);
-        console.log(`[diag-bp-search #${_diagBpSearchSeq}] corpus cache MISS key=${_cacheKey} stored size=${raw.length}`);
-      }
-    }
-
-    if (signal.aborted) { console.log(`[diag-bp-search #${_diagBpSearchSeq}] ABORTED after fetch loop`); return; }
+    if (signal.aborted) { console.log(`[diag-bp-search #${_diagBpSearchSeq}] ABORTED after corpus fetch`); return; }
     if (seq !== _bpSearchSeq) { console.log(`[diag-bp-search #${_diagBpSearchSeq}] STALE seq=${seq} current=${_bpSearchSeq} — discarding`); return; }
+
+    if (_corpusResult.status === 'REMOTE_FAILURE') {
+      console.log(`[diag-bp-search #${_diagBpSearchSeq}] OFF proxy REMOTE_FAILURE stale=${_corpusResult.stale}`);
+      _bpProducts = [];
+      if (queryEl)   queryEl.textContent  = 'לא ניתן לחפש כרגע — נסה שוב';
+      if (resultsEl) resultsEl.innerHTML  = '<div class="bp-loading">⚠️ שגיאה בחיפוש, נסה שוב</div>';
+      return;
+    }
+    _cacheHit = _corpusResult.fromCache || false;
+    bpConsumeBatches(_corpusResult.batches, new Set(), raw, queryLang);
+    if (raw.length === 0 && _corpusResult.partialFailure) {
+      console.log(`[diag-bp-search #${_diagBpSearchSeq}] OFF partial failure with zero usable corpus — unavailable`);
+      _bpProducts = [];
+      if (queryEl)   queryEl.textContent  = 'לא ניתן לחפש כרגע — נסה שוב';
+      if (resultsEl) resultsEl.innerHTML  = '<div class="bp-loading">⚠️ שגיאה בחיפוש, נסה שוב</div>';
+      return;
+    }
+    console.log(`[diag-bp-search #${_diagBpSearchSeq}] corpus ${_cacheHit ? 'cache HIT' : 'cache MISS'} size=${raw.length} partial=${_corpusResult.partialFailure || false}`);
     console.log(`[diag-bp-search #${_diagBpSearchSeq}] raw candidates=${raw.length} queryLang=${queryLang} normQ=${JSON.stringify(normQ)} cacheHit=${_cacheHit}`);
 
     // Eligibility: name language must be compatible with query language (before scoring)
@@ -3497,7 +3395,6 @@ window.closeBrandPicker = function() {
   document.getElementById('bp-overlay')?.classList.remove('show');
   document.body.classList.remove('sheet-open');
   _bpMode = 'new'; _bpItemId = null; _bpProducts = [];
-  _bpCorpusCache.clear();  // fresh corpus on next picker open
 };
 
 // ── ip-tile helpers (emoji + clear; picker reuses bp-overlay) ──
@@ -4132,9 +4029,9 @@ function renderPriceRow(p, isFirst, total, warnings) {
   let actions = '';
   if (p.source==='official'||p.source==='user_override') {
     const pname = sanitize(_currentScanProduct?.name||selectedProduct?.name||'');
-    actions = `<div class="override-actions">
-      <button class="override-btn primary" onclick="event.stopPropagation();openOverrideModal('${chainKey}','${esc(store)}','${p.price}','${esc(pname)}')">✏️ תקן אישי</button>
-      <button class="override-btn" onclick="event.stopPropagation();openReportModal('${chainKey}','${esc(store)}','${p.price}','${esc(pname)}')">🚨 דווח שגיאה</button>
+    actions = `<div class="override-actions" onclick="event.stopPropagation()">
+      <button class="override-btn primary" onclick="event.stopPropagation();openOverrideModal(${_jsAttr(chainKey)},${_jsAttr(store)},${p.price},${_jsAttr(pname)})">✏️ תקן אישי</button>
+      <button class="override-btn" onclick="event.stopPropagation();openReportModal(${_jsAttr(chainKey)},${_jsAttr(store)},${p.price},${_jsAttr(pname)})">🚨 דווח שגיאה</button>
     </div>`;
   }
 
@@ -4154,18 +4051,7 @@ function renderPriceRow(p, isFirst, total, warnings) {
   // Cache row data for the store-detail panel (safe index reference, no inline
   // JSON) so the row is tappable → opens existing openStoreDetail.
   const _sdIdx = (window._sdRows = window._sdRows || []).length;
-  window._sdRows.push({
-    chainName: p.chainName || p.chainId || '', chainId: p.chainId || '',
-    storeId: p.storeId || '', storeName: p.storeName || '',
-    city: p.city || '', address: p.address || '',
-    distanceKm: p.distanceKm ?? null,
-    latitude: p.latitude ?? null, longitude: p.longitude ?? null,
-    approximateLocation: p.approximateLocation || false,
-    openingHours: p.openingHours || null,
-    price: p.displayPrice ?? p.price ?? null,
-    unit: p.unit || '', quantity: p.quantity || '',
-    syncedAt: p.syncedAt || p.lastUpdated || null,
-  });
+  window._sdRows.push(normalizeStoreInfo(p));
 
   return `<div class="spr${isBest?' best':''}" style="cursor:pointer"
       onclick="openStoreDetail(window._sdRows[${_sdIdx}])">
@@ -4484,7 +4370,7 @@ window.submitReport = async function() {
   const price = parseFloat(document.getElementById('report-price-input').value);
   const note  = sanitize(document.getElementById('report-note-input').value, 300);
   if (!isValidPrice(price)) { toast('⚠️ הכנס מחיר שראיתי'); return; }
-  const barcode = _currentScanProduct?.barcode || selectedProduct?.barcode || '';
+  const barcode = _currentScanProduct?.barcode || selectedProduct?.barcode || _pdBarcode || '';
   if (!isValidBarcode(barcode)) { toast('⚠️ ברקוד חסר'); return; }
   const m = myProfile || {};
   const rid = `r_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
@@ -4499,7 +4385,7 @@ window.submitReport = async function() {
       note: note||null, evidenceType: 'user_report', status: 'pending',
     });
     closeOL2('report-overlay');
-    toast('📢 תודה! הדיווח נשמר');
+    toast('📢 תודה! הדיווח נשלח לבדיקה');
     if (selectedProduct) window.showProductPricesEnhanced(selectedProduct);
   } catch(e) { console.error('[report]', e.message); toast('❌ '+e.message); }
 };
@@ -6791,6 +6677,8 @@ async function _fetchPricesForBarcode(barcode) {
   }
   try {
     let url = `/api/prices?barcode=${encodeURIComponent(barcode)}`;
+    if (myId)    url += `&userId=${encodeURIComponent(myId)}`;
+    if (groupId) url += `&groupId=${encodeURIComponent(groupId)}`;
     if (_hasLoc()) url += `&lat=${_locLat()}&lng=${_locLng()}&radiusKm=${_nearbyRadius}&includeApproximate=true`;
     const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -6955,10 +6843,12 @@ async function loadItemPricesInBackground() {
           continue;
         }
 
-        const prices = result.prices;
-        const best   = prices[0];
-        const qty    = item.qty || 1;
-        const totalP = (best.displayPrice || best.price || 0) * qty;
+        const prices  = result.prices;
+        const best    = prices[0];
+        const qty     = item.qty || 1;
+        const qtyLabel = formatQty(item);
+        const unitP   = best.displayPrice || best.price || 0;
+        const totalP  = unitP * qty;
         const isStale  = best.isStale || result.stale;
         const hasMulti = prices.length > 1;
         const chainLabel = esc(best.chainName || best.storeName || '');
@@ -6967,16 +6857,20 @@ async function loadItemPricesInBackground() {
         // Instead compare the values that would cause a visible change.
         const chainCount = new Set(prices.map(p => p.chainName).filter(Boolean)).size;
         const chainColor = (CHAIN_META[best.chainName] || {}).color || 'var(--accent)';
-        const fingerprint = `${totalP.toFixed(2)}|${chainLabel}|${isStale?1:0}|${chainCount}|${qty}`;
+        const distLabel  = best.distanceKm != null ? `${best.distanceKm} ק"מ` : '';
+        const storeLabel = (best.storeName && best.storeName !== best.chainName) ? esc(best.storeName) : '';
+        // Chip shows unit price + qty badge so the user can verify: unitP × qty = what the bar totals
+        const fingerprint = `${unitP.toFixed(2)}|${chainLabel}|${isStale?1:0}|${chainCount}|${qtyLabel}|${distLabel}`;
         if (chipArea.dataset.fingerprint !== fingerprint) {
           chipArea.innerHTML = `<button class="price-chip${hasMulti?' best':''}${isStale?' stale':''}"
             onclick="openPriceChipDetail('${item.id}')"
             title="השווה מחירים">
             <span class="price-chip-dot" style="background:${chainColor}"></span>
-            <span class="price-chip-chain">${chainLabel}</span>
-            <span class="price-chip-price">₪${totalP.toFixed(2)}</span>
-            ${qty > 1 ? `<span class="price-chip-qty">×${qty}</span>` : ''}
+            <span class="price-chip-chain">${chainLabel}${storeLabel ? ` · ${storeLabel}` : ''}</span>
+            <span class="price-chip-price">₪${unitP.toFixed(2)}</span>
+            ${qty > 1 ? `<span class="price-chip-qty">×${qtyLabel}</span>` : ''}
             ${chainCount > 1 ? `<span class="price-chip-more">${chainCount} רשתות</span>` : ''}
+            ${distLabel ? `<span class="price-chip-dist">📍${distLabel}</span>` : ''}
             ${isStale ? '<span style="color:var(--red)">⚠</span>' : ''}
           </button>`;
           chipArea.dataset.fingerprint = fingerprint;
@@ -7046,15 +6940,270 @@ function _updateListTotals() {
 // ══════════════════════════════════════════════════
 // PRICE DETAIL BOTTOM SHEET  (cache-first + real-time)
 // ══════════════════════════════════════════════════
-let _pdBarcode   = null;
-let _pdName      = '';
-let _pdQty       = 1;
-let _pdSort      = 'cheapest';
-let _pdFilters   = new Set();
-let _pdPrices    = [];
-let _pdFromCache = false;
-let _pdUnsub     = null;   // Firebase real-time unsub
-let _pdLastUpdateBy = null; // track who just updated for notification
+let _pdBarcode      = null;
+let _pdName         = '';
+let _pdQty          = 1;
+let _pdSort         = 'cheapest';
+let _pdFilters      = new Set();
+let _pdPrices       = [];
+let _pdFromCache    = false;
+let _pdUnsub        = null;   // Firebase real-time unsub
+let _pdLastUpdateBy = null;   // track who just updated for notification
+let _pdMode         = 'all';  // 'city' | 'radius' | 'all' — recomputed on each open
+
+// ── PD LOCATION SYSTEM ────────────────────────────────────────────────────────
+
+function _pdEffectiveRadius() {
+  return pdEffR(_radiusExplicitlySet, _nearbyRadius);
+}
+
+function _pdInitMode() {
+  return pdInitialMode(_selectedCities, _selectedLocation);
+}
+
+function _pdSetMode(mode) {
+  _pdMode = mode;
+  _syncPdLocationUI();
+  _pdRefreshPrices();
+}
+
+function _pdCacheKey(barcode) {
+  return pdCKFn(barcode, _pdMode, _selectedLocation, _selectedCities, _radiusExplicitlySet, _nearbyRadius);
+}
+
+const _pdCache = {};
+const PD_CACHE_TTL = 30 * 60 * 1000; // 30 min
+
+function _pdCacheGet(barcode) {
+  const key = _pdCacheKey(barcode);
+  const m = _pdCache[key];
+  if (m && Date.now() - m.ts < PD_CACHE_TTL) return m;
+  return null;
+}
+
+function _pdCacheSet(barcode, prices) {
+  const key = _pdCacheKey(barcode);
+  _pdCache[key] = { prices, ts: Date.now() };
+}
+
+function _pdCacheInvalidate(barcode) {
+  const prefix = `pd_${barcode}_`;
+  for (const k of Object.keys(_pdCache)) {
+    if (k.startsWith(prefix)) delete _pdCache[k];
+  }
+}
+
+async function _pdFetchPrices(barcode, forceRefresh = false) {
+  if (!forceRefresh) {
+    const cached = _pdCacheGet(barcode);
+    if (cached) return { prices: cached.prices, ts: cached.ts, fromCache: true };
+  }
+  if (!navigator.onLine) return null;
+
+  try {
+    let prices;
+    const { url: reqUrl, isCityMode, blocked } = pdBuildRequestUrl(
+      barcode, _pdMode, _selectedLocation, _selectedCities,
+      _radiusExplicitlySet, _nearbyRadius, myId, groupId
+    );
+    // Blocked filtered mode (city with no cities, radius with no location):
+    // return empty without issuing a national request.
+    if (!reqUrl) return { prices: [], ts: Date.now(), fromCache: false, blocked };
+    const res = await fetch(reqUrl, { signal: AbortSignal.timeout(12000) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    prices = pdExtractRows(data, isCityMode)
+      .filter(p => (p.displayPrice || p.price || 0) > 0)
+      .filter(p => pdRowEligible(p, _pdMode));
+
+    // Fallback: name search when barcode returns empty results and product name is known.
+    // Skipped in city mode — the name search endpoint is national and would silently
+    // replace a city-filtered view with unrelated national results.
+    if (pdShouldUseFallback(prices, _pdName, _pdMode)) {
+      try {
+        const fallbackUrl = pdNameFallbackUrl(_pdName, _pdMode, _selectedLocation, _radiusExplicitlySet, _nearbyRadius);
+        if (fallbackUrl) {
+          const res  = await fetch(fallbackUrl, { signal: AbortSignal.timeout(10000) });
+          const data = await res.json();
+          const match = (data.results || []).find(r => r.barcode === barcode) || data.results?.[0];
+          prices = (match?.prices || [])
+            .filter(p => (p.displayPrice || p.price || 0) > 0)
+            .filter(p => pdRowEligible(p, _pdMode));
+        }
+      } catch(_) {}
+    }
+
+    _pdCacheSet(barcode, prices);
+    return { prices, ts: Date.now(), fromCache: false };
+  } catch(e) {
+    console.warn('[pdFetch] failed:', barcode, e.message);
+    return null;
+  }
+}
+
+function _pdAddCity(city) {
+  if (!city || _selectedCities.includes(city)) return;
+  _selectedCities.push(city);
+  try { localStorage.setItem('priceFilterCities', JSON.stringify(_selectedCities)); } catch(_) {}
+  _syncCityUI();
+  _syncPdLocationUI();
+  _pdRefreshPrices();
+}
+
+function _pdRemoveCity(city) {
+  _selectedCities = _selectedCities.filter(c => c !== city);
+  try { localStorage.setItem('priceFilterCities', JSON.stringify(_selectedCities)); } catch(_) {}
+  _syncCityUI();
+  _syncPdLocationUI();
+  _pdRefreshPrices();
+}
+
+function _pdSetRadius(km) {
+  _nearbyRadius = km;
+  _radiusExplicitlySet = true;
+  localStorage.setItem('nearbyRadius', String(km));
+  _syncNearbyUI();
+  _syncPdLocationUI();
+  _pdRefreshPrices();
+}
+
+function _pdSelectGPS() {
+  openManualAddressModal();
+}
+
+function _pdRefreshPrices() {
+  if (!_pdBarcode) return;
+  _pdCacheInvalidate(_pdBarcode);
+  const body = document.getElementById('pd-body');
+  if (body) body.innerHTML = `<div class="pd-loading"><div class="spin"></div><p>טוען מחירים...</p></div>`;
+  _pdFetchPrices(_pdBarcode).then(result => {
+    _pdPrices    = result?.prices || [];
+    _pdFromCache = result?.fromCache || false;
+    _renderPriceDetail();
+  }).catch(() => { _pdPrices = []; _renderPriceDetail(); });
+}
+
+function _syncPdLocationUI() {
+  const container = document.getElementById('pd-loc-controls');
+  if (!container) return;
+
+  const tabs = [
+    { id: 'all',    label: '🌍 הכל' },
+    { id: 'city',   label: '🏙 עיר' },
+    { id: 'radius', label: '📍 מרחק' },
+  ];
+  const tabsHtml = `<div class="pd-mode-tabs">${
+    tabs.map(t => `<button class="pd-tab${_pdMode === t.id ? ' active' : ''}"
+      onclick="_pdSetMode('${t.id}')">${t.label}</button>`).join('')
+  }</div>`;
+
+  let panelHtml = '';
+
+  if (_pdMode === 'city') {
+    // Chips row is populated via DOM after innerHTML assignment — dataset.city
+    // assignment bypasses HTML parsing entirely, safe for any city name including
+    // apostrophes (ג'סר א-זרקא) and double quotes (עיר "בדיקה").
+    panelHtml = `<div class="pd-city-panel">
+      <div class="pd-city-chips-row"></div>
+      <div class="pd-city-input-wrap">
+        <input class="pd-city-input" id="pd-city-input" type="text" placeholder="הוסף עיר..."
+          oninput="_pdOnCityInput(this.value)" onkeydown="_pdOnCityKeydown(event)">
+        <div class="pd-city-sug" id="pd-city-sug"></div>
+      </div>
+    </div>`;
+  } else if (_pdMode === 'radius') {
+    const locLabel = _pdHasLoc()
+      ? `<span class="pd-loc-label">${esc(_selectedLocation.label)}</span>`
+      : `<span class="pd-loc-label pd-loc-missing">לא נבחר מיקום</span>`;
+    const radii = [1, 3, 5, 10, 25, 50];
+    const r = _pdEffectiveRadius();
+    const segs = radii.map(v =>
+      `<button class="radius-seg-btn${v === r ? ' active' : ''}" onclick="_pdSetRadius(${v})">${v} ק"מ</button>`
+    ).join('');
+    panelHtml = `<div class="pd-radius-panel">
+      <div class="pd-radius-loc-row">
+        ${locLabel}
+        <button class="pd-change-loc-btn" onclick="_pdSelectGPS()">שנה מיקום</button>
+      </div>
+      <div class="pd-radius-seg">${segs}</div>
+    </div>`;
+  }
+
+  container.innerHTML = tabsHtml + panelHtml;
+
+  // Build city chips via DOM — dataset.city assignment is HTML-injection-safe
+  // for any city name including apostrophes and double quotes.
+  if (_pdMode === 'city') {
+    const chipsRow = container.querySelector('.pd-city-chips-row');
+    if (chipsRow) {
+      _selectedCities.forEach(c => {
+        const span = document.createElement('span');
+        span.className = 'city-chip';
+        span.textContent = c;
+        const btn = document.createElement('button');
+        btn.className = 'pd-remove-city';
+        btn.setAttribute('aria-label', 'הסר עיר');
+        btn.textContent = '×';
+        btn.dataset.city = c;
+        span.appendChild(btn);
+        chipsRow.appendChild(span);
+      });
+    }
+  }
+
+  // Delegated handler for chip remove — named property prevents accumulation across re-renders
+  if (container._pdChipHandler) container.removeEventListener('click', container._pdChipHandler);
+  container._pdChipHandler = function(e) {
+    const btn = e.target.closest('.pd-remove-city');
+    if (btn) _pdRemoveCity(btn.dataset.city);
+  };
+  container.addEventListener('click', container._pdChipHandler);
+}
+
+window._pdSetMode      = _pdSetMode;
+window._pdAddCity      = _pdAddCity;
+window._pdRemoveCity   = _pdRemoveCity;
+window._pdSetRadius    = _pdSetRadius;
+window._pdSelectGPS    = _pdSelectGPS;
+
+window._pdOnCityInput = function(val) {
+  const sug = document.getElementById('pd-city-sug');
+  if (!sug) return;
+  const q = (val || '').trim();
+  if (!q) { sug.innerHTML = ''; sug.style.display = 'none'; return; }
+  const matches = _citySugItems
+    .filter(c => c.city.includes(q) && !_selectedCities.includes(c.city))
+    .slice(0, 6);
+  if (!matches.length) { sug.innerHTML = ''; sug.style.display = 'none'; return; }
+  sug.style.display = 'block';
+  sug.innerHTML = '';
+  // Build suggestion items via DOM — dataset.city is HTML-injection-safe
+  matches.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'pd-city-sug-item';
+    div.textContent = c.city;
+    div.dataset.city = c.city;
+    sug.appendChild(div);
+  });
+  // Delegated — named property prevents accumulation when suggestions update
+  if (sug._pdSugHandler) sug.removeEventListener('click', sug._pdSugHandler);
+  sug._pdSugHandler = function(e) {
+    const item = e.target.closest('.pd-city-sug-item');
+    if (item) {
+      _pdAddCity(item.dataset.city);
+      const inp = document.getElementById('pd-city-input');
+      if (inp) inp.value = '';
+    }
+  };
+  sug.addEventListener('click', sug._pdSugHandler);
+};
+
+window._pdOnCityKeydown = function(e) {
+  if (e.key === 'Enter') {
+    const val = e.target.value.trim();
+    if (val) { _pdAddCity(val); e.target.value = ''; }
+  }
+};
 
 // Stable-key entry from the list price chip. Looks the item up by its Firebase
 // id (safe inline) so a product NAME — single- or multi-word, with quotes,
@@ -7077,6 +7226,7 @@ window.openPriceDetailModal = async function(barcode, name, qty) {
   _pdSort      = 'cheapest';
   _pdFilters   = new Set();
   _pdLastUpdateBy = null;
+  _pdMode      = _pdInitMode();
 
   const overlay = document.getElementById('price-detail-overlay');
   const body    = document.getElementById('pd-body');
@@ -7091,6 +7241,9 @@ window.openPriceDetailModal = async function(barcode, name, qty) {
   document.querySelectorAll('.pd-filter-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('pd-sort-cheapest')?.classList.add('active');
 
+  // Render in-sheet location controls
+  _syncPdLocationUI();
+
   // Detach previous real-time listener
   if (_pdUnsub) { _pdUnsub(); _pdUnsub = null; }
 
@@ -7098,39 +7251,25 @@ window.openPriceDetailModal = async function(barcode, name, qty) {
   document.body.classList.add('sheet-open');
 
   // ── Cache-first: render immediately if cached ────────────────────────────
-  const cached = _pcGet(barcode);
+  const cached = _pdCacheGet(barcode);
   if (cached?.prices?.length) {
     _pdPrices    = cached.prices;
     _pdFromCache = true;
     _renderPriceDetail();
-    // Background refresh — do NOT show loading spinner
-    _fetchPricesForBarcode(barcode).then(result => {
+    // Background refresh — bypass cache so a real network request is made
+    _pdFetchPrices(barcode, true).then(result => {
       if (result && !result.fromCache && _pdBarcode === barcode) {
         _pdPrices    = result.prices;
         _pdFromCache = false;
         _renderPriceDetail();
       }
-    }).catch(() => {}); // silently ignore — cached data stays visible
+    }).catch(() => {});
   } else {
     // No cache — show loading spinner and wait
     if (body) body.innerHTML = `<div class="pd-loading"><div class="spin"></div><p>טוען מחירים...</p></div>`;
-    const result = await _fetchPricesForBarcode(barcode).catch(() => null);
+    const result = await _pdFetchPrices(barcode).catch(() => null);
     _pdPrices    = result?.prices || [];
     _pdFromCache = result?.fromCache || false;
-    const isOffline = !navigator.onLine;
-
-    // Fallback: search by name if barcode returns nothing and we're online
-    if (!_pdPrices.length && _pdName && !isOffline) {
-      try {
-        let url = `/api/prices?q=${encodeURIComponent(_pdName)}`;
-        if (_hasLoc()) url += `&lat=${_locLat()}&lng=${_locLng()}&radiusKm=${_nearbyRadius}`;
-        const res  = await fetch(url, { signal: AbortSignal.timeout(10000) });
-        const data = await res.json();
-        const match = (data.results || []).find(r => r.barcode === barcode) || data.results?.[0];
-        _pdPrices = (match?.prices || []).filter(p => (p.displayPrice || p.price || 0) > 0);
-        if (_pdPrices.length) _pcSet(barcode, _pdPrices);
-      } catch(_) {}
-    }
     _renderPriceDetail();
   }
 
@@ -7143,12 +7282,10 @@ window.openPriceDetailModal = async function(barcode, name, qty) {
       if (!document.getElementById('price-detail-overlay')?.classList.contains('show')) return;
       if (_pdBarcode !== barcode) return;
       // A family member updated — invalidate cache and refresh
-      _pcInvalidate(barcode);
-      _fetchPricesForBarcode(barcode).then(result => {
+      _pdCacheInvalidate(barcode);
+      _pdFetchPrices(barcode).then(result => {
         if (!result) return;
-        const prevBest = _pdPrices[0]?.displayPrice;
         _pdPrices = result.prices || [];
-        // Detect who updated (last submittedByDisplayName from manual entries)
         if (snap.exists()) {
           const vals = Object.values(snap.val() || {});
           const latest = vals.sort((a,b) => (b.submittedAt||'') > (a.submittedAt||'') ? 1 : -1)[0];
@@ -7157,7 +7294,6 @@ window.openPriceDetailModal = async function(barcode, name, qty) {
           }
         }
         _renderPriceDetail();
-        // Animate updated rows
         setTimeout(() => {
           document.querySelectorAll('.pd-row').forEach(r => {
             r.classList.add('price-updated');
@@ -7201,7 +7337,16 @@ function _renderPriceDetail() {
   const staleBanner    = _pdFromCache && _pcGet(_pdBarcode)?.ts && (Date.now() - _pcGet(_pdBarcode).ts > PRICE_CACHE_TTL * 0.9)
     ? `<div class="pd-warn-banner">⚠ ייתכן שהמחירים אינם עדכניים לחלוטין</div>` : '';
 
-  if (!_pdPrices.length) {
+  // Defensive de-dup: each Firebase store key should render once
+  const _seenKeys = new Set();
+  const _pdPricesDeduped = _pdPrices.filter(p => {
+    if (!p._key) return true;
+    if (_seenKeys.has(p._key)) return false;
+    _seenKeys.add(p._key);
+    return true;
+  });
+
+  if (!_pdPricesDeduped.length) {
     body.innerHTML = updateByBanner + offlineBanner + `
       <div class="pd-empty">
         <div class="pe-icon">🔍</div>
@@ -7210,7 +7355,7 @@ function _renderPriceDetail() {
           ${!navigator.onLine ? 'אין חיבור — לא ניתן לחפש מחירים' : 'לא נמצאו מחירים רשמיים. הוסף ידנית:'}
         </div>
       </div>
-      ${navigator.onLine ? `<button class="pd-manual-btn" onclick="openMp2(${JSON.stringify(_pdBarcode)},${JSON.stringify(_pdName)},false,'',0)">📝 הוסף מחיר ידנית</button>` : ''}`;
+      ${navigator.onLine ? `<button class="pd-manual-btn" onclick="openMp2(${_jsAttr(_pdBarcode)},${_jsAttr(_pdName)},false,'',0)">📝 הוסף מחיר ידנית</button>` : ''}`;
     return;
   }
 
@@ -7276,37 +7421,30 @@ function _renderPriceDetail() {
     const src         = p.source || '';
     const isOverride  = !!p.override;
     const badge       = sourceBadge(p.sourceDisplay || src, p.submittedByDisplayName);
-    const chainName   = p.chainName || p.chainId || '';
-    const storeName   = (p.storeName && p.storeName !== p.chainName) ? p.storeName : '';
-    const chainKey    = `${p.chainId || chainName.replace(/\s/g,'_')}_${p.storeId || '0'}`;
-    const approxMark  = p.approximateLocation ? `<span class="approx-badge">~משוער</span>` : '';
+    const chainName    = p.chainName || p.chainId || '';
+    const chainColor   = (CHAIN_META[chainName] || {}).color || '#7d8590';
+    const primaryName  = p.storeName || chainName;
+    const chainKey     = p._key || `${p.chainId || chainName.replace(/\s/g,'_')}_${p.storeId || '0'}`;
+    const approxMark   = p.approximateLocation ? `<span class="approx-badge">~משוער</span>` : '';
+    const addrLine     = [p.address, p.city].filter(Boolean).join(', ');
 
     // Freshness label
     const freshInfo   = _freshnessLabel(p.syncedAt);
     const freshBadge  = `<span class="fresh-label ${freshInfo.cls}">${freshInfo.label}</span>`;
 
     const metaParts = [];
-    if (p.city)            metaParts.push(esc(p.city));
     if (p.distanceKm != null) metaParts.push(`📍 ${p.distanceKm} ק"מ`);
 
     // Cache store data for the details modal (safe index reference, no inline JSON)
     const sdIdx = window._sdRows.length;
-    window._sdRows.push({
-      chainName, chainId: p.chainId || '',
-      storeId: p.storeId || '', storeName: p.storeName || '',
-      city: p.city || '', address: p.address || '',
-      distanceKm: p.distanceKm ?? null,
-      latitude: p.latitude ?? null, longitude: p.longitude ?? null,
-      approximateLocation: p.approximateLocation || false,
-      openingHours: p.openingHours || null,
-    });
+    window._sdRows.push(normalizeStoreInfo(p));
 
     const actionBtns = (src === 'official' || src === 'user_override') ? `
-      <div class="pd-row-actions">
+      <div class="pd-row-actions" onclick="event.stopPropagation()">
         <button class="pd-row-act"
-          onclick="event.stopPropagation();openMp2(${JSON.stringify(_pdBarcode)},${JSON.stringify(_pdName)},true,${JSON.stringify(chainName)},${displayP})">✏️ תקן</button>
+          onclick="event.stopPropagation();openMp2(${_jsAttr(_pdBarcode)},${_jsAttr(_pdName)},true,${_jsAttr(chainName)},${displayP},${_jsAttr(chainKey)})">✏️ תקן</button>
         <button class="pd-row-act"
-          onclick="event.stopPropagation();openReportModal(${JSON.stringify(chainKey)},${JSON.stringify(chainName)},${displayP},${JSON.stringify(_pdName)})">🚨 דווח</button>
+          onclick="event.stopPropagation();openReportModal(${_jsAttr(chainKey)},${_jsAttr(chainName)},${displayP},${_jsAttr(_pdName)})">🚨 דווח</button>
       </div>` : '';
 
     // Override rows get a distinct background; all rows are tappable → opens store detail
@@ -7317,26 +7455,26 @@ function _renderPriceDetail() {
         data-store="${esc(p.storeId||'')}" data-source="${esc(src)}"
         onclick="openStoreDetail(window._sdRows[${sdIdx}])">
       <div class="pd-row-left">
-        ${isBest && filtered.length > 1 ? '<div class="pd-row-trophy">🏆 הכי זול לידך</div>' : ''}
-        <div class="pd-row-chain">${esc(chainName)} ${badge} ${approxMark}</div>
-        ${storeName ? `<div class="pd-row-store">${esc(storeName)}</div>` : ''}
-        <div class="pd-row-meta">${metaParts.join(' · ')}</div>
-        <div class="pd-row-meta">${freshBadge} ${p.isStale ? '<span class="pd-row-stale">⚠ מחיר ישן</span>' : ''}</div>
-        ${isOverride ? '<div style="font-size:10px;color:var(--blue);margin-top:2px">✏️ תיקון אישי שלך · המחיר הרשמי לא השתנה</div>' : ''}
+        ${isBest && filtered.length > 1 ? '<div class="pd-row-trophy">🏆 הכי זול</div>' : ''}
+        <div class="pd-row-chain">
+          <span class="pd-chain-dot" style="background:${chainColor}"></span>
+          ${esc(primaryName)} ${badge} ${approxMark}
+        </div>
+        ${addrLine ? `<div class="pd-row-addr">כתובת: ${esc(addrLine)}</div>` : ''}
+        <div class="pd-row-meta">${[...metaParts, freshBadge].join(' · ')} ${p.isStale ? '<span class="pd-row-stale">⚠ ישן</span>' : ''}</div>
+        ${isOverride ? '<div style="font-size:10px;color:var(--blue);margin-top:2px">✏️ תיקון אישי שלך</div>' : ''}
         ${actionBtns}
       </div>
       <div class="pd-row-right">
         <div class="pd-row-price">₪${totalP.toFixed(2)}</div>
         ${qty > 1 ? `<div class="pd-row-unit">₪${displayP.toFixed(2)} יח'</div>` : ''}
+        <button class="pd-nav-btn" onclick="event.stopPropagation();_sdNav(${sdIdx})" title="נווט לסניף">🧭 נווט</button>
       </div>
     </div>`;
   }).join('');
 
   const hasOfficial = filtered.some(p => p.source === 'official' || p.source === 'user_override');
-  body.innerHTML = updateByBanner + offlineBanner + staleBanner + summaryHTML + rowsHTML + `
-    <button class="pd-manual-btn" onclick="openMp2(${JSON.stringify(_pdBarcode)},${JSON.stringify(_pdName)},${hasOfficial},'',0)">
-      📝 ${hasOfficial ? 'תקן / הוסף מחיר' : 'הוסף מחיר ידנית'}
-    </button>`;
+  body.innerHTML = updateByBanner + offlineBanner + staleBanner + summaryHTML + rowsHTML;
 }
 
 // ══════════════════════════════════════════════════
@@ -7345,8 +7483,8 @@ function _renderPriceDetail() {
 let _mp2Context = null;
 let _mp2Tab     = 'override';
 
-window.openMp2 = function(barcode, name, hasOfficial, store, officialPrice) {
-  _mp2Context = { barcode, name, hasOfficial, store: store || '', officialPrice: +officialPrice || 0 };
+window.openMp2 = function(barcode, name, hasOfficial, store, officialPrice, chainKeyOverride) {
+  _mp2Context = { barcode, name, hasOfficial, store: store || '', officialPrice: +officialPrice || 0, chainKeyOverride: chainKeyOverride || null };
   _mp2Tab     = hasOfficial ? 'override' : 'family';
 
   const titleEl   = document.getElementById('mp2-title');
@@ -7358,7 +7496,7 @@ window.openMp2 = function(barcode, name, hasOfficial, store, officialPrice) {
   if (titleEl)   titleEl.textContent   = hasOfficial ? '✏️ תיקון / הוספת מחיר' : '📝 הוסף מחיר';
   if (productEl) productEl.textContent = name || '';
   if (storeEl)   storeEl.value  = store || '';
-  if (priceEl)   priceEl.value  = '';
+  if (priceEl)   priceEl.value  = _mp2Context.officialPrice ? (+_mp2Context.officialPrice).toFixed(2) : '';
   if (tabOvr)    tabOvr.style.display  = hasOfficial ? '' : 'none';
 
   setMp2Tab(_mp2Tab);
@@ -7407,7 +7545,7 @@ window.saveMp2Price = async function() {
 
   if (_mp2Tab === 'override') {
     const storeName = store || 'לא ידוע';
-    const chainKey  = storeName.replace(/\s/g,'_') + '_0';
+    const chainKey  = _mp2Context.chainKeyOverride || (storeName.replace(/\s/g,'_') + '_0');
     const now       = new Date().toISOString();
     const path      = `userPriceOverrides/${myId}/${barcode}/${chainKey}`;
     const data      = {
@@ -7457,9 +7595,11 @@ window.saveMp2Price = async function() {
 async function _refreshPdAfterSave(barcode) {
   const overlay = document.getElementById('price-detail-overlay');
   if (!overlay?.classList.contains('show') || _pdBarcode !== barcode) return;
-  // Fetch fresh data (cache already invalidated)
-  const res  = await _fetchPricesForBarcode(barcode).catch(() => null);
-  if (res?.prices) { _pdPrices = res.prices; _renderPriceDetail(); }
+  const res = await _fetchPricesForBarcode(barcode).catch(() => null);
+  if (res?.prices) {
+    _pdPrices = res.prices;
+    _renderPriceDetail();
+  }
 }
 
 // ══════════════════════════════════════════════════
@@ -7492,6 +7632,34 @@ window.clearPriceSearch = function() {
 // STAGE 1 — STORE DETAILS MODAL
 // ══════════════════════════════════════════════════
 let _sdStore = null;
+
+window._sdNav = function(i) {
+  const s = window._sdRows && window._sdRows[i];
+  if (!s) return;
+  navigateToStoreDirect(s.latitude, s.longitude, s.address || '', s.storeName || s.chainName || '');
+};
+
+function normalizeStoreInfo(p) {
+  return {
+    chainName:           p.chainName           || p.chainId || '',
+    chainId:             p.chainId             || '',
+    storeId:             p.storeId             || '',
+    storeName:           p.storeName           || '',
+    city:                p.city                || '',
+    address:             p.address             || '',
+    distanceKm:          p.distanceKm          ?? null,
+    latitude:            p.latitude            ?? null,
+    longitude:           p.longitude           ?? null,
+    approximateLocation: p.approximateLocation || false,
+    openingHours:        p.openingHours        || null,
+    price:               p.displayPrice        ?? p.price ?? null,
+    unit:                p.unit                || '',
+    quantity:            p.quantity            || '',
+    syncedAt:            p.syncedAt            || p.updatedAt || p.lastUpdated || null,
+    isStale:             !!p.isStale,
+    source:              p.source              || '',
+  };
+}
 
 window.openStoreDetail = function(storeData) {
   if (!storeData) return;
@@ -7527,10 +7695,16 @@ window.openStoreDetail = function(storeData) {
       tags.push(`<span class="sd-tag" style="color:var(--muted)">₪${per.toFixed(2)} ל-1 ${esc(storeData.unit)}</span>`);
     }
   }
-  // Last updated (Part 4 fallback when missing)
-  tags.push(storeData.syncedAt
-    ? `<span class="sd-tag" style="color:var(--muted)">🕒 ${_freshnessLabel(storeData.syncedAt).label}</span>`
-    : `<span class="sd-tag" style="color:var(--muted)">🕒 עדכון אחרון לא זמין</span>`);
+  // Last updated — only show tag when we actually have data
+  if (storeData.syncedAt) {
+    const freshInfo = _freshnessLabel(storeData.syncedAt);
+    const staleStyle = storeData.isStale ? 'color:var(--red)' : 'color:var(--muted)';
+    const stalePrefix = storeData.isStale ? '⚠ ישן · ' : '';
+    tags.push(`<span class="sd-tag" style="${staleStyle}">🕒 ${stalePrefix}${freshInfo.label}</span>`);
+  } else if (storeData.isStale) {
+    tags.push(`<span class="sd-tag" style="color:var(--red)">⚠ מחיר ישן</span>`);
+  }
+  // If neither syncedAt nor isStale — omit the tag entirely (no misleading "לא זמין")
   document.getElementById('sd-tags').innerHTML = tags.join('');
 
   // Address section

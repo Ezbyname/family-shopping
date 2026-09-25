@@ -1,6 +1,8 @@
 // workers/prices/normalizeProduct.js
 // Validates and normalizes raw parsed product/store data before writing to Firebase.
 
+import { resolveLocality } from './localityResolver.js';
+
 // ── BARCODE ──
 export function normalizeBarcode(raw) {
   return String(raw || '').replace(/\D/g, '').trim();
@@ -72,15 +74,31 @@ export function normalizeProduct(raw, header = {}) {
 }
 
 // ── STORE ──
+export function normalizeStoreId(raw) {
+  const value = raw === null || raw === undefined
+    ? ''
+    : String(raw).trim();
+
+  if (!value) return '';
+
+  if (/^\d+$/.test(value)) {
+    return String(BigInt(value));
+  }
+
+  return value;
+}
+
 export function normalizeStore(raw, chainMeta = {}) {
-  const storeId = String(raw.storeId || '').trim();
+  const storeId = normalizeStoreId(raw.storeId);
   if (!storeId) return null;
+
+  const locality = resolveLocality(raw.city);
 
   const lat = parseFloat(raw.latitude  || '');
   const lng = parseFloat(raw.longitude || '');
   const hasCoords = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
 
-  return {
+  const store = {
     chainId:      String(chainMeta.chainId   || raw.chainId   || '').trim(),
     chainName:    String(chainMeta.chainName || raw.chainName || '').trim(),
     subChainId:   String(raw.subChainId   || '').trim(),
@@ -88,11 +106,20 @@ export function normalizeStore(raw, chainMeta = {}) {
     storeId,
     storeName: String(raw.storeName || '').trim(),
     address:   String(raw.address   || '').trim(),
-    city:      String(raw.city      || '').trim(),
+    rawCityCode: locality.rawCityCode,
     zipCode:   String(raw.zipCode   || '').trim(),
     latitude:  hasCoords ? lat : null,
     longitude: hasCoords ? lng : null,
     hasCoords,
     updatedAt: new Date().toISOString(),
+    cityResolutionSource: locality.cityResolutionSource,
   };
+
+  if (locality.resolved) {
+    store.cityId = locality.cityId;
+    store.cityName = locality.cityName;
+    store.city = locality.city;
+  }
+
+  return store;
 }

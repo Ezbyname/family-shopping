@@ -23,6 +23,7 @@ import { resolveFileUrls, downloadToStream, fetchAndDownloadLatest,
          resolveAllPriceUrls, resolveStoreMetaUrls } from './fetchPrices.js';
 import { parseXMLStream }                    from './parseXml.js';
 import { safeKey }                           from './normalizeProduct.js';
+import { buildStorePayload, buildStoreCoordsPayload } from './storeWritePayload.js';
 import { initFirebase, BatchWriter, getDB,
          getPriceLastSync, sendAlert }       from './firebaseWriter.js';
 import { logger }                            from './logger.js';
@@ -95,31 +96,17 @@ async function syncChainStores(chain, writer, config) {
 
           if (!config.dryRun) {
             const storeKey = safeKey(`${chain.id}_${store.storeId}`);
-            await writer.queue(`stores/${storeKey}`, {
-              chainId:      chain.chainId,
-              chainName:    chain.name,
-              subChainId:   store.subChainId   || '',
-              subChainName: store.subChainName || '',
-              storeId:      store.storeId,
-              storeName:    store.storeName,
-              address:      store.address,
-              city:         store.city,
-              zipCode:      store.zipCode,
-              latitude:     store.latitude,
-              longitude:    store.longitude,
-              hasCoords:    store.hasCoords,
-              active:       true,
-              updatedAt:    new Date().toISOString(),
-              source:       'official',
-            });
+            await writer.queue(
+              `stores/${storeKey}`,
+              buildStorePayload(store, chain),
+            );
             // storeCoords/{storeKey} = { lat, lng, city } — lightweight index (~28 KB total)
             // read by basket-compare.js and prices.js to avoid loading the full stores node.
             if (store.hasCoords) {
-              await writer.queue(`storeCoords/${storeKey}`, {
-                lat:  store.latitude,
-                lng:  store.longitude,
-                city: store.city || '',
-              });
+              await writer.queue(
+                `storeCoords/${storeKey}`,
+                buildStoreCoordsPayload(store),
+              );
             }
           }
         },
@@ -712,10 +699,26 @@ async function main() {
     try {
       let result;
       if (storesOnly) {
-        // --stores-only: skip price sync, run store metadata only
-        result = await syncChainStores(chain, writer, config);
-        result = { chainId: chain.id, chainName: chain.name, count: result.count || 0,
-                   failed: result.failed, failReason: result.failReason };
+        // --stores-only: dedicated chains may provide their own store ingestion path.
+        if (chain.syncModule) {
+          const mod = await import(new URL(chain.syncModule, import.meta.url));
+          if (typeof mod.syncStores === 'function') {
+            result = await mod.syncStores(chain, writer, config);
+          } else {
+            result = await syncChainStores(chain, writer, config);
+          }
+        } else {
+          result = await syncChainStores(chain, writer, config);
+        }
+
+        result = {
+          chainId: chain.id,
+          chainName: chain.name,
+          count: result.count || 0,
+          storeCount: result.storeCount ?? result.count ?? 0,
+          failed: result.failed,
+          failReason: result.failReason,
+        };
       } else if (chain.syncModule) {
         // Chain has a dedicated sync module (e.g. rami-levy.js for auth-gated portals)
         const mod = await import(new URL(chain.syncModule, import.meta.url));
