@@ -13,7 +13,7 @@
 
 import { restGet, getDbUrl, getAdminToken, haversine, setCors, isValidBarcode, isValidPrice } from './_firebase.js';
 import { translateIngredient } from './_normalize-he.js';
-import { resolveLocality } from '../workers/prices/localityResolver.js';
+import { resolveLocality } from './_localityResolver.js';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const INIT_TIMEOUT_MS  = 8_000;   // admin token fetch budget

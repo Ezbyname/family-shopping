@@ -1,4 +1,4 @@
-import { LOCALITIES_2023 } from './data/localities-2023.js';
+import { LOCALITIES_2023 } from './_data/localities-2023.js';
 
 export const LOCALITY_RESOLUTION_SOURCE = 'data.gov.il_localities_2023';
 export const UNRESOLVED_RESOLUTION_SOURCE = 'unresolved';
