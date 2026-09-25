@@ -7337,7 +7337,16 @@ function _renderPriceDetail() {
   const staleBanner    = _pdFromCache && _pcGet(_pdBarcode)?.ts && (Date.now() - _pcGet(_pdBarcode).ts > PRICE_CACHE_TTL * 0.9)
     ? `<div class="pd-warn-banner">⚠ ייתכן שהמחירים אינם עדכניים לחלוטין</div>` : '';
 
-  if (!_pdPrices.length) {
+  // Defensive de-dup: each Firebase store key should render once
+  const _seenKeys = new Set();
+  const _pdPricesDeduped = _pdPrices.filter(p => {
+    if (!p._key) return true;
+    if (_seenKeys.has(p._key)) return false;
+    _seenKeys.add(p._key);
+    return true;
+  });
+
+  if (!_pdPricesDeduped.length) {
     body.innerHTML = updateByBanner + offlineBanner + `
       <div class="pd-empty">
         <div class="pe-icon">🔍</div>
@@ -7545,11 +7554,9 @@ window.saveMp2Price = async function() {
       overridePrice: Math.round(price * 100) / 100,
       reason: null, createdAt: now, updatedAt: now, source: 'user_override',
     };
-    console.log('[mp2-save]', { barcode, myId, storeName, chainKeyOverride: _mp2Context?.chainKeyOverride, chainKey, path, overridePrice: data.overridePrice });
     if (!navigator.onLine) { _queueOfflineEdit(path, data); closeMp2(); return; }
     try {
       await set(ref(db, path), data);
-      console.log('[mp2-save-ok]', path);
       closeMp2();
       _pcInvalidate(barcode);
       toast(`✏️ תיקון אישי נשמר ב${storeName}`);
@@ -7585,38 +7592,13 @@ window.saveMp2Price = async function() {
 };
 
 // Refresh price detail sheet after a save — without full loading spinner
-async function _refreshPdAfterSave(barcode, _isDelayed) {
+async function _refreshPdAfterSave(barcode) {
   const overlay = document.getElementById('price-detail-overlay');
   if (!overlay?.classList.contains('show') || _pdBarcode !== barcode) return;
-  // Fetch fresh data (cache already invalidated)
   const res = await _fetchPricesForBarcode(barcode).catch(() => null);
-  const _d = res?.prices || [];
-  const _dKeys = _d.map(p => p._key).filter(Boolean);
-  console.log(`[refresh-pd${_isDelayed ? '-delayed' : ''}]`, {
-    barcode,
-    total: _d.length,
-    dupKeys: _dKeys.filter((k, i) => _dKeys.indexOf(k) !== i),
-    overrideCount: _d.filter(p => p.override).length,
-    rows: _d.map(p => ({
-      _key:          p._key,
-      price:         p.price,
-      displayPrice:  p.displayPrice,
-      sourceDisplay: p.sourceDisplay,
-      hasOverride:   !!p.override,
-      overridePrice: p.override?.overridePrice ?? null,
-      chainId:       p.chainId,
-      chainName:     p.chainName,
-      storeId:       p.storeId,
-      storeName:     p.storeName,
-    })),
-  });
-  if (res?.prices) { _pdPrices = res.prices; _renderPriceDetail(); }
-  // Timing test: schedule a second fetch at +2s to detect propagation delay
-  if (!_isDelayed) {
-    setTimeout(() => {
-      _pcInvalidate(barcode);
-      _refreshPdAfterSave(barcode, true);
-    }, 2000);
+  if (res?.prices) {
+    _pdPrices = res.prices;
+    _renderPriceDetail();
   }
 }
 

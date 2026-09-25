@@ -445,7 +445,6 @@ async function buildLayeredPrices(
   timings.priceReadMs = Date.now() - tPrice;
 
   const overrides = (overrideData && typeof overrideData === 'object') ? overrideData : {};
-  console.log('[prices-overrides]', { barcode, userId, dbUrl, overrideKeys: Object.keys(overrides) });
 
   // ── Process official prices ──────────────────────────────────────────────
   let official = [];
