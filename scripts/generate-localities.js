@@ -23,7 +23,7 @@ const __dirname = path.dirname(__filename);
 
 const OUTPUT_FILE = path.resolve(
   __dirname,
-  '../workers/prices/data/localities-2023.js',
+  '../api/_data/localities-2023.js',
 );
 
 function normalizeCode(value) {
