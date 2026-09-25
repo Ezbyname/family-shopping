@@ -13,6 +13,7 @@
 
 import { restGet, getDbUrl, getAdminToken, haversine, setCors, isValidBarcode, isValidPrice } from './_firebase.js';
 import { translateIngredient } from './_normalize-he.js';
+import { resolveLocality } from '../workers/prices/localityResolver.js';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const INIT_TIMEOUT_MS  = 8_000;   // admin token fetch budget
@@ -21,6 +22,42 @@ const BUILD_TIMEOUT_MS = 10_000;  // whole buildLayeredPrices budget
 const STALE_MS         = 36 * 3_600_000; // 36 h
 const MAX_PRICES       = 50;      // cap price list per barcode response
 const STORE_CACHE_MS   = 5 * 60_000;     // 5 min store index cache
+
+// Historical Firebase rows may contain supplier locality codes in `city`.
+// Public API responses must expose a human-readable city only.
+function cleanCity(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+}
+
+function isNumericCity(value) {
+  const city = cleanCity(value);
+  return city !== '' && /^\d+$/.test(city);
+}
+
+function cityForApi(record = {}, preferredCity = '') {
+  const current = cleanCity(record?.city);
+
+  // Preserve existing human-readable metadata.
+  if (current && !isNumericCity(current)) return current;
+
+  // Canonical store metadata overrides a legacy numeric price-row value.
+  const preferred = cleanCity(preferredCity);
+  if (preferred && !isNumericCity(preferred)) return preferred;
+
+  // Canonical records may already expose cityName.
+  const cityName = cleanCity(record?.cityName);
+  if (cityName && !isNumericCity(cityName)) return cityName;
+
+  // Resolve a supplier locality code when possible.
+  const rawCode =
+    record?.rawCityCode ??
+    record?.cityId ??
+    current;
+
+  const resolved = resolveLocality(rawCode);
+  return resolved.resolved ? resolved.city : '';
+}
 
 // ── Timeout helper ───────────────────────────────────────────────────────────
 function withTimeout(promise, ms, label = '') {
@@ -45,17 +82,18 @@ async function getStoreIndex(dbUrl) {
   const now = Date.now();
   if (_storeCache && _storeCacheExp > now) return _storeCache;
 
-  // Try storeCoords first (lightweight index written by price sync worker)
+  // Full stores/ is authoritative for branch identity and canonical city data.
   try {
-    const coordsData = await restGet(dbUrl, 'storeCoords', READ_TIMEOUT_MS);
-    if (coordsData && typeof coordsData === 'object' && Object.keys(coordsData).length > 0) {
-      // Normalize storeCoords {lat,lng,city} → stores-compatible shape
+    const storesData = await restGet(dbUrl, 'stores', READ_TIMEOUT_MS);
+    if (storesData && typeof storesData === 'object' && Object.keys(storesData).length > 0) {
       _storeCache = Object.fromEntries(
-        Object.entries(coordsData).map(([k, v]) => [k, {
-          hasCoords: true,
-          latitude:  v.lat ?? v.latitude ?? null,
-          longitude: v.lng ?? v.longitude ?? null,
-          city:      v.city || '',
+        Object.entries(storesData).map(([k, v]) => [k, {
+          hasCoords:  !!(v.hasCoords ?? (v.latitude != null && v.longitude != null)),
+          latitude:   v.latitude  ?? v.lat ?? null,
+          longitude:  v.longitude ?? v.lng ?? null,
+          storeName:  v.storeName || '',
+          address:    v.address   || '',
+          city:       cityForApi(v),
         }])
       );
       _storeCacheExp = now + STORE_CACHE_MS;
@@ -63,11 +101,34 @@ async function getStoreIndex(dbUrl) {
     }
   } catch (_) {}
 
-  // Fallback: full stores node (pre-storeCoords deploy)
-  const data = await restGet(dbUrl, 'stores', READ_TIMEOUT_MS);
-  _storeCache    = (data && typeof data === 'object') ? data : {};
+  // Lightweight fallback preserves radius filtering if stores/ is unavailable.
+  try {
+    const coordsData = await restGet(dbUrl, 'storeCoords', READ_TIMEOUT_MS);
+    if (coordsData && typeof coordsData === 'object' && Object.keys(coordsData).length > 0) {
+      _storeCache = Object.fromEntries(
+        Object.entries(coordsData).map(([k, v]) => [k, {
+          hasCoords:  true,
+          latitude:   v.lat ?? v.latitude ?? null,
+          longitude:  v.lng ?? v.longitude ?? null,
+          storeName:  '',
+          address:    '',
+          city:       cityForApi(v),
+        }])
+      );
+      _storeCacheExp = now + STORE_CACHE_MS;
+      return _storeCache;
+    }
+  } catch (_) {}
+
+  _storeCache = {};
   _storeCacheExp = now + STORE_CACHE_MS;
   return _storeCache;
+}
+
+// Test-only cache reset. Production invokes only the default handler.
+export function _resetStoreCache() {
+  _storeCache = null;
+  _storeCacheExp = 0;
 }
 
 const isHebrew = s => /[֐-׿]/.test(s);
@@ -389,8 +450,8 @@ async function buildLayeredPrices(
         override:     overrides[key] ?? null,
       }));
 
-    // Radius filter — use cached store index (prefers storeCoords, falls back to stores/)
-    if (hasLoc && official.length > 0) {
+    // Enrich every official row with authoritative branch metadata.
+    if (official.length > 0) {
       let idx = storeIndex;
       if (idx === undefined) {
         const tStore = Date.now();
@@ -401,7 +462,21 @@ async function buildLayeredPrices(
         }
         timings.storeReadMs = Date.now() - tStore;
       }
-      official = filterByRadius(official, lat, lng, radius, idx);
+
+      for (const p of official) {
+        const store = idx[p._key] ?? idx[`${p.chainId || ''}_${p.storeId || ''}`];
+
+        if (store) {
+          if (!p.storeName) p.storeName = store.storeName || '';
+          if (!p.address)   p.address   = store.address   || '';
+        }
+
+        p.city = cityForApi(p, store?.city || '');
+      }
+
+      if (hasLoc) {
+        official = filterByRadius(official, lat, lng, radius, idx);
+      }
     }
 
     official.sort((a, b) => a.displayPrice - b.displayPrice);
@@ -444,7 +519,12 @@ async function buildLayeredPrices(
   if (proxyData && typeof proxyData === 'object') {
     proxy = Object.values(proxyData)
       .filter(p => p?.price > 0 && (now - (p.fetchedAt || 0)) < 3_600_000)
-      .map(p => ({ ...p, source: 'proxy', displayPrice: p.price }));
+      .map(p => ({
+        ...p,
+        source: 'proxy',
+        displayPrice: p.price,
+        city: cityForApi(p),
+      }));
     if (hasLoc) {
       const idx = storeIndex ?? {};
       proxy = filterByRadius(proxy, lat, lng, radius, idx);
@@ -462,7 +542,12 @@ async function buildLayeredPrices(
     const seen = new Set();
     manual = Object.values(manualData)
       .filter(p => p?.price > 0)
-      .map(p => ({ ...p, source: 'manual', displayPrice: p.price }))
+      .map(p => ({
+        ...p,
+        source: 'manual',
+        displayPrice: p.price,
+        city: cityForApi(p),
+      }))
       .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))
       .filter(p => {
         const k = p.chainName || p.storeName || '';
@@ -484,16 +569,20 @@ function filterByRadius(prices, lat, lng, radius, storeIndex) {
   return prices.filter(p => {
     const key   = `${p.chainId || ''}_${p.storeId || ''}`;
     const store = storeIndex[key];
+
+    p.city = cityForApi(p, store?.city || '');
+
     if (!store?.hasCoords) return true; // include if no coords yet (pre-geocoding)
-    const dist  = haversine(lat, lng, store.latitude, store.longitude);
+
+    const dist = haversine(lat, lng, store.latitude, store.longitude);
     if (dist <= radius) {
-      p.distanceKm  = Math.round(dist * 10) / 10;
-      p.latitude    = store.latitude  ?? null;
-      p.longitude   = store.longitude ?? null;
-      p.address     = p.address  || store.address  || '';
-      p.city        = p.city     || store.city     || '';
+      p.distanceKm = Math.round(dist * 10) / 10;
+      p.latitude   = store.latitude  ?? null;
+      p.longitude  = store.longitude ?? null;
+      p.address    = p.address || store.address || '';
       return true;
     }
+
     return false;
   });
 }
