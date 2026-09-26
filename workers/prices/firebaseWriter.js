@@ -61,6 +61,22 @@ export class BatchWriter {
     if (this._count >= this.batchSize) await this.flush();
   }
 
+  // Queue a partial update without replacing the whole Firebase node.
+  // Each top-level field is written as its own multi-location update path,
+  // preserving fields that are not present in `value` (for example geocoding
+  // metadata written by a separate maintenance process).
+  async queueMerge(path, value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new TypeError('queueMerge value must be a plain object');
+    }
+
+    for (const [key, childValue] of Object.entries(value)) {
+      // Firebase rejects undefined. Omitted fields must remain untouched.
+      if (childValue === undefined) continue;
+      await this.queue(`${path}/${key}`, childValue);
+    }
+  }
+
   async flush() {
     if (this._count === 0) return;
     const n     = this._count;

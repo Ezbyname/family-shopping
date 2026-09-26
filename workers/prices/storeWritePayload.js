@@ -33,12 +33,39 @@ export function buildStorePayload(store, chain) {
   return payload;
 }
 
+export function buildStoreMergePayload(store, chain) {
+  const payload = buildStorePayload(store, chain);
+
+  // Coordinate ownership:
+  // If the supplier did not provide usable coordinates, do not write any
+  // coordinate fields. Existing geocoded coordinates and metadata must survive.
+  if (!store.hasCoords) {
+    delete payload.latitude;
+    delete payload.longitude;
+    delete payload.hasCoords;
+    return payload;
+  }
+
+  // Supplier coordinates are authoritative exact coordinates.
+  // Clear stale Google-geocoding metadata that may belong to older coordinates.
+  payload.approximateLocation = false;
+  payload.geocodedAt = null;
+  payload.geocodeProvider = null;
+  payload.geocodeQuery = null;
+  payload.geocodeConfidence = null;
+  payload.coordinateResolutionSource = 'official';
+
+  return payload;
+}
+
 export function buildStoreCoordsPayload(store) {
   if (!store.hasCoords) return null;
 
   const payload = {
     lat: store.latitude,
     lng: store.longitude,
+    approximateLocation: false,
+    coordinateResolutionSource: 'official',
   };
 
   if (store.city !== undefined) {

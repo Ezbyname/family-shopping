@@ -23,7 +23,7 @@ import { resolveFileUrls, downloadToStream, fetchAndDownloadLatest,
          resolveAllPriceUrls, resolveStoreMetaUrls } from './fetchPrices.js';
 import { parseXMLStream }                    from './parseXml.js';
 import { safeKey }                           from './normalizeProduct.js';
-import { buildStorePayload, buildStoreCoordsPayload } from './storeWritePayload.js';
+import { buildStoreMergePayload, buildStoreCoordsPayload } from './storeWritePayload.js';
 import { initFirebase, BatchWriter, getDB,
          getPriceLastSync, sendAlert }       from './firebaseWriter.js';
 import { logger }                            from './logger.js';
@@ -96,9 +96,9 @@ async function syncChainStores(chain, writer, config) {
 
           if (!config.dryRun) {
             const storeKey = safeKey(`${chain.id}_${store.storeId}`);
-            await writer.queue(
+            await writer.queueMerge(
               `stores/${storeKey}`,
-              buildStorePayload(store, chain),
+              buildStoreMergePayload(store, chain),
             );
             // storeCoords/{storeKey} = { lat, lng, city } — lightweight index (~28 KB total)
             // read by basket-compare.js and prices.js to avoid loading the full stores node.

@@ -5,6 +5,7 @@ import { safeKey } from '../normalizeProduct.js';
 import {
   buildStorePayload,
   buildStoreCoordsPayload,
+  buildStoreMergePayload,
 } from '../storeWritePayload.js';
 
 const chain = {
@@ -113,6 +114,18 @@ await test('real pipeline resolves 001 / 5000', async () => {
 
   assert(coords !== null, 'coords payload must exist');
   assertEqual(coords.city, 'תל אביב -יפו', 'coords city');
+
+  assertEqual(
+    coords.approximateLocation,
+    false,
+    'supplier storeCoords must be explicitly exact'
+  );
+
+  assertEqual(
+    coords.coordinateResolutionSource,
+    'official',
+    'supplier storeCoords must preserve official coordinate ownership'
+  );
 });
 
 await test('real pipeline supports unseen StoreID 99991', async () => {
@@ -165,6 +178,96 @@ await test('parser callback receives already-normalized store', async () => {
   assertEqual(store.storeId, '1', 'callback storeId');
   assertEqual(store.rawCityCode, '5000', 'callback rawCityCode');
   assertEqual(store.city, 'תל אביב -יפו', 'callback city');
+});
+
+
+await test('supplier merge without coords preserves existing geocoding ownership', async () => {
+  const store = await parseSingleStore(
+    makeStoresXml({
+      storeId: '123',
+      city: '5000',
+      latitude: '',
+      longitude: '',
+    }),
+  );
+
+  const payload = buildStoreMergePayload(store, chain);
+
+  assertEqual(store.hasCoords, false, 'fixture must have no supplier coords');
+
+  assert(
+    !Object.hasOwn(payload, 'latitude'),
+    'latitude must be omitted when supplier has no coords'
+  );
+  assert(
+    !Object.hasOwn(payload, 'longitude'),
+    'longitude must be omitted when supplier has no coords'
+  );
+  assert(
+    !Object.hasOwn(payload, 'hasCoords'),
+    'hasCoords must be omitted when supplier has no coords'
+  );
+
+  assert(
+    !Object.hasOwn(payload, 'approximateLocation'),
+    'existing approximateLocation must remain untouched'
+  );
+  assert(
+    !Object.hasOwn(payload, 'geocodedAt'),
+    'existing geocodedAt must remain untouched'
+  );
+  assert(
+    !Object.hasOwn(payload, 'geocodeProvider'),
+    'existing geocodeProvider must remain untouched'
+  );
+  assert(
+    !Object.hasOwn(payload, 'geocodeQuery'),
+    'existing geocodeQuery must remain untouched'
+  );
+  assert(
+    !Object.hasOwn(payload, 'geocodeConfidence'),
+    'existing geocodeConfidence must remain untouched'
+  );
+});
+
+await test('supplier exact coords take coordinate ownership and clear stale geocoding metadata', async () => {
+  const store = await parseSingleStore(
+    makeStoresXml({
+      storeId: '124',
+      city: '5000',
+      latitude: '32.1234',
+      longitude: '34.9876',
+    }),
+  );
+
+  const payload = buildStoreMergePayload(store, chain);
+
+  assertEqual(store.hasCoords, true, 'fixture must have supplier coords');
+
+  assertEqual(payload.latitude, 32.1234, 'supplier latitude');
+  assertEqual(payload.longitude, 34.9876, 'supplier longitude');
+  assertEqual(payload.hasCoords, true, 'supplier hasCoords');
+
+  assertEqual(
+    payload.approximateLocation,
+    false,
+    'supplier coordinates must not remain marked approximate'
+  );
+
+  assertEqual(payload.geocodedAt, null, 'stale geocodedAt must be cleared');
+  assertEqual(payload.geocodeProvider, null, 'stale geocodeProvider must be cleared');
+  assertEqual(payload.geocodeQuery, null, 'stale geocodeQuery must be cleared');
+  assertEqual(
+    payload.geocodeConfidence,
+    null,
+    'stale geocodeConfidence must be cleared'
+  );
+
+  assertEqual(
+    payload.coordinateResolutionSource,
+    'official',
+    'supplier exact coordinates must own coordinateResolutionSource'
+  );
 });
 
 console.log(`\n${passed} / ${passed + failed} PASS`);

@@ -153,13 +153,21 @@ export default async function handler(req, res) {
     })
   );
 
-  // ── 5. Radius filter using loaded store coordinates ───────────────────────
-  // Only needed when storeCoords pre-filter was unavailable.
-  const nearbyKeys = (hasLoc && !usedCoordsPrefilt)
+  // ── 5. Final radius validation using loaded store coordinates ─────────────
+  // Always validate the fully loaded store record. The lightweight storeCoords
+  // pre-filter is only an optimization and must never be treated as proof that
+  // a store is inside the requested radius.
+  const nearbyKeys = hasLoc
     ? candidateKeys.filter(k => {
         const s = storeIndex[k];
-        if (!s?.hasCoords) return !wantApproximate ? s?.approximateLocation !== true : true;
+
+        // Radius results must always have a verifiable location.
+        // Missing coordinates can never be proven to be inside the requested radius.
+        if (!s?.hasCoords || s.latitude == null || s.longitude == null) return false;
+
+        // Approximate/city-level coordinates are excluded from strict-radius mode.
         if (!wantApproximate && s.approximateLocation === true) return false;
+
         return haversine(userLat, userLng, s.latitude, s.longitude) <= radius;
       })
     : candidateKeys.filter(k => wantApproximate || storeIndex[k]?.approximateLocation !== true);

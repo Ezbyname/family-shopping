@@ -57,6 +57,10 @@ import { getDatabase } from 'firebase-admin/database';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import {
+  buildGeocodePlan,
+  buildGeocodeWritePayloads,
+} from './geocodePolicy.js';
 
 const __dirname  = dirname(fileURLToPath(import.meta.url));
 const SNAPSHOT   = resolve(__dirname, 'data', 'stores-geocoded.json');
@@ -117,10 +121,11 @@ async function throttle() {
 }
 
 // ── Google Geocoding API ──────────────────────────────────────────────────────
-async function geocodeAddress(address, city) {
+async function geocodeAddress(plan) {
   if (!process.env.GOOGLE_MAPS_API_KEY) return { ok: false, reason: 'GOOGLE_MAPS_API_KEY not set' };
+  if (!plan?.query) return { ok: false, reason: 'no geocode plan' };
 
-  const query = `${address.trim()}, ${city.trim()}, ישראל`;
+  const query = plan.query;
   const url = [
     'https://maps.googleapis.com/maps/api/geocode/json',
     `?address=${encodeURIComponent(query)}`,
@@ -168,9 +173,14 @@ async function geocodeAddress(address, city) {
     if (!isApprox && !TRUSTED_TYPES.has(locType)) {
       return { ok: false, reason: `unknown location_type (${locType})`, query };
     }
+
+    // A city-only lookup is approximate by contract even if Google reports
+    // GEOMETRIC_CENTER or another otherwise trusted geometry type.
+    const approximate = plan.forceApproximate === true || isApprox;
+
     return {
       ok:               true,
-      approximate:      isApprox,
+      approximate,
       latitude:         result.geometry.location.lat,
       longitude:        result.geometry.location.lng,
       confidence:       locType,
@@ -277,8 +287,9 @@ async function main() {
     if (!prev) {
       newStores.push(key);
       if (!hasCoords) {
-        if (s.address?.trim() && s.city?.trim()) needsGeocodeNew.push(key);
-        else                                       noCoordNoAddr.push(key);
+        const geocodePlan = buildGeocodePlan(s);
+        if (geocodePlan) needsGeocodeNew.push(key);
+        else             noCoordNoAddr.push(key);
       }
       continue; // lifecycle computed fresh below
     }
@@ -339,7 +350,7 @@ async function main() {
   console.log(`   Lifecycle transitions:        ${lifecycleChanges.length}`);
   console.log(`   APPROXIMATE coords (review):  ${approxReviewList.length}`);
   console.log(`   Needs geocoding (new):        ${needsGeocodeNew.length}`);
-  console.log(`   Cannot geocode (no addr):     ${noCoordNoAddr.length}`);
+  console.log(`   Cannot geocode (no city):     ${noCoordNoAddr.length}`);
   console.log(`   Already high-confidence:      ${alreadyGeocoded.length}`);
 
   // ── New stores ──────────────────────────────────────────────────────────────
@@ -457,7 +468,8 @@ async function main() {
       const s   = fbStores[key];
       process.stdout.write(`  [${i+1}/${needsGeocodeNew.length}] ${key.padEnd(30)} `);
 
-      const geo = await geocodeAddress(s.address, s.city);
+      const plan = buildGeocodePlan(s);
+      const geo = await geocodeAddress(plan);
       if (!geo.ok) {
         process.stdout.write(`✗ ${geo.reason}\n`);
         counts.geocodeFailed++;
@@ -470,17 +482,24 @@ async function main() {
       geocodedResults[key] = geo;
       counts.geocodedNew++;
 
-      // Write to Firebase
-      await db.ref(`stores/${key}`).update({
-        latitude:            geo.latitude,
-        longitude:           geo.longitude,
-        hasCoords:           true,
-        approximateLocation: geo.approximate === true,
-        geocodedAt:          new Date().toISOString(),
-        geocodeProvider:     'google',
-        geocodeQuery:        geo.query,
-        geocodeConfidence:   geo.confidence,
+      // Keep the full store record and the lightweight radius index in sync.
+      // Use a multi-location update so both views of the coordinates change atomically.
+      const { store: storeGeoUpdate, storeCoords } = buildGeocodeWritePayloads({
+        geo,
+        city: s.city,
+        geocodedAt: new Date().toISOString(),
+        source: plan.mode === 'city_center' ? 'city_center' : undefined,
       });
+
+      const firebaseUpdate = {
+        [`storeCoords/${key}`]: storeCoords,
+      };
+
+      for (const [field, value] of Object.entries(storeGeoUpdate)) {
+        firebaseUpdate[`stores/${key}/${field}`] = value;
+      }
+
+      await db.ref('/').update(firebaseUpdate);
     }
   }
 

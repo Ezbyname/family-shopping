@@ -195,11 +195,12 @@ console.log('\n── A. No-radius enrichment (real handler, stores/ primary) �
   expect('city populated from stores/',             row?.city,       'Rishon LeZion');
   expect('price source is firebase_cache',          body?.source,   'firebase_cache');
 
-  // Verify stores/ was actually requested (not storeCoords/ alone)
-  const storesFetched  = fetchLog.some(u => u.includes('/stores.json'));
-  const coordsFetched  = fetchLog.some(u => u.includes('/storeCoords.json'));
-  expectTruthy('real handler fetched stores/ endpoint',    storesFetched);
-  expect(    'storeCoords/ NOT fetched when stores/ ok',   coordsFetched, false);
+  // Both metadata sources are loaded and merged per store.
+  // stores/ owns branch metadata; storeCoords/ can recover stale/missing coords.
+  const storesFetched = fetchLog.some(u => u.includes('/stores.json'));
+  const coordsFetched = fetchLog.some(u => u.includes('/storeCoords.json'));
+  expectTruthy('real handler fetched stores/ endpoint', storesFetched);
+  expectTruthy('real handler fetched storeCoords/ for per-store merge', coordsFetched);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -267,21 +268,23 @@ console.log('\n── C. Radius path (real handler) ──');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// D. stores/ is primary — verified via fetch call log
+// D. stores/ + storeCoords/ are both loaded for per-store merge
 // ─────────────────────────────────────────────────────────────────────────────
-console.log('\n── D. stores/ called first, storeCoords/ not called when stores/ ok ──');
+console.log('\n── D. stores/ + storeCoords/ per-store merge sources loaded ──');
 {
   const { mockFetch, fetchLog } = buildMockFetch({ priceKeys: ['rami-levy_203'] });
   await withMock(mockFetch, () => callHandler({ barcode: '7290010935007' }));
 
-  const storesIdx  = fetchLog.findIndex(u => u.includes('/stores.json'));
-  const coordsIdx  = fetchLog.findIndex(u => u.includes('/storeCoords.json'));
-  expectTruthy('stores/ was fetched',              storesIdx !== -1);
-  expect(      'storeCoords/ was NOT fetched',     coordsIdx, -1);
-  // stores/ must appear before any price read
+  const storesIdx = fetchLog.findIndex(u => u.includes('/stores.json'));
+  const coordsIdx = fetchLog.findIndex(u => u.includes('/storeCoords.json'));
   const pricesIdx = fetchLog.findIndex(u => u.match(/\/prices\/\d+\.json/));
-  // (stores/ and prices/ are loaded concurrently via getStoreIndex + parallel price read)
-  expectTruthy('both stores/ and prices/ were fetched', storesIdx !== -1 && pricesIdx !== -1);
+
+  expectTruthy('stores/ was fetched', storesIdx !== -1);
+  expectTruthy('storeCoords/ was fetched for merge', coordsIdx !== -1);
+  expectTruthy(
+    'stores/, storeCoords/, and prices/ were all fetched',
+    storesIdx !== -1 && coordsIdx !== -1 && pricesIdx !== -1
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

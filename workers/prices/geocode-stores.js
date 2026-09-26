@@ -24,7 +24,7 @@
 //   ROOFTOP              → exact building (best)
 //   RANGE_INTERPOLATED   → street-segment interpolation (good)
 //   GEOMETRIC_CENTER     → area/polygon center (acceptable for stores in malls)
-//   APPROXIMATE          → city-level only → REJECTED (too imprecise for radius)
+//   APPROXIMATE          → city-level only → stored as approximate; excluded from strict radius
 //   partial_match        → IGNORED for stores (abbreviated Israeli addresses like
 //                          "א.ת", "ק.שר", mall names always trigger this flag even
 //                          when Google returns a correct precise location)
@@ -32,6 +32,10 @@
 import 'dotenv/config.js';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getDatabase } from 'firebase-admin/database';
+import {
+  buildGeocodePlan,
+  buildGeocodeWritePayloads,
+} from './geocodePolicy.js';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const ARGS         = process.argv.slice(2);
@@ -95,9 +99,10 @@ async function throttle() {
 }
 
 // ── Google Geocoding API ──────────────────────────────────────────────────────
-async function geocodeAddress(address, city) {
-  // Build query: "{address}, {city}, ישראל" — Hebrew "Israel" improves results for IL addresses
-  const query = `${address.trim()}, ${city.trim()}, ישראל`;
+async function geocodeAddress(plan) {
+  if (!plan?.query) return { ok: false, reason: 'no geocode plan' };
+
+  const query = plan.query;
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   const url = [
     'https://maps.googleapis.com/maps/api/geocode/json',
@@ -156,27 +161,19 @@ async function geocodeAddress(address, city) {
     // addresses (א.ת, ק.שר, mall names) often trigger partial_match even when Google
     // returns a correct ROOFTOP/GEOMETRIC_CENTER location.
 
-    // APPROXIMATE = city-level fallback. Stored with approximateLocation:true so the
-    // API and basket-compare can exclude them from strict nearby queries.
-    if (locType === 'APPROXIMATE') {
-      return {
-        ok:                  true,
-        approximate:         true,
-        latitude:            result.geometry.location.lat,
-        longitude:           result.geometry.location.lng,
-        confidence:          locType,
-        formattedAddress:    result.formatted_address,
-        query,
-      };
-    }
+    const isApprox = locType === 'APPROXIMATE';
 
-    if (!TRUSTED_TYPES.has(locType)) {
+    if (!isApprox && !TRUSTED_TYPES.has(locType)) {
       return { ok: false, reason: `unknown location_type (${locType})`, query };
     }
 
+    // A city-only query is approximate by contract even when Google returns
+    // GEOMETRIC_CENTER or another otherwise trusted geometry type.
+    const approximate = plan.forceApproximate === true || isApprox;
+
     return {
       ok:               true,
-      approximate:      false,
+      approximate,
       latitude:         result.geometry.location.lat,
       longitude:        result.geometry.location.lng,
       confidence:       locType,
@@ -216,7 +213,7 @@ async function main() {
   // ── Categorize ──────────────────────────────────────────────────────────────
   const alreadyDone   = []; // hasCoords=true, skip unless FORCE
   const needsGeocode  = []; // will be processed
-  const missingAddr   = []; // no address or city — cannot geocode
+  const missingAddr   = []; // no canonical city — cannot geocode
 
   for (const [key, s] of Object.entries(stores)) {
     if (CHAIN_FILTER && !key.startsWith(CHAIN_FILTER + '_')) continue;
@@ -225,8 +222,8 @@ async function main() {
       alreadyDone.push(key);
       continue;
     }
-    // Need both address and city to form a useful query
-    if (!s.address?.trim() || !s.city?.trim()) {
+    const geocodePlan = buildGeocodePlan(s);
+    if (!geocodePlan) {
       missingAddr.push(key);
       continue;
     }
@@ -238,7 +235,7 @@ async function main() {
   console.log(`   Total in Firebase:       ${Object.keys(stores).length}`);
   if (CHAIN_FILTER) console.log(`   Matching "${CHAIN_FILTER}":         ${totalScoped}`);
   console.log(`   Already have coords:     ${alreadyDone.length}`);
-  console.log(`   Missing address/city:    ${missingAddr.length}`);
+  console.log(`   Missing canonical city:  ${missingAddr.length}`);
   console.log(`   To geocode now:          ${needsGeocode.length}`);
 
   if (missingAddr.length > 0) {
@@ -247,7 +244,7 @@ async function main() {
   console.log('');
 
   if (needsGeocode.length === 0) {
-    console.log('✅ Nothing to geocode. All stores either have coordinates or lack address data.');
+    console.log('✅ Nothing to geocode. All stores either have coordinates or lack canonical city data.');
     process.exit(0);
   }
 
@@ -260,7 +257,8 @@ async function main() {
     console.log('   Sample queries that would be sent to Google Geocoding API:');
     for (const key of sample) {
       const s = stores[key];
-      console.log(`     ${key}: "${s.address}, ${s.city}, ישראל"`);
+      const plan = buildGeocodePlan(s);
+      console.log(`     ${key}: "${plan.query}" [${plan.mode}]`);
     }
     if (needsGeocode.length > 5) console.log(`     … and ${needsGeocode.length - 5} more`);
 
@@ -290,7 +288,8 @@ async function main() {
 
     process.stdout.write(`  [${idx}/${needsGeocode.length}] ${pct}% ${tag} `);
 
-    const geo = await geocodeAddress(s.address, s.city);
+    const plan = buildGeocodePlan(s);
+    const geo = await geocodeAddress(plan);
 
     if (!geo.ok) {
       process.stdout.write(`✗ ${geo.reason}\n`);
@@ -318,20 +317,23 @@ async function main() {
       });
     }
 
-    // Write to Firebase
-    const update = {
-      latitude:            geo.latitude,
-      longitude:           geo.longitude,
-      hasCoords:           true,
-      approximateLocation: geo.approximate === true,   // true for APPROXIMATE, false otherwise
-      geocodedAt:          new Date().toISOString(),
-      geocodeProvider:     'google',
-      geocodeQuery:        geo.query,
-      geocodeConfidence:   geo.confidence,             // ROOFTOP / GEOMETRIC_CENTER / APPROXIMATE etc.
+    const { store: storeGeoUpdate, storeCoords } = buildGeocodeWritePayloads({
+      geo,
+      city: s.city,
+      geocodedAt: new Date().toISOString(),
+      source: plan.mode === 'city_center' ? 'city_center' : undefined,
+    });
+
+    const firebaseUpdate = {
+      [`storeCoords/${key}`]: storeCoords,
     };
 
+    for (const [field, value] of Object.entries(storeGeoUpdate)) {
+      firebaseUpdate[`stores/${key}/${field}`] = value;
+    }
+
     try {
-      await db.ref(`stores/${key}`).update(update);
+      await db.ref('/').update(firebaseUpdate);
     } catch (e) {
       console.error(`\n  Firebase write failed for ${key}: ${e.message}`);
       counts.failed++;
@@ -347,7 +349,7 @@ async function main() {
 
   console.log(`  ✅ Succeeded:           ${counts.succeeded}`);
   console.log(`  ✗  Failed:              ${counts.failed}`);
-  console.log(`  ⏭  Skipped (no addr):  ${missingAddr.length}`);
+  console.log(`  ⏭  Skipped (no city):  ${missingAddr.length}`);
   console.log(`  📍 Already had coords: ${alreadyDone.length}`);
   console.log(`  Total with coords now: ${alreadyDone.length + counts.succeeded}`);
 

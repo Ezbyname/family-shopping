@@ -21,7 +21,7 @@ import {
 } from './rami-levy-discovery.js';
 import { parseXMLStream }         from './parseXml.js';
 import { safeKey }                from './normalizeProduct.js';
-import { buildStorePayload, buildStoreCoordsPayload } from './storeWritePayload.js';
+import { buildStoreMergePayload, buildStoreCoordsPayload } from './storeWritePayload.js';
 import { logger }                 from './logger.js';
 
 const DOWNLOAD_TIMEOUT = 120_000;
@@ -164,9 +164,9 @@ export async function syncStores(chain, writer, config) {
     for (const store of stores) {
       const storeKey = safeKey(`${chain.id}_${store.storeId}`);
 
-      await writer.queue(
+      await writer.queueMerge(
         `stores/${storeKey}`,
-        buildStorePayload(store, chain),
+        buildStoreMergePayload(store, chain),
       );
 
       if (store.hasCoords) {

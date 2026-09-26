@@ -92,48 +92,89 @@ async function getStoreIndex(dbUrl) {
   const now = Date.now();
   if (_storeCache && _storeCacheExp > now) return _storeCache;
 
-  // Try full stores/ first — has storeName, address, city, lat/lng
-  try {
-    const storesData = await restGet(dbUrl, 'stores', READ_TIMEOUT_MS);
-    if (storesData && typeof storesData === 'object' && Object.keys(storesData).length > 0) {
-      // Normalize stores/ record → internal shape (supports both lat/lng field variants)
-      _storeCache = Object.fromEntries(
-        Object.entries(storesData).map(([k, v]) => [k, {
-          hasCoords:  !!(v.hasCoords ?? (v.latitude != null && v.longitude != null)),
-          latitude:   v.latitude  ?? v.lat ?? null,
-          longitude:  v.longitude ?? v.lng ?? null,
-          storeName:  v.storeName  || '',
-          address:    v.address    || '',
-          city:       cityForApi(v),
-        }])
-      );
-      _storeCacheExp = now + STORE_CACHE_MS;
-      return _storeCache;
-    }
-  } catch (_) {}
+  // Load both metadata sources and merge per store.
+  // stores/ owns branch metadata.
+  // storeCoords/ can recover coordinates when the stores/ record is stale
+  // or lost its geocoded coordinates during a later sync.
+  const [storesResult, coordsResult] = await Promise.allSettled([
+    restGet(dbUrl, 'stores', READ_TIMEOUT_MS),
+    restGet(dbUrl, 'storeCoords', READ_TIMEOUT_MS),
+  ]);
 
-  // Fallback: lightweight storeCoords/ (written by sync worker alongside stores/).
-  // Preserves radius/distance filtering when stores/ is temporarily unavailable.
-  // storeName and address will remain blank in this path.
-  try {
-    const coordsData = await restGet(dbUrl, 'storeCoords', READ_TIMEOUT_MS);
-    if (coordsData && typeof coordsData === 'object' && Object.keys(coordsData).length > 0) {
-      _storeCache = Object.fromEntries(
-        Object.entries(coordsData).map(([k, v]) => [k, {
-          hasCoords:  true,
-          latitude:   v.lat ?? v.latitude ?? null,
-          longitude:  v.lng ?? v.longitude ?? null,
-          storeName:  '',
-          address:    '',
-          city:       cityForApi(v),
-        }])
-      );
-      _storeCacheExp = now + STORE_CACHE_MS;
-      return _storeCache;
-    }
-  } catch (_) {}
+  const storesData =
+    storesResult.status === 'fulfilled' &&
+    storesResult.value &&
+    typeof storesResult.value === 'object'
+      ? storesResult.value
+      : {};
 
-  _storeCache    = {};
+  const coordsData =
+    coordsResult.status === 'fulfilled' &&
+    coordsResult.value &&
+    typeof coordsResult.value === 'object'
+      ? coordsResult.value
+      : {};
+
+  const keys = new Set([
+    ...Object.keys(storesData),
+    ...Object.keys(coordsData),
+  ]);
+
+  const merged = {};
+
+  for (const key of keys) {
+    const store = storesData[key] || {};
+    const coords = coordsData[key] || {};
+
+    const storeLat = store.latitude ?? store.lat ?? null;
+    const storeLng = store.longitude ?? store.lng ?? null;
+    const coordsLat = coords.lat ?? coords.latitude ?? null;
+    const coordsLng = coords.lng ?? coords.longitude ?? null;
+
+    const storeHasCoords =
+      storeLat != null &&
+      storeLng != null &&
+      store.hasCoords !== false;
+
+    const coordsHasCoords =
+      coordsLat != null &&
+      coordsLng != null;
+
+    const useStoreCoords = storeHasCoords;
+    const hasCoords = storeHasCoords || coordsHasCoords;
+
+    merged[key] = {
+      hasCoords,
+      latitude: hasCoords
+        ? (useStoreCoords ? storeLat : coordsLat)
+        : null,
+      longitude: hasCoords
+        ? (useStoreCoords ? storeLng : coordsLng)
+        : null,
+
+      storeName: store.storeName || '',
+      address: store.address || '',
+      city: cityForApi(store, cityForApi(coords)),
+
+      approximateLocation: useStoreCoords
+        ? store.approximateLocation === true
+        : coords.approximateLocation === true,
+
+      geocodeConfidence: useStoreCoords
+        ? (store.geocodeConfidence || null)
+        : (coords.geocodeConfidence || null),
+
+      coordinateResolutionSource: useStoreCoords
+        ? (store.coordinateResolutionSource || null)
+        : (coords.coordinateResolutionSource || null),
+
+      geoSource: useStoreCoords
+        ? (store.geoSource || store.geocodeProvider || null)
+        : (coords.geoSource || coords.geocodeProvider || null),
+    };
+  }
+
+  _storeCache = merged;
   _storeCacheExp = now + STORE_CACHE_MS;
   return _storeCache;
 }
@@ -232,9 +273,16 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
 
-  const { barcode, q, lat, lng, radiusKm, groupId, userId, debug, debugScore } = req.query || {};
+  const {
+    barcode, q, lat, lng, radiusKm, groupId, userId,
+    includeApproximate, debug, debugScore,
+  } = req.query || {};
   const isDebug      = debug === '1' || debug === 'true';
   const isDebugScore = debugScore === '1' || debugScore === 'true';
+  const wantApproximate =
+    includeApproximate === true ||
+    includeApproximate === 'true' ||
+    includeApproximate === '1';
   const timings = { initMs: 0, priceReadMs: 0, storeReadMs: 0, totalMs: 0 };
 
   const userLat = parseFloat(lat  || '');
@@ -265,7 +313,11 @@ export default async function handler(req, res) {
     // Build prices with hard total budget
     try {
       const result = await withTimeout(
-        buildLayeredPrices(dbUrl, clean, userId, groupId, hasLoc, userLat, userLng, radius, timings),
+        buildLayeredPrices(
+          dbUrl, clean, userId, groupId,
+          hasLoc, userLat, userLng, radius,
+          wantApproximate, timings
+        ),
         BUILD_TIMEOUT_MS,
         'buildLayeredPrices'
       );
@@ -338,7 +390,8 @@ export default async function handler(req, res) {
         return { ...p, prices: [], source: 'none' };
       const layered = await buildLayeredPrices(
         dbUrl, p.barcode, userId, groupId,
-        hasLoc, userLat, userLng, radius, {},
+        hasLoc, userLat, userLng, radius,
+        wantApproximate, {},
         storeIndex
       ).catch(() => ({ prices: [], source: 'none', communityWarning: null }));
       return { ...p, ...layered };
@@ -429,6 +482,7 @@ export default async function handler(req, res) {
 async function buildLayeredPrices(
   dbUrl, barcode, userId, groupId,
   hasLoc, lat, lng, radius,
+  wantApproximate = false,
   timings = {},           // filled by barcode-mode caller
   storeIndex = undefined  // undefined = lazy-load if hasLoc; object = already loaded
 ) {
@@ -490,7 +544,9 @@ async function buildLayeredPrices(
       // Radius filter — uses the same already-loaded index.
       // Continues to own distanceKm calculation and lat/lng enrichment.
       if (hasLoc) {
-        official = filterByRadius(official, lat, lng, radius, idx);
+        official = filterByRadius(
+          official, lat, lng, radius, idx, wantApproximate
+        );
       }
     }
 
@@ -542,7 +598,9 @@ async function buildLayeredPrices(
       }));
     if (hasLoc) {
       const idx = storeIndex ?? {};
-      proxy = filterByRadius(proxy, lat, lng, radius, idx);
+      proxy = filterByRadius(
+        proxy, lat, lng, radius, idx, wantApproximate
+      );
     }
     proxy.sort((a, b) => a.displayPrice - b.displayPrice);
   }
@@ -570,6 +628,16 @@ async function buildLayeredPrices(
         seen.add(k);
         return true;
       });
+
+    // Manual family prices currently do not carry a canonical store key or
+    // verified coordinates. In radius mode they must satisfy the same
+    // measurable-location contract as official/proxy rows; otherwise they are
+    // excluded rather than guessed into the requested radius.
+    if (hasLoc) {
+      manual = filterByRadius(
+        manual, lat, lng, radius, storeIndex ?? {}, wantApproximate
+      );
+    }
   }
 
   if (manual.length > 0) {
@@ -580,24 +648,55 @@ async function buildLayeredPrices(
 }
 
 // ── Filter prices to stores within radius ────────────────────────────────────
-function filterByRadius(prices, lat, lng, radius, storeIndex) {
+function filterByRadius(
+  prices, lat, lng, radius, storeIndex, wantApproximate = false
+) {
   return prices.filter(p => {
-    const key   = `${p.chainId || ''}_${p.storeId || ''}`;
+    const key   = p._key || `${p.chainId || ''}_${p.storeId || ''}`;
     const store = storeIndex[key];
 
     // Keep the API contract safe even when radius filtering receives legacy
     // rows directly (for example proxy rows).
     p.city = cityForApi(p, store?.city || '');
 
-    if (!store?.hasCoords) return true; // include if no coords yet (pre-geocoding)
-    const dist  = haversine(lat, lng, store.latitude, store.longitude);
+    // Radius results must always have coordinates that can actually be measured.
+    // Unknown-location stores cannot be proven to be inside the requested radius.
+    if (!store?.hasCoords ||
+        store.latitude == null ||
+        store.longitude == null) {
+      return false;
+    }
+
+    const approximate =
+      store.approximateLocation === true ||
+      p.approximateLocation === true;
+
+    if (!wantApproximate && approximate) return false;
+
+    const dist = haversine(lat, lng, store.latitude, store.longitude);
+
     if (dist <= radius) {
-      p.distanceKm  = Math.round(dist * 10) / 10;
-      p.latitude    = store.latitude  ?? null;
-      p.longitude   = store.longitude ?? null;
-      p.address     = p.address  || store.address  || '';
+      p.distanceKm = Math.round(dist * 10) / 10;
+      p.latitude   = store.latitude;
+      p.longitude  = store.longitude;
+      p.address    = p.address || store.address || '';
+      p.approximateLocation = approximate;
+
+      if (store.geocodeConfidence) {
+        p.geocodeConfidence = store.geocodeConfidence;
+      }
+
+      if (store.coordinateResolutionSource) {
+        p.coordinateResolutionSource = store.coordinateResolutionSource;
+      }
+
+      if (store.geoSource) {
+        p.geoSource = store.geoSource;
+      }
+
       return true;
     }
+
     return false;
   });
 }
