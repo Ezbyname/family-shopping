@@ -812,6 +812,31 @@ window.searchPrices = async function(){
       ? ` · 📍 סניפים עד ${_nearbyRadius} ק"מ`
       : ' בכל הסופרמרקטים';
     wrap.innerHTML = `<div class="price-loading"><div class="spin"></div><p>מחפש "${esc(q)}"${locationLabel}...</p></div>`;
+    // Broadening: for multi-word queries, fire up to 2 parallel single-token searches.
+    // Tokens: non-numeric (filter /^\d+$/), min 2 chars, sorted longest-first (JS stable sort
+    // preserves original order on length ties), capped at 2.
+    // Budget: max 3 total requests per user search (1 primary + up to 2 broader), all in flight
+    // simultaneously. Latency: max(primary, broader1, broader2) — never additive.
+    // Each broader request has its own AbortController with a 15 s timeout.
+    const _mbToks = resolvedQuery.trim().split(/\s+/);
+    const _broaderPromises = [];
+    if (_mbToks.length > 1) {
+      const _candidateToks = _mbToks
+        .filter(t => !/^\d+$/.test(t) && t.length >= 2)
+        .sort((a, b) => b.length - a.length)
+        .slice(0, 2);
+      for (const _tok of _candidateToks) {
+        let _bUrl = `/api/prices?q=${encodeURIComponent(_tok)}`;
+        if (_hasLoc()) _bUrl += `&lat=${_locLat()}&lng=${_locLng()}&radiusKm=${_nearbyRadius}`;
+        const _bc = new AbortController();
+        const _bt = setTimeout(() => _bc.abort(), 15000);
+        _broaderPromises.push(
+          fetch(_bUrl, { signal: _bc.signal })
+            .then(async r => { clearTimeout(_bt); return r.ok ? r.json() : null; })
+            .catch(() => { clearTimeout(_bt); return null; })
+        );
+      }
+    }
     try {
       let _apiUrl = `/api/prices?q=${encodeURIComponent(resolvedQuery)}`;
       if (_hasLoc()) {
@@ -836,8 +861,20 @@ window.searchPrices = async function(){
         return;
       }
 
+      // Await all broader results (all already in flight). Promise.all resolves when
+      // the last in-flight request completes — no extra latency vs single broader fetch.
+      const _broaderDataArr = _broaderPromises.length ? await Promise.all(_broaderPromises) : [];
+      if (mySeq !== _searchSeq) return;
+      const _broaderPool = _broaderDataArr.flatMap(d => d?.results || []);
+
       if (!data.results || !data.results.length) {
-        wrap.innerHTML = `<div class="search-hint"><div class="sh-icon">🔍</div><p>לא נמצאו תוצאות עבור "${esc(q)}"</p><small>נסה שם שונה</small></div>`;
+        if (_broaderPool.length) {
+          const limited = _limitMerged(_normalizeResults(_mergeByBarcode([], _broaderPool)), resolvedQuery);
+          searchResults = limited;
+          renderSearchResults(limited, resolvedQuery);
+        } else {
+          wrap.innerHTML = `<div class="search-hint"><div class="sh-icon">🔍</div><p>לא נמצאו תוצאות עבור "${esc(q)}"</p><small>נסה שם שונה</small></div>`;
+        }
         return;
       }
 
@@ -847,14 +884,18 @@ window.searchPrices = async function(){
         return;
       }
 
-      searchResults = data.results;
-      // Only fall back to manual entry when the single result genuinely has NO prices.
-      // (API exposes prices under `prices`, not `storePrices` — the old field name
-      //  was always undefined, forcing manual fallback even when prices existed.)
-      if (data.results.length === 1 && !data.results[0].prices?.length) {
-        wrap.innerHTML = renderManualFallback(q, data.results[0]);
+      // Merge primary + broader candidates; dedup by barcode; normalize (same-name store
+      // merge); rank by original full query; cap at _SEARCH_RESULT_LIMIT (20) so the limit
+      // is applied to already-merged products, not raw rows.
+      const limited = _limitMerged(
+        _normalizeResults(_mergeByBarcode(data.results, _broaderPool)),
+        resolvedQuery
+      );
+      searchResults = limited;
+      if (limited.length === 1 && !limited[0].prices?.length) {
+        wrap.innerHTML = renderManualFallback(q, limited[0]);
       } else {
-        renderSearchResults(data.results, q);
+        renderSearchResults(limited, resolvedQuery);
       }
     } catch(e) {
       if (mySeq !== _searchSeq) return;  // superseded — stay silent
@@ -1509,7 +1550,13 @@ let _chainGroups = [];
 
 function _normalizeResults(results) {
   // API v6 returns: { name, barcode, prices: [{chainName, storeName, displayPrice, price, unit, ...}] }
+  // Also handles already-normalized items (stores[] present) so the function is idempotent.
   const normalized = results.map(r => {
+    // If already normalized (stores[] present), pass through without remapping prices.
+    if (Array.isArray(r.stores)) {
+      return { name: r.name || '', brand: r.brand || '', size: r.size || '',
+               image: r.image || '', barcode: r.barcode || '', stores: r.stores };
+    }
     // Primary: r.prices[] from buildLayeredPrices (official / proxy / manual)
     const rawPrices = Array.isArray(r.prices) ? r.prices : [];
     const stores = rawPrices
@@ -1579,6 +1626,27 @@ function _applyFilter(groups) {
     if (_filterState.officialOnly) products = products.filter(p => p.chainPrice > 0);
     return products.length ? { ...group, products } : null;
   }).filter(Boolean);
+}
+
+// Merge two result arrays (primary + broader candidates), deduplicating by barcode.
+// Primary results take precedence. Products without a barcode pass through; name-level
+// dedup happens downstream in _normalizeResults.
+function _mergeByBarcode(primary, broader) {
+  if (!broader?.length) return primary;
+  const seen = new Set(primary.map(r => r.barcode).filter(Boolean));
+  const extras = broader.filter(r => !r.barcode || !seen.has(r.barcode));
+  return [...primary, ...extras];
+}
+
+// Rank merged candidates by matchScore against the original query and limit to n.
+// Applied after merge+dedup so broader/weaker results are cut before weaker cherry matches.
+// No-op when merged.length <= n (single-query path unchanged).
+const _SEARCH_RESULT_LIMIT = 20; // mirrors API ranked.slice(0, 20)
+function _limitMerged(results, query, limit = _SEARCH_RESULT_LIMIT) {
+  if (results.length <= limit) return results;
+  return [...results]
+    .sort((a, b) => matchScore(b.name || '', query) - matchScore(a.name || '', query))
+    .slice(0, limit);
 }
 
 function renderSearchResults(results, query) {
@@ -2477,7 +2545,7 @@ function itemHTML(item, suppressDrag = false) {
   const avatarValue = addedMember?.avatarValue || item.addedByAvatarValue || '👤';
   const avatarEmoji = addedMember?.avatarEmoji || item.addedByAvatarEmoji || null;
 
-  const boughtBtn = isFavTab ? '' : `<button class="${item.bought?'bought-tag':'pending-tag'}" onclick="toggleBought('${item.id}')" aria-pressed="${item.bought?'true':'false'}" aria-label="${item.bought?'בטל סימון — נקנה':'סמן כמוצר שנקנה'}">${item.bought?'✅ קניתי':'קניתי'}</button>`;
+  const boughtBtn = isFavTab ? '' : `<button class="${item.bought?'bought-tag':'pending-tag'}" onclick="toggleBought('${item.id}')" aria-pressed="${item.bought?'true':'false'}" aria-label="${item.bought?'בטל סימון — נקנה':'סמן כמוצר שנקנה'}">${item.bought?'החזר לעגלה':'קניתי'}</button>`;
 
   // ── Product attachment tile (replaces check-btn) ──
   const at = item.attached;

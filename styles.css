@@ -20,7 +20,7 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
 /* ── SPLASH SCREEN ──────────────────────────────────────────────────────── */
 #splash-overlay{
   position:fixed;inset:0;z-index:9999;
-  background:#1b4a1b;          /* fallback — matches image green */
+  background:#ffffff;
   display:flex;align-items:center;justify-content:center;
   overflow:hidden;
   transition:opacity .55s ease;
@@ -284,8 +284,11 @@ body{font-family:'Rubik',sans-serif;background:var(--bg);color:var(--text);
   justify-content:center;font-weight:700;transition:background .1s,transform .1s;line-height:1;}
 .qty-btn:active{transform:scale(.78);background:var(--accent);color:#fff}
 .qty-num{font-size:13px;font-weight:800;min-width:22px;text-align:center;color:var(--accent)}
-.qty-mode-toggle{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-right:2px}
+.qty-mode-toggle{display:inline-flex;border:1px solid var(--border);border-radius:8px;margin-right:2px}
 .qty-mode-btn{padding:2px 7px;font-size:10px;font-weight:700;font-family:inherit;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:background .12s,color .12s;line-height:1.6}
+/* RTL: :first-child renders on the right, :last-child on the left */
+.qty-mode-btn:first-child{border-radius:0 7px 7px 0}
+.qty-mode-btn:last-child{border-radius:7px 0 0 7px}
 .qty-mode-btn.active{background:var(--accent);color:#fff}
 /* ── "קניתי" PRIMARY CTA (tap to mark purchased) ── */
 .pending-tag{display:inline-flex;align-items:center;justify-content:center;gap:5px;
