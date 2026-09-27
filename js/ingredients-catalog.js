@@ -147,6 +147,7 @@ export const CATALOG = new Map([
   ['תאנה',             'fig'],
   // ── Pantry — Grains & Bread ────────────────────────────────────────────────
   ['לחם',              'bread'],
+  ['לחם ללא גלוטן',    'gluten free bread'],
   ['לחם מלא',          'whole wheat bread'],
   ['לחם שיפון',        'rye bread'],
   ['פיתה',             'pita'],
@@ -296,6 +297,7 @@ export const CATALOG = new Map([
   ['פקאן',             'pecans'],
   // ── Beverages ──────────────────────────────────────────────────────────────
   ['קפה',              'coffee'],
+  ['קפה שחור',        'black coffee'],
   ['קפה טחון',         'ground coffee'],
   ['קפה נמס',          'instant coffee'],
   ['קפה אספרסו',       'espresso'],

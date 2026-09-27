@@ -67,6 +67,20 @@ test('חלב 3 אחוז resolves through shared canonical synonym knowledge', ()
   );
 });
 
+test('קפה שחור uses canonical specific translation', () => {
+  assert(
+    bpTranslate('קפה שחור') === 'black coffee',
+    `got ${JSON.stringify(bpTranslate('קפה שחור'))}`
+  );
+});
+
+test('לחם ללא גלוטן uses canonical specific translation', () => {
+  assert(
+    bpTranslate('לחם ללא גלוטן') === 'gluten free bread',
+    `got ${JSON.stringify(bpTranslate('לחם ללא גלוטן'))}`
+  );
+});
+
 test('legacy fuzzy typo: ניר טואלט remains covered', () => {
   assert(
     bpTranslate('ניר טואלט') === 'toilet paper',
