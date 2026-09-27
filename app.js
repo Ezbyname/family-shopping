@@ -1,5 +1,7 @@
 import { pdHasLoc as _pdHasLocFn, pdInitialMode, pdEffectiveRadius as pdEffR, pdCacheKey as pdCKFn, pdRowEligible, pdBuildRequestUrl, pdExtractRows, pdNameFallbackUrl, pdShouldUseFallback } from './js/pd-location.js';
 import { bpSelectName, bpConsumeBatches, bpFetchCorpus } from './js/bp-search.js';
+import { bpTranslate } from './js/bp-translation.js';
+import { bpSelectStrictCandidates } from './js/bp-strict.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, push, onValue, update, remove }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -2904,56 +2906,11 @@ window._onAddInputChange = function() {
 };
 
 // Internal search runner — used by both 'new' and 'attach' modes
-// Quick Hebrew→English for OFX search (mirrors server-side HE_EN dict)
-const _BP_HE_EN = {
-  'חלב':'milk',
-  // Multi-word cheese phrases must appear before the generic 'גבינה' entry so the
-  // substring fallback in _bpTranslate finds the specific phrase first.
-  'גבינה לבנה':'white cheese','גבינה צהובה':'yellow cheese',
-  'גבינה קוטג':"cottage cheese",'גבינת שמנת':'cream cheese',
-  'גבינה עיזים':'goat cheese','גבינה בולגרית':'bulgarian cheese',
-  'גבינה מלוחה':'salted cheese','גבינה צפתית':'tzfatit cheese',
-  'גבינה':'cheese','קוטג':'cottage cheese',"קוטג'":'cottage cheese',
-  'שמנת':'cream','יוגורט':'yogurt','חמאה':'butter','לחם':'bread','פיתה':'pita',
-  'קמח':'flour','ביצים':'eggs','ביצה':'egg','קורנפלקס':'cornflakes',
-  'שיבולת שועל':'oatmeal','גרנולה':'granola','אורז':'rice','פסטה':'pasta',
-  'שמן':'oil','שמן זית':'olive oil','סוכר':'sugar','דבש':'honey','מלח':'salt',
-  'טחינה':'tahini','חומוס':'hummus','קטשופ':'ketchup','מיונז':'mayonnaise',
-  'טונה':'tuna','קפה':'coffee','תה':'tea','מיץ':'juice','שוקולד':'chocolate',
-  'עוגיות':'cookies','במבה':'bamba','ביסלי':'bisli','גלידה':'ice cream',
-  'עוף':'chicken','בשר':'beef','דג':'fish','עגבניות':'tomatoes',
-  'מלפפון':'cucumber','בצל':'onion','שום':'garlic','גזר':'carrot',
-  'תפוח אדמה':'potato','ברוקולי':'broccoli','תפוח':'apple','בננה':'banana',
-  // household & hygiene
-  'נייר טואלט':'toilet paper','נייר אסלה':'toilet paper',
-  'נייר מגבת':'paper towel','מגבת נייר':'paper towel',
-  'מגבונים':'wet wipes','מגבון':'wet wipe',
-  'סבון':'soap','סבון ידיים':'hand soap','סבון כלים':'dish soap',
-  'שמפו':'shampoo','מרכך':'conditioner','מרכך שיער':'hair conditioner',
-  'אבקת כביסה':'laundry detergent','נוזל כביסה':'liquid detergent',
-  'מרכך כביסה':'fabric softener','ממיס שומן':'degreaser',
-  'חומר ניקוי':'cleaning product','נוזל ניקוי':'cleaning liquid',
-  'אקונומיקה':'bleach','מי ברז':'water',
-  'תחתיות':'diapers','חיתולים':'diapers','טיטולים':'diapers',
-  'פד':'pad','תחבושת':'sanitary pad',
-  'קרם שיניים':'toothpaste','מברשת שיניים':'toothbrush',
-  'דאודורנט':'deodorant','קרם גוף':'body lotion','קרם פנים':'face cream',
-  'תחבושת פלסטר':'bandage','כדורים':'pills',
-  // kitchen & misc
-  'שקיות זבל':'garbage bags','שקית זבל':'garbage bag',
-  'ניילון נצמד':'cling film','נייר אלומיניום':'aluminum foil',
-  'נייר אפייה':'baking paper','נייר לאפייה':'baking paper',
-  'ספריי ניקוי':'cleaning spray','ספריי':'spray',
-  'נוזל כלים':'dish soap',
-  'כלי חד פעמי':'disposable','צלחת חד פעמית':'disposable plate',
-  'כוס חד פעמית':'disposable cup',
-  'מרק':'soup','מרק עוף':'chicken soup','מרק ירקות':'vegetable soup',
-  'שימורים':'canned food','קופסת שימורים':'canned goods',
-  'חטיפים':'snacks','חטיף':'snack',
-  'מים':'water','מים מינרליים':'mineral water','סודה':'soda water',
-};
+// Product Picker Hebrew→English translation uses the shared catalog
+// through the compatibility layer in ./js/bp-translation.js
 
-// Canonical synonym map — variant phrasings → canonical _BP_HE_EN key.
+
+// Canonical query-normalization synonyms used before Product Picker translation.
 // Add entries here to cover misspellings, alternative phrasing, singular/plural.
 const _BP_SYNONYMS = {
   // toilet paper variants & typos
@@ -3040,29 +2997,9 @@ function _levenshtein(a, b) {
 }
 
 function _bpTranslate(q) {
-  // q arrives already normalized; apostrophe guard kept as defense-in-depth
-  const l     = q.trim();
-  const lNorm = l.replace(/[''׳`'ʼ]/g, "'");
-  if (_BP_HE_EN[l])     return _BP_HE_EN[l];
-  if (_BP_HE_EN[lNorm]) return _BP_HE_EN[lNorm];
-  // Exact substring match
-  for (const [h, e] of Object.entries(_BP_HE_EN)) {
-    if (l.includes(h) || lNorm.includes(h)) return e;
-  }
-  // Fuzzy token match — catches typos like "ניר" (missing yod) vs "נייר".
-  // Only fires when exact/substring both failed.
-  // Requires ALL query tokens to find a match (exact or dist≤1) within the SAME dict key.
-  // This prevents "ניר מגבת" from falsely matching "נייר טואלט" via the "ניר"≈"נייר" hit alone.
-  const lTokens = lNorm.split(/\s+/).filter(w => w.length >= 3);
-  if (lTokens.length) {
-    for (const [h, e] of Object.entries(_BP_HE_EN)) {
-      const hTokens = h.replace(/[''׳`'ʼ]/g, '').split(/\s+/).filter(w => w.length >= 3);
-      if (!hTokens.length) continue;
-      const allMatch = lTokens.every(lt => hTokens.some(ht => _levenshtein(lt, ht) <= 1));
-      if (allMatch) return e;
-    }
-  }
-  return null;
+  // Single shared deterministic Hebrew translation pipeline.
+  // Same source of truth is used by the backend and Product Picker.
+  return bpTranslate(q);
 }
 
 // ── Language detection & relevance scoring ──────────────────────────────────
@@ -3243,49 +3180,70 @@ async function _bpRunSearch(query, signal, seq) {
     const _stableSort = (a, b) =>
       (b._s - a._s) || String(a.barcode || '').localeCompare(String(b.barcode || ''));
 
-    // ── Fix A + Hebrew strict bucket — 2+ token Hebrew queries ───────────────
-    // For multi-token Hebrew queries, require that all query tokens appear as
-    // whole words in the Hebrew display name or nameHe field (prefix allowed
-    // on the last token). Prevents Israeli English-named products from
-    // dominating via Israeli bonus + EN-translation match alone.
-    //
-    // Fix A: when strict mode activates (2+ token Hebrew query), it is ALWAYS
-    // the exclusive result path — even when the bucket is empty. This prevents
-    // fallthrough to the generic scoring pipeline which would show irrelevant
-    // English products (Cream Cheese, Pringles) as normal results.
-    //
-    // Activated only for queryLang==='he' and 2+ tokens; single-token queries
-    // and Latin queries fall through to the existing scoring pipeline.
+    // ── Strict candidate selection — Hebrew first, translated fallback ───────
     let _bpFallback   = false;
     let _heStrictUsed = false;
-    if (queryLang === 'he') {
-      const _hsToks = normQ.split(/\s+/).filter(w => w.length > 0);
-      if (_hsToks.length >= 2) {
-        _heStrictUsed = true;  // Fix A: always own this path, even when bucket is empty
-        const _hsLead  = _hsToks.slice(0, -1);
-        const _hsLast  = _hsToks[_hsToks.length - 1];
-        const _hsMatch = field => {
-          if (!field) return false;
-          const fToks = field.toLowerCase().split(/\s+/);
-          return _hsLead.every(t => fToks.some(ft => ft === t)) &&
-                 fToks.some(ft => ft.startsWith(_hsLast));
-        };
-        const _heStrict = eligible.filter(p => _hsMatch(p.name) || _hsMatch(p.nameHe));
-        console.log(`[diag-bp-search #${_diagBpSearchSeq}] heStrict bucket=${_heStrict.length} of eligible=${eligible.length}`);
-        if (_heStrict.length > 0) {
-          _bpProducts = _heStrict
-            .map(p => ({ ...p, _s: _bpScore(p, normQ, queryLang, enQuery, queryBrand) }))
-            .sort(_stableSort)
-            .slice(0, 20)
-            .map(({ _s, ...p }) => p);
-          console.log(`[diag-bp-search #${_diagBpSearchSeq}] heStrict used, _bpProducts=${_bpProducts.length}`);
-          console.log('[search-quality]', { rawQuery, normalizedQuery: normQ, translatedQuery: enQuery, resultCount: _bpProducts.length, candidateCount: raw.length, heStrict: true, cacheHit: _cacheHit });
-        } else {
-          // Fix A: strict mode active but no matches → show empty, not garbage
-          _bpProducts = [];
-          console.log(`[diag-bp-search #${_diagBpSearchSeq}] heStrict empty — no results shown (fallthrough blocked)`);
-          console.log('[search-quality]', { rawQuery, normalizedQuery: normQ, translatedQuery: enQuery, resultCount: 0, candidateCount: raw.length, heStrict: true, emptyStrict: true, cacheHit: _cacheHit });
-        }
+
+    const _strictResult = bpSelectStrictCandidates(eligible, {
+      queryLang,
+      normQ,
+      enQuery,
+    });
+
+    _heStrictUsed = _strictResult.used;
+
+    if (_strictResult.used) {
+      const _strictCandidates = _strictResult.candidates;
+
+      console.log(
+        `[diag-bp-search #${_diagBpSearchSeq}] strict mode=${_strictResult.mode} ` +
+        `bucket=${_strictCandidates.length} of eligible=${eligible.length}`
+      );
+
+      if (_strictCandidates.length > 0) {
+        _bpProducts = _strictCandidates
+          .map(p => ({
+            ...p,
+            _s: _bpScore(p, normQ, queryLang, enQuery, queryBrand)
+          }))
+          .sort(_stableSort)
+          .slice(0, 20)
+          .map(({ _s, ...p }) => p);
+
+        console.log(
+          `[diag-bp-search #${_diagBpSearchSeq}] strict used ` +
+          `mode=${_strictResult.mode}, _bpProducts=${_bpProducts.length}`
+        );
+
+        console.log('[search-quality]', {
+          rawQuery,
+          normalizedQuery: normQ,
+          translatedQuery: enQuery,
+          resultCount: _bpProducts.length,
+          candidateCount: raw.length,
+          heStrict: true,
+          strictMode: _strictResult.mode,
+          cacheHit: _cacheHit
+        });
+      } else {
+        _bpProducts = [];
+
+        console.log(
+          `[diag-bp-search #${_diagBpSearchSeq}] strict empty — ` +
+          `no results shown (fallthrough blocked)`
+        );
+
+        console.log('[search-quality]', {
+          rawQuery,
+          normalizedQuery: normQ,
+          translatedQuery: enQuery,
+          resultCount: 0,
+          candidateCount: raw.length,
+          heStrict: true,
+          strictMode: 'empty',
+          emptyStrict: true,
+          cacheHit: _cacheHit
+        });
       }
     }
 
