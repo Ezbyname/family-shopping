@@ -35,6 +35,7 @@ await test('address + canonical city uses branch-address geocoding', () => {
   const plan = buildGeocodePlan({
     address: 'דיזנגוף 50',
     city: 'תל אביב -יפו',
+    cityResolutionSource: 'data.gov.il_localities_2023',
   });
 
   assertEqual(plan.mode, 'address', 'mode');
@@ -50,6 +51,7 @@ await test('missing address + canonical city falls back to city center', () => {
   const plan = buildGeocodePlan({
     address: '',
     city: 'אילת',
+    cityResolutionSource: 'data.gov.il_localities_2023',
   });
 
   assertEqual(plan.mode, 'city_center', 'mode');
@@ -61,9 +63,50 @@ await test('missing canonical city cannot be geocoded', () => {
   const plan = buildGeocodePlan({
     address: 'הרצל 1',
     city: '',
+    cityResolutionSource: 'unresolved',
   });
 
   assertEqual(plan, null, 'plan');
+});
+
+await test('numeric legacy locality code cannot be geocoded', () => {
+  const plan = buildGeocodePlan({
+    address: 'לחי 2',
+    city: '8300',
+  });
+
+  assertEqual(plan, null, 'numeric legacy city must be rejected');
+});
+
+await test('city without approved canonical resolution source cannot be geocoded', () => {
+  const plan = buildGeocodePlan({
+    address: 'יהודה הנשיא',
+    city: 'קריית טבעון',
+  });
+
+  assertEqual(plan, null, 'unverified city must be rejected');
+});
+
+await test('closed stores cannot be geocoded', () => {
+  const plan = buildGeocodePlan({
+    address: 'הזרם 12',
+    city: 'קדימה-צורן',
+    cityResolutionSource: 'data.gov.il_localities_2023',
+    status: 'closed',
+  });
+
+  assertEqual(plan, null, 'closed store must be rejected');
+});
+
+await test('possibly-closed stores cannot be geocoded', () => {
+  const plan = buildGeocodePlan({
+    address: 'גינת זבולון 24',
+    city: 'מודיעין-מכבים-רעות',
+    cityResolutionSource: 'data.gov.il_localities_2023',
+    status: 'possibly_closed',
+  });
+
+  assertEqual(plan, null, 'possibly-closed store must be rejected');
 });
 
 await test('exact geocode writes stores + storeCoords as exact', () => {
