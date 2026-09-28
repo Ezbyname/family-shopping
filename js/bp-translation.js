@@ -30,6 +30,13 @@ export const LEGACY_BP_HE_EN = {
   'שמן':'oil','שמן זית':'olive oil','סוכר':'sugar','דבש':'honey','מלח':'salt',
   'טחינה':'tahini','חומוס':'hummus','קטשופ':'ketchup','מיונז':'mayonnaise',
   'טונה':'tuna','קפה':'coffee','תה':'tea','מיץ':'juice','שוקולד':'chocolate',
+  // Preserve important search modifiers instead of collapsing them through
+  // the generic "קולה" substring/synonym fallback.
+  'קוקה קולה':'cola',
+  'קולה זירו':'cola zero',
+  'קולה zero':'cola zero',
+  'קוקה קולה זירו':'coca cola zero',
+  'קוקה קולה zero':'coca cola zero',
   'עוגיות':'cookies','במבה':'bamba','ביסלי':'bisli','גלידה':'ice cream',
   'עוף':'chicken','בשר':'beef','דג':'fish','עגבניות':'tomatoes',
   'מלפפון':'cucumber','בצל':'onion','שום':'garlic','גזר':'carrot',
@@ -46,7 +53,8 @@ export const LEGACY_BP_HE_EN = {
   'אקונומיקה':'bleach','מי ברז':'water',
   'תחתיות':'diapers','חיתולים':'diapers','טיטולים':'diapers',
   'פד':'pad','תחבושת':'sanitary pad',
-  'קרם שיניים':'toothpaste','מברשת שיניים':'toothbrush',
+  'משחת שיניים':'toothpaste','קרם שיניים':'toothpaste',
+  'מברשת שיניים':'toothbrush',
   'דאודורנט':'deodorant','קרם גוף':'body lotion','קרם פנים':'face cream',
   'תחבושת פלסטר':'bandage','כדורים':'pills',
   // kitchen & misc

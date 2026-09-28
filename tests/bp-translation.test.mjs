@@ -115,5 +115,50 @@ test('legacy canonical toothpaste translation remains covered', () => {
   );
 });
 
+
+// ── Search specificity regressions ───────────────────────────────────────────
+
+test('direct משחת שיניים query resolves to toothpaste', () => {
+  assert(
+    bpTranslate('משחת שיניים') === 'toothpaste',
+    `got ${JSON.stringify(bpTranslate('משחת שיניים'))}`
+  );
+});
+
+test('קוקה קולה without zero remains plain cola', () => {
+  assert(
+    bpTranslate('קוקה קולה') === 'cola',
+    `got ${JSON.stringify(bpTranslate('קוקה קולה'))}`
+  );
+});
+
+test('קולה זירו preserves zero modifier', () => {
+  assert(
+    bpTranslate('קולה זירו') === 'cola zero',
+    `got ${JSON.stringify(bpTranslate('קולה זירו'))}`
+  );
+});
+
+test('קולה zero preserves zero modifier', () => {
+  assert(
+    bpTranslate('קולה zero') === 'cola zero',
+    `got ${JSON.stringify(bpTranslate('קולה zero'))}`
+  );
+});
+
+test('קוקה קולה זירו preserves brand + zero modifier', () => {
+  assert(
+    bpTranslate('קוקה קולה זירו') === 'coca cola zero',
+    `got ${JSON.stringify(bpTranslate('קוקה קולה זירו'))}`
+  );
+});
+
+test('קוקה קולה zero preserves brand + zero modifier', () => {
+  assert(
+    bpTranslate('קוקה קולה zero') === 'coca cola zero',
+    `got ${JSON.stringify(bpTranslate('קוקה קולה zero'))}`
+  );
+});
+
 console.log(`\n${pass}/${pass + fail} passed`);
 if (fail) process.exitCode = 1;
