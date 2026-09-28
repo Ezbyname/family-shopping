@@ -14,6 +14,9 @@
 import { restGet, getDbUrl, getAdminToken, haversine, setCors, isValidBarcode, isValidPrice } from './_firebase.js';
 import { translateIngredient } from './_normalize-he.js';
 import { resolveLocality } from './_localityResolver.js';
+import { searchOpenFoodFacts } from './_openfoodfacts.js';
+import { buildSearchLkgKey } from './_search-lkg.js';
+import { resolveSearchWithLkg } from './_search-lkg-service.js';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const INIT_TIMEOUT_MS  = 8_000;   // admin token fetch budget
@@ -87,6 +90,29 @@ let _storeCacheExp = 0;
 // Test-only export — resets module-level cache between test runs.
 // Has no effect in production; Vercel only invokes the default export handler.
 export function _resetStoreCache() { _storeCache = null; _storeCacheExp = 0; }
+
+// Test-only Search LKG injection.
+// Production never calls this, so no persistent LKG reads/writes occur yet.
+let _searchLkgTestConfig = null;
+
+export function _setSearchLkgRepositoryForTests(
+  repository = null,
+  ttlMs = null
+) {
+  if (repository === null) {
+    _searchLkgTestConfig = null;
+    return;
+  }
+
+  if (!Number.isFinite(ttlMs) || ttlMs <= 0) {
+    throw new Error('positive LKG ttlMs required for test injection');
+  }
+
+  _searchLkgTestConfig = {
+    repository,
+    ttlMs,
+  };
+}
 
 async function getStoreIndex(dbUrl) {
   const now = Date.now();
@@ -369,11 +395,54 @@ export default async function handler(req, res) {
   try {
     const tInit = Date.now();
     // OFF search + token pre-warm in parallel
-    const [offProducts] = await Promise.all([
+    const [offSearch] = await Promise.all([
       searchOFF(query, en),
       getAdminToken().catch(() => {}),
     ]);
     timings.initMs = Date.now() - tInit;
+
+    const offProducts = offSearch.products;
+    const offPartialFailure =
+      offSearch.status === 'ok' &&
+      offSearch.batches.some(batch => batch.error !== null);
+
+    let searchProducts = offProducts;
+    let lkgResolution = null;
+
+    if (_searchLkgTestConfig) {
+      const lkgKey = buildSearchLkgKey({
+        normalizedQuery: normalizeProductText(query),
+        normalizedTranslatedQuery: normalizeProductText(en),
+      });
+
+      lkgResolution = await resolveSearchWithLkg({
+        repository: _searchLkgTestConfig.repository,
+        key: lkgKey,
+        current: {
+          status: offSearch.status,
+          partialFailure: offPartialFailure,
+          products: offProducts,
+        },
+        ttlMs: _searchLkgTestConfig.ttlMs,
+      });
+
+      searchProducts = lkgResolution.products;
+    }
+
+    if (offSearch.status === 'REMOTE_FAILURE') {
+      console.warn(JSON.stringify({
+        event: 'off_remote_failure',
+        query,
+        englishQuery: en,
+        errors: offSearch.batches
+          .filter(batch => batch.error !== null)
+          .map(batch => ({
+            strategy: batch.strategy,
+            error: batch.error,
+          })),
+        ts: new Date().toISOString(),
+      }));
+    }
 
     // Load store index once for radius filtering (search mode)
     let storeIndex = {};
@@ -385,7 +454,7 @@ export default async function handler(req, res) {
       } catch (_) {}
     }
 
-    const enriched = await Promise.all(offProducts.map(async p => {
+    const enriched = await Promise.all(searchProducts.map(async p => {
       if (!p.barcode || !isValidBarcode(p.barcode) || !dbUrl)
         return { ...p, prices: [], source: 'none' };
       const layered = await buildLayeredPrices(
@@ -452,6 +521,14 @@ export default async function handler(req, res) {
       version: '6.3.2', query, englishQuery: en,
       results, total: ranked.length,
       syncStatus,
+      offStatus: offSearch.status,
+      offPartialFailure,
+      ...(lkgResolution ? {
+        lkgSource: lkgResolution.source,
+        lkgDegraded: lkgResolution.degraded,
+        lkgRepositoryReadStatus: lkgResolution.repositoryReadStatus,
+        lkgMutationStatus: lkgResolution.mutationStatus,
+      } : {}),
     };
     if (isDebug) response.timings = timings;
     return res.status(200).json(response);
@@ -735,50 +812,52 @@ function buildCommunityWarning(reportsData, officialPrices) {
   return warnings.length > 0 ? warnings : null;
 }
 
-// ── Open Food Facts search — prefers Israeli products ─────────────────────────
+// ── Open Food Facts search — shared structured transport ──────────────────────
 async function searchOFF(hebrewQuery, englishQuery) {
-  const seen = new Set(), results = [];
-  const isHeb = isHebrew(hebrewQuery);
-  const FIELDS = 'product_name,product_name_he,brands,quantity,image_small_url,code,countries_tags';
-  const OFF    = 'https://world.openfoodfacts.org/cgi/search.pl';
-  const urls = [
-    // 1. Hebrew query with Israel filter — highest precision for Israeli products
-    isHeb ? `${OFF}?search_terms=${encodeURIComponent(hebrewQuery)}&search_simple=1&action=process&json=1&page_size=10&fields=${FIELDS}&tagtype_0=countries&tag_contains_0=contains&tag_0=israel` : null,
-    // 2. English query with Israel filter
-    `${OFF}?search_terms=${encodeURIComponent(englishQuery)}&search_simple=1&action=process&json=1&page_size=8&fields=${FIELDS}&tagtype_0=countries&tag_contains_0=contains&tag_0=israel`,
-    // 3. Hebrew query without filter — catches products with missing country tags
-    isHeb ? `${OFF}?search_terms=${encodeURIComponent(hebrewQuery)}&search_simple=1&action=process&json=1&page_size=8&fields=${FIELDS}` : null,
-    // 4. English query without filter — broadest fallback
-    `${OFF}?search_terms=${encodeURIComponent(englishQuery)}&search_simple=1&action=process&json=1&page_size=12&fields=${FIELDS}`,
-  ].filter(Boolean);
+  const off = await searchOpenFoodFacts({
+    q: hebrewQuery,
+    translatedQ: englishQuery,
+    pageSize: 10,
+  });
 
-  for (const url of urls) {
-    try {
-      const r = await fetch(url, {
-        headers: { 'User-Agent': 'FamilyShoppingIL/6.3' },
-        signal: AbortSignal.timeout(10_000),
+  const seen = new Set();
+  const products = [];
+
+  for (const batch of off.batches) {
+    for (const p of batch.products) {
+      const code = p.code || '';
+
+      if (code && seen.has(code)) continue;
+      if (code) seen.add(code);
+
+      const name = p.product_name_he || p.product_name || '';
+      if (!name) continue;
+
+      const isIsraeli = (p.countries_tags || [])
+        .some(country => country.includes('israel'));
+
+      products.push({
+        name,
+        brand: p.brands || '',
+        size: p.quantity || '',
+        image: p.image_small_url || '',
+        barcode: code,
+        isIsraeli,
+        prices: [],
+        source: 'none',
       });
-      if (!r.ok) continue;
-      const data = await r.json();
-      for (const p of data?.products || []) {
-        const code = p.code || '';
-        if (code && seen.has(code)) continue;
-        if (code) seen.add(code);
-        const name = p.product_name_he || p.product_name || '';
-        if (!name) continue;
-        const isIsraeli = (p.countries_tags || []).some(c => c.includes('israel'));
-        results.push({
-          name, brand: p.brands || '', size: p.quantity || '',
-          image: p.image_small_url || '', barcode: code,
-          isIsraeli, prices: [], source: 'none',
-        });
-      }
-      if (results.length >= 20) break;
-    } catch (e) {
-      console.warn('[OFF] search error:', e.message);
     }
   }
 
-  results.sort((a, b) => (b.isIsraeli ? 1 : 0) - (a.isIsraeli ? 1 : 0));
-  return results.slice(0, 12);
+  products.sort(
+    (a, b) =>
+      (b.isIsraeli ? 1 : 0) -
+      (a.isIsraeli ? 1 : 0)
+  );
+
+  return {
+    status: off.status,
+    batches: off.batches,
+    products: products.slice(0, 12),
+  };
 }
