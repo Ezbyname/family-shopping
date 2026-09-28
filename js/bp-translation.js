@@ -9,7 +9,11 @@
 //   5. Shared phrase/plural fallback — additional coverage only.
 
 import { CATALOG, SYNONYMS } from './ingredients-catalog.js';
-import { normalizeHe, translateIngredient } from './hebrew-product-translation.js';
+import {
+  normalizeHe,
+  translateIngredient,
+  unorderedPhraseScan,
+} from './hebrew-product-translation.js';
 
 export const LEGACY_BP_HE_EN = {
   'חלב':'milk',
@@ -94,38 +98,6 @@ function sharedExactOrSynonym(q) {
   return null;
 }
 
-function tokenSignature(q) {
-  return normalizeHe(q)
-    .split(/\s+/)
-    .filter(Boolean)
-    .sort()
-    .join('\u0000');
-}
-
-function sharedUnorderedMatch(q) {
-  const n = normalizeHe(q);
-  const qTokens = n.split(/\s+/).filter(Boolean);
-  if (qTokens.length < 2) return null;
-
-  const signature = tokenSignature(n);
-
-  for (const [hebrew, english] of CATALOG) {
-    const tokens = normalizeHe(hebrew).split(/\s+/).filter(Boolean);
-    if (tokens.length !== qTokens.length) continue;
-    if (tokenSignature(hebrew) === signature) return english;
-  }
-
-  for (const [variant, canonical] of SYNONYMS) {
-    const tokens = normalizeHe(variant).split(/\s+/).filter(Boolean);
-    if (tokens.length !== qTokens.length) continue;
-    if (tokenSignature(variant) !== signature) continue;
-
-    return CATALOG.get(canonical) || null;
-  }
-
-  return null;
-}
-
 export function bpTranslate(q) {
   const l = String(q || '').trim();
   if (!l) return null;
@@ -142,7 +114,7 @@ export function bpTranslate(q) {
   if (sharedExact) return sharedExact;
 
   // 3. Same canonical phrase with different word order.
-  const unordered = sharedUnorderedMatch(l);
+  const unordered = unorderedPhraseScan(l);
   if (unordered) return unordered;
 
   // 4. Preserve the old substring behaviour.

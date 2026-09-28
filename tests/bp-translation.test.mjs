@@ -3,6 +3,10 @@ import {
   LEGACY_BP_HE_EN,
 } from '../js/bp-translation.js';
 
+import {
+  translateIngredient,
+} from '../js/hebrew-product-translation.js';
+
 let pass = 0;
 let fail = 0;
 
@@ -57,6 +61,13 @@ test('שרי עגבניות is word-order resilient', () => {
   assert(
     bpTranslate('שרי עגבניות') === 'cherry tomatoes',
     `got ${JSON.stringify(bpTranslate('שרי עגבניות'))}`
+  );
+});
+
+test('shared backend translator is also word-order resilient', () => {
+  assert(
+    translateIngredient('שרי עגבניות') === 'cherry tomatoes',
+    `got ${JSON.stringify(translateIngredient('שרי עגבניות'))}`
   );
 });
 

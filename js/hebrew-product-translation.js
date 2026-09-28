@@ -7,9 +7,10 @@
 // Lookup order (translateIngredient):
 //   1. exact  → CATALOG
 //   2. synonym → SYNONYMS → CATALOG
-//   3. phrase  → contiguous-token scan on CATALOG keys, longest match wins
-//              ("מיץ תפוזים" matches before "מיץ"; "שמן זית" before "שמן")
-//   4. plural  → per-word suffix strip, stem must exist in CATALOG (safe, no garbage stems)
+//   3. unordered → exact multi-token knowledge with word-order resilience
+//   4. phrase    → contiguous-token scan on CATALOG keys, longest match wins
+//                ("מיץ תפוזים" matches before "מיץ"; "שמן זית" before "שמן")
+//   5. plural    → per-word suffix strip, stem must exist in CATALOG (safe, no garbage stems)
 //
 // Why phrase before plural:
 //   "מיץ תפוזים" must not singularize "תפוזים"→"תפוז" before the phrase is matched,
@@ -72,6 +73,42 @@ export function phraseScan(normalized) {
   return best;
 }
 
+function tokenSignature(q) {
+  return normalizeHe(q)
+    .split(/\s+/)
+    .filter(Boolean)
+    .sort()
+    .join('\u0000');
+}
+
+// Exact multi-token knowledge with word-order resilience.
+// Only matches entries with the same number of tokens and the exact same
+// normalized token set. It does NOT perform broad substring matching.
+export function unorderedPhraseScan(normalized) {
+  const n = normalizeHe(normalized);
+  const qTokens = n.split(/\s+/).filter(Boolean);
+
+  if (qTokens.length < 2) return null;
+
+  const signature = tokenSignature(n);
+
+  for (const [hebrew, english] of CATALOG) {
+    const tokens = normalizeHe(hebrew).split(/\s+/).filter(Boolean);
+    if (tokens.length !== qTokens.length) continue;
+    if (tokenSignature(hebrew) === signature) return english;
+  }
+
+  for (const [variant, canonical] of SYNONYMS) {
+    const tokens = normalizeHe(variant).split(/\s+/).filter(Boolean);
+    if (tokens.length !== qTokens.length) continue;
+    if (tokenSignature(variant) !== signature) continue;
+
+    return CATALOG.get(canonical) || null;
+  }
+
+  return null;
+}
+
 // Per-word plural suffix strip. Returns English value for the first word whose
 // de-suffixed stem exists in CATALOG. Never returns a stem not in CATALOG.
 // Tries both the raw stem and a final-letter-corrected stem, because Hebrew
@@ -113,10 +150,14 @@ export function translateIngredient(raw) {
     if (synEn) return synEn;
   }
 
-  // 3. Phrase (token-sequence, longest match, word-boundary safe)
+  // 3. Exact multi-token knowledge, independent of word order
+  const unordered = unorderedPhraseScan(n);
+  if (unordered) return unordered;
+
+  // 4. Phrase (token-sequence, longest match, word-boundary safe)
   const phrase = phraseScan(n);
   if (phrase) return phrase;
 
-  // 4. Plural strip (dictionary-backed, safe)
+  // 5. Plural strip (dictionary-backed, safe)
   return singularScan(n);
 }
