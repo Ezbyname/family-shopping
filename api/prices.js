@@ -17,6 +17,7 @@ import { resolveLocality } from './_localityResolver.js';
 import { searchOpenFoodFacts } from './_openfoodfacts.js';
 import { buildSearchLkgKey } from './_search-lkg.js';
 import { resolveSearchWithLkg } from './_search-lkg-service.js';
+import { createSearchLkgRuntime } from './_search-lkg-runtime.js';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const INIT_TIMEOUT_MS  = 8_000;   // admin token fetch budget
@@ -392,6 +393,29 @@ export default async function handler(req, res) {
 
   const dbUrl = getDbUrl();
 
+  // Persistent Search LKG runtime.
+  //
+  // Safety:
+  // - test injection has priority;
+  // - production runtime is constructed with the source-controlled hard gate;
+  // - while SEARCH_LKG_PERSISTENCE_APPROVED=false, this creates no repository
+  //   and performs no Search-LKG Firebase reads/writes.
+  const persistentLkgRuntime = _searchLkgTestConfig
+    ? null
+    : createSearchLkgRuntime({
+        dbUrl,
+        tokenProvider: getAdminToken,
+      });
+
+  const activeSearchLkgConfig =
+    _searchLkgTestConfig ||
+    (persistentLkgRuntime?.enabled
+      ? {
+          repository: persistentLkgRuntime.repository,
+          ttlMs: persistentLkgRuntime.ttlMs,
+        }
+      : null);
+
   try {
     const tInit = Date.now();
     // OFF search + token pre-warm in parallel
@@ -409,21 +433,21 @@ export default async function handler(req, res) {
     let searchProducts = offProducts;
     let lkgResolution = null;
 
-    if (_searchLkgTestConfig) {
+    if (activeSearchLkgConfig) {
       const lkgKey = buildSearchLkgKey({
         normalizedQuery: normalizeProductText(query),
         normalizedTranslatedQuery: normalizeProductText(en),
       });
 
       lkgResolution = await resolveSearchWithLkg({
-        repository: _searchLkgTestConfig.repository,
+        repository: activeSearchLkgConfig.repository,
         key: lkgKey,
         current: {
           status: offSearch.status,
           partialFailure: offPartialFailure,
           products: offProducts,
         },
-        ttlMs: _searchLkgTestConfig.ttlMs,
+        ttlMs: activeSearchLkgConfig.ttlMs,
       });
 
       searchProducts = lkgResolution.products;
