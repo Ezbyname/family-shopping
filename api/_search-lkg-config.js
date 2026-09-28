@@ -9,20 +9,37 @@
 
 const DEFAULT_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
+// HARD SAFETY GATE
+//
+// Persistent Search LKG access must remain disabled until explicitly approved.
+// Even if SEARCH_LKG_ENABLED=true already exists in a remote environment,
+// this source-controlled gate prevents activation.
+//
+// Change to true only in a separately reviewed/approved activation change.
+export const SEARCH_LKG_PERSISTENCE_APPROVED = false;
+
 function isExplicitlyEnabled(value) {
   const v = String(value ?? '').trim().toLowerCase();
   return v === '1' || v === 'true';
 }
 
 export function getSearchLkgConfig(env = process.env) {
-  const enabled = isExplicitlyEnabled(
+  const requested = isExplicitlyEnabled(
     env.SEARCH_LKG_ENABLED
   );
 
-  if (!enabled) {
+  if (!requested) {
     return {
       enabled: false,
       ttlMs: null,
+    };
+  }
+
+  if (!SEARCH_LKG_PERSISTENCE_APPROVED) {
+    return {
+      enabled: false,
+      ttlMs: null,
+      blockedByApprovalGate: true,
     };
   }
 

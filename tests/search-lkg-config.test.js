@@ -1,6 +1,6 @@
 import {
   getSearchLkgConfig,
-  SEARCH_LKG_DEFAULT_TTL_MS,
+  SEARCH_LKG_PERSISTENCE_APPROVED,
 } from '../api/_search-lkg-config.js';
 
 let passed = 0;
@@ -21,10 +21,16 @@ function eq(name, actual, expected) {
   }
 }
 
-console.log('\n── Search LKG runtime config ──');
+console.log('\n── Search LKG runtime config safety gate ──');
 
 eq(
-  '1. absent feature flag is disabled',
+  '1. source-controlled persistence approval is false',
+  SEARCH_LKG_PERSISTENCE_APPROVED,
+  false
+);
+
+eq(
+  '2. absent feature flag is disabled',
   getSearchLkgConfig({}),
   {
     enabled: false,
@@ -33,7 +39,7 @@ eq(
 );
 
 eq(
-  '2. false is disabled',
+  '3. explicit false is disabled',
   getSearchLkgConfig({
     SEARCH_LKG_ENABLED: 'false',
   }),
@@ -44,7 +50,7 @@ eq(
 );
 
 eq(
-  '3. zero is disabled',
+  '4. explicit zero is disabled',
   getSearchLkgConfig({
     SEARCH_LKG_ENABLED: '0',
   }),
@@ -55,54 +61,44 @@ eq(
 );
 
 eq(
-  '4. explicit true enables with conservative default TTL',
+  '5. remote true is blocked by source approval gate',
   getSearchLkgConfig({
     SEARCH_LKG_ENABLED: 'true',
   }),
   {
-    enabled: true,
-    ttlMs: SEARCH_LKG_DEFAULT_TTL_MS,
+    enabled: false,
+    ttlMs: null,
+    blockedByApprovalGate: true,
   }
 );
 
 eq(
-  '5. explicit 1 enables',
+  '6. remote 1 is blocked by source approval gate',
   getSearchLkgConfig({
     SEARCH_LKG_ENABLED: '1',
   }),
   {
-    enabled: true,
-    ttlMs: SEARCH_LKG_DEFAULT_TTL_MS,
+    enabled: false,
+    ttlMs: null,
+    blockedByApprovalGate: true,
   }
 );
 
 eq(
-  '6. configured positive TTL is accepted',
+  '7. valid TTL cannot bypass source approval gate',
   getSearchLkgConfig({
     SEARCH_LKG_ENABLED: 'true',
     SEARCH_LKG_TTL_MS: '3600000',
   }),
   {
-    enabled: true,
-    ttlMs: 3600000,
-  }
-);
-
-eq(
-  '7. zero TTL fail-closes the feature',
-  getSearchLkgConfig({
-    SEARCH_LKG_ENABLED: 'true',
-    SEARCH_LKG_TTL_MS: '0',
-  }),
-  {
     enabled: false,
     ttlMs: null,
-    error: 'invalid_search_lkg_ttl',
+    blockedByApprovalGate: true,
   }
 );
 
 eq(
-  '8. malformed TTL fail-closes the feature',
+  '8. malformed TTL cannot bypass source approval gate',
   getSearchLkgConfig({
     SEARCH_LKG_ENABLED: 'true',
     SEARCH_LKG_TTL_MS: 'banana',
@@ -110,7 +106,7 @@ eq(
   {
     enabled: false,
     ttlMs: null,
-    error: 'invalid_search_lkg_ttl',
+    blockedByApprovalGate: true,
   }
 );
 
