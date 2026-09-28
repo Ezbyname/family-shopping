@@ -93,6 +93,43 @@ test('translated strict rejects processed/composite names with too many extra to
   assert(got[0] === 'Cherry Tomatoes');
 });
 
+test('authoritative single-token translation accepts only exact single-token product', () => {
+  const result = bpSelectStrictCandidates([
+    {
+      name: 'Toothpaste',
+      nameHe: '',
+      nameEn: 'Toothpaste',
+    },
+    {
+      name: 'Multi Action Toothpaste',
+      nameHe: '',
+      nameEn: 'Multi Action Toothpaste',
+    },
+  ], {
+    queryLang: 'he',
+    normQ: 'משחת שיניים',
+    enQuery: 'toothpaste',
+  });
+
+  assert(result.used === true);
+  assert(
+    result.mode === 'translated',
+    `expected translated, got ${result.mode}`
+  );
+
+  const got = names(result);
+
+  assert(
+    got.length === 1,
+    `expected exactly 1 candidate, got ${got.length}: ${got.join(' | ')}`
+  );
+
+  assert(
+    got[0] === 'Toothpaste',
+    `expected exact Toothpaste candidate, got ${got.join(' | ')}`
+  );
+});
+
 test('single-token broad translation does NOT open English fallback', () => {
   const result = bpSelectStrictCandidates([
     { name: 'Instant Coffee', nameHe: '', nameEn: 'Instant Coffee' },

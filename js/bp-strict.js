@@ -38,9 +38,17 @@ function translatedStrictMatch(nameEn, enQuery) {
   const qTokens = [...new Set(englishTokens(enQuery))];
   const nTokens = [...new Set(englishTokens(nameEn))];
 
-  // Safety gate: a broad one-word translation is not specific enough
-  // to replace a 2+ token Hebrew query.
-  if (qTokens.length < 2 || !nTokens.length) return false;
+  if (!qTokens.length || !nTokens.length) return false;
+
+  // A one-word English translation can still be authoritative for a
+  // multi-word Hebrew query (e.g. "משחת שיניים" -> "toothpaste").
+  // Keep this path extremely narrow: only an exact single-token product
+  // name may match. This intentionally rejects broader products such as
+  // "Instant Coffee" for "קפה שחור" -> "coffee".
+  if (qTokens.length === 1) {
+    return nTokens.length === 1 &&
+           englishTokenMatch(qTokens[0], nTokens[0]);
+  }
 
   const allQueryTokensMatch = qTokens.every(qt =>
     nTokens.some(nt => englishTokenMatch(qt, nt))

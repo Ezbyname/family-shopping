@@ -257,6 +257,47 @@ assert(
   translateIngredient('טלה') === 'lamb'
 );
 
+// Main Search specificity regressions
+assert(
+  'משחת שיניים → toothpaste',
+  translateIngredient('משחת שיניים') === 'toothpaste'
+);
+
+assert(
+  'קרם שיניים → toothpaste',
+  translateIngredient('קרם שיניים') === 'toothpaste'
+);
+
+assert(
+  'קולה זירו → cola zero',
+  translateIngredient('קולה זירו') === 'cola zero'
+);
+
+assert(
+  'קולה zero → cola zero',
+  translateIngredient('קולה zero') === 'cola zero'
+);
+
+assert(
+  'קוקה קולה זירו → coca cola zero',
+  translateIngredient('קוקה קולה זירו') === 'coca cola zero'
+);
+
+assert(
+  'קוקה קולה zero → coca cola zero',
+  translateIngredient('קוקה קולה zero') === 'coca cola zero'
+);
+
+assert(
+  'מים מינרלים → mineral water',
+  translateIngredient('מים מינרלים') === 'mineral water'
+);
+
+assert(
+  'מים מינרליים → mineral water',
+  translateIngredient('מים מינרליים') === 'mineral water'
+);
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log('\n' + '─'.repeat(60));
 console.log(`Catalog:  ${CATALOG.size} canonical entries`);

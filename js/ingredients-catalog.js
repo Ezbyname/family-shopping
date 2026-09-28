@@ -323,6 +323,8 @@ export const CATALOG = new Map([
   ['שייק',             'shake'],
   ['שייק חלב',         'milkshake'],
   ['קולה',             'cola'],
+  ['קולה זירו',        'cola zero'],
+  ['קוקה קולה זירו',   'coca cola zero'],
   ['לימונדה',          'lemonade'],
   ['אנרגיה',           'energy drink'],
   // ── Meat & Fish ────────────────────────────────────────────────────────────
@@ -385,6 +387,7 @@ export const CATALOG = new Map([
   ['סבון',             'soap'],
   ['סבון ידיים',       'hand soap'],
   ['סבון גוף',         'body wash'],
+  ['משחת שיניים',      'toothpaste'],
   ['שמפו',             'shampoo'],
   ['מרכך שיער',        'conditioner'],
   ['אבקת כביסה',       'laundry detergent'],
@@ -400,6 +403,7 @@ export const CATALOG = new Map([
 // brand-influenced names, and common aliases → canonical key in CATALOG.
 // All keys should be pre-normalized (no quotes, no apostrophes — see normalize-he.js).
 export const SYNONYMS = new Map([
+  ['קרם שיניים',      'משחת שיניים'],
   // ── Dairy synonyms ─────────────────────────────────────────────────────────
   ['חלב פרה',          'חלב'],
   ['חלב טרי',          'חלב'],
@@ -648,6 +652,7 @@ export const SYNONYMS = new Map([
   ['רויבוס',           'תה צמחים'],
   ['קמומיל',           'תה קמומיל'],
   ['כתית',             'מים מינרלים'],
+  ['מים מינרליים',    'מים מינרלים'],
   ['מים טבעיים',       'מים מינרלים'],
   ['מים בקבוק',        'מים מינרלים'],
   ['מים גזים',         'מים מוגזים'],
@@ -660,7 +665,8 @@ export const SYNONYMS = new Map([
   ['מיץ גזר',          'מיץ גזר'],
   ['מיץ אשכולית',      'מיץ אשכולית'],
   ['מיצים',            'מיץ'],
-  ['קולה זירו',        'קולה'],
+  ['קולה zero',        'קולה זירו'],
+  ['קוקה קולה zero',   'קוקה קולה זירו'],
   ['פפסי',             'קולה'],
   ['ספרייט',           'סודה'],
   ['פנטה',             'סודה'],
