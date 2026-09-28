@@ -13,8 +13,8 @@
  *   - Cross-check: every SYNONYM value must point to a valid CATALOG key
  */
 
-import { CATALOG, SYNONYMS } from '../api/ingredients.js';
-import { translateIngredient, normalizeHe, phraseScan, singularScan } from '../api/normalize-he.js';
+import { CATALOG, SYNONYMS } from '../api/_ingredients.js';
+import { translateIngredient, normalizeHe, phraseScan, singularScan } from '../api/_normalize-he.js';
 
 let passed = 0, failed = 0;
 
@@ -244,6 +244,17 @@ assert(
 assert(
   'חלב → exact path',
   translateIngredient('חלב') === 'milk'
+);
+
+// Lamb terminology regressions
+assert(
+  'בשר טלה → lamb',
+  translateIngredient('בשר טלה') === 'lamb'
+);
+
+assert(
+  'טלה → lamb',
+  translateIngredient('טלה') === 'lamb'
 );
 
 // ── Summary ───────────────────────────────────────────────────────────────────

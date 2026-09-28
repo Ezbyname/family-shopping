@@ -1,6 +1,6 @@
 // Local coverage + translation-audit script (no network needed)
-import { CATALOG, SYNONYMS } from '../api/ingredients.js';
-import { translateIngredient } from '../api/normalize-he.js';
+import { CATALOG, SYNONYMS } from '../api/_ingredients.js';
+import { translateIngredient } from '../api/_normalize-he.js';
 
 // 30 harness queries + expected tokens (same as search-quality.mjs)
 const TRUTH = [

@@ -24,8 +24,8 @@
  *   2 = error
  */
 
-import { CATALOG, SYNONYMS } from '../api/ingredients.js';
-import { translateIngredient } from '../api/normalize-he.js';
+import { CATALOG, SYNONYMS } from '../api/_ingredients.js';
+import { translateIngredient } from '../api/_normalize-he.js';
 import { readFileSync, readdirSync } from 'fs';
 
 const BASE          = process.env.BASE || '';
