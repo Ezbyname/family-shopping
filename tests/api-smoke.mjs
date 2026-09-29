@@ -345,6 +345,45 @@ function isExpectedExternalDataGap(tc, picker, raw) {
   );
 }
 
+function pickerResponseIsUsable(tc, data, translated) {
+  if (data?.status !== 'ok') return false;
+  if (!Array.isArray(data?.batches)) return false;
+
+  const raw = [];
+  bpConsumeBatches(data.batches, new Set(), raw, 'he');
+
+  // A specifically-approved external data gap is a valid completed
+  // response for retry purposes. It will still be reported as DATA GAP
+  // later and is never counted as PASS.
+  if (isExpectedExternalDataGap(tc, data, raw)) {
+    return true;
+  }
+
+  if (raw.length === 0) return false;
+
+  const strict = bpSelectStrictCandidates(raw, {
+    queryLang: 'he',
+    normQ: tc.query,
+    enQuery: translated,
+  });
+
+  if (tc.strict) {
+    if (!strict.used || strict.candidates.length === 0) {
+      return false;
+    }
+
+    return strict.candidates.some(product =>
+      tc.relevant(productText(product))
+    );
+  }
+
+  if (strict.used) return false;
+
+  return raw.some(product =>
+    tc.relevant(productText(product))
+  );
+}
+
 function vercelCurl(url) {
   const out = execFileSync(
     'npx',
@@ -447,7 +486,7 @@ for (const tc of cases) {
 
     const picker = await fetchWithRetry(
       pickerUrl,
-      data => data?.status === 'ok',
+      data => pickerResponseIsUsable(tc, data, translated),
       `picker ${tc.query}`
     );
 
