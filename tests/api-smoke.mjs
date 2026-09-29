@@ -398,38 +398,140 @@ function vercelCurl(url) {
   return JSON.parse(out.trim());
 }
 
+const TRANSIENT_OFF_ERRORS = new Set([
+  'off_http_5xx',
+  'off_timeout',
+  'off_network',
+]);
+
+const TRANSIENT_REQUEST_ERRORS = new Set([
+  'ETIMEDOUT',
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'EAI_AGAIN',
+  'ENETUNREACH',
+  'EHOSTUNREACH',
+]);
+
+function transientSignalsForAttempt(item) {
+  const signals = new Set();
+
+  if (item?.error) {
+    const code = item.error?.code;
+
+    // Only explicit timeout/network failures are accepted as direct
+    // evidence of external instability. Generic exceptions remain FAIL.
+    if (TRANSIENT_REQUEST_ERRORS.has(code)) {
+      signals.add(`request_${String(code).toLowerCase()}`);
+    }
+
+    return [...signals];
+  }
+
+  const data = item?.data;
+  if (!data) return [];
+
+  if (
+    data?.status === 'REMOTE_FAILURE' ||
+    data?.offStatus === 'REMOTE_FAILURE'
+  ) {
+    signals.add('off_remote_failure');
+  }
+
+  if (data?.offPartialFailure === true) {
+    signals.add('off_partial_failure');
+  }
+
+  if (Array.isArray(data?.batches)) {
+    for (const batch of data.batches) {
+      if (TRANSIENT_OFF_ERRORS.has(batch?.error)) {
+        signals.add(batch.error);
+      }
+    }
+  }
+
+  return [...signals];
+}
+
+function externalInstabilitySignals(attempts) {
+  const failedAttempts = attempts.filter(
+    item => item?.accepted !== true
+  );
+
+  if (failedAttempts.length === 0) return [];
+
+  const signalsByAttempt = failedAttempts.map(
+    transientSignalsForAttempt
+  );
+
+  // Hard safety rule:
+  // Never downgrade a deterministic failure just because some other
+  // retry happened to encounter a transient upstream problem.
+  //
+  // External instability is reported only when EVERY unsuccessful
+  // attempt contains direct transient/upstream-failure evidence.
+  if (signalsByAttempt.some(signals => signals.length === 0)) {
+    return [];
+  }
+
+  return [...new Set(signalsByAttempt.flat())];
+}
+
 async function fetchWithRetry(url, accept, label) {
   let last = null;
   let lastError = null;
+  const attempts = [];
 
   for (let attempt = 1; attempt <= 5; attempt++) {
     try {
       last = vercelCurl(url);
       lastError = null;
 
-      if (accept(last)) {
+      const accepted = Boolean(accept(last));
+
+      attempts.push({
+        attempt,
+        data: last,
+        accepted,
+      });
+
+      if (accepted) {
         if (attempt > 1) {
           console.log(`    recovered on attempt ${attempt}: ${label}`);
         }
-        return last;
+
+        return {
+          data: last,
+          attempts,
+          accepted: true,
+          terminalError: null,
+        };
       }
     } catch (e) {
       lastError = e;
+
+      attempts.push({
+        attempt,
+        error: e,
+        accepted: false,
+      });
     }
 
     if (attempt < 5) await sleep(2000);
   }
 
-  if (lastError) {
-    throw new Error(`${label}: request failed: ${lastError.message}`);
-  }
-
-  return last;
+  return {
+    data: last,
+    attempts,
+    accepted: false,
+    terminalError: lastError,
+  };
 }
 
 let passed = 0;
 let failed = 0;
 let dataGaps = 0;
+let externalInstabilities = 0;
 
 function assert(cond, message) {
   if (!cond) throw new Error(message);
@@ -450,12 +552,15 @@ function recordGroup(group, outcome) {
     passed: 0,
     failed: 0,
     dataGap: 0,
+    externalInstability: 0,
   };
 
   if (outcome === 'passed') {
     current.passed++;
   } else if (outcome === 'dataGap') {
     current.dataGap++;
+  } else if (outcome === 'externalInstability') {
+    current.externalInstability++;
   } else {
     current.failed++;
   }
@@ -484,11 +589,37 @@ for (const tc of cases) {
       `&translatedQ=${encodeURIComponent(translated)}` +
       `&pageSize=40`;
 
-    const picker = await fetchWithRetry(
+    const pickerRetry = await fetchWithRetry(
       pickerUrl,
       data => pickerResponseIsUsable(tc, data, translated),
       `picker ${tc.query}`
     );
+
+    const picker = pickerRetry.data;
+
+    if (!pickerRetry.accepted) {
+      const signals =
+        externalInstabilitySignals(pickerRetry.attempts);
+
+      if (signals.length > 0) {
+        console.log(
+          `  EXTERNAL INSTABILITY ${tc.query}: picker could not produce ` +
+          `a semantically usable result after 5 attempts; ` +
+          `signals=${signals.join(',')}`
+        );
+
+        externalInstabilities++;
+        recordGroup(tc.group, 'externalInstability');
+        continue;
+      }
+
+      if (pickerRetry.terminalError && !picker) {
+        throw new Error(
+          `picker ${tc.query}: request failed: ` +
+          pickerRetry.terminalError.message
+        );
+      }
+    }
 
     assert(
       picker?.status === 'ok',
@@ -575,11 +706,36 @@ for (const tc of cases) {
     const mainUrl =
       `${baseUrl}/api/prices?q=${encodeURIComponent(tc.query)}`;
 
-    const main = await fetchWithRetry(
+    const mainRetry = await fetchWithRetry(
       mainUrl,
       data => Array.isArray(data?.results) && data.results.length > 0,
       `main search ${tc.query}`
     );
+
+    const main = mainRetry.data;
+
+    if (!mainRetry.accepted) {
+      const signals =
+        externalInstabilitySignals(mainRetry.attempts);
+
+      if (signals.length > 0) {
+        console.log(
+          `  EXTERNAL INSTABILITY ${tc.query}: main search could not produce ` +
+          `results after 5 attempts; signals=${signals.join(',')}`
+        );
+
+        externalInstabilities++;
+        recordGroup(tc.group, 'externalInstability');
+        continue;
+      }
+
+      if (mainRetry.terminalError && !main) {
+        throw new Error(
+          `main search ${tc.query}: request failed: ` +
+          mainRetry.terminalError.message
+        );
+      }
+    }
 
     const expectedMainTranslations =
       tc.expectedMainTranslations || [tc.expectedTranslation];
@@ -631,11 +787,18 @@ for (const tc of cases) {
 console.log('\n===== COVERAGE SUMMARY =====');
 
 for (const [group, stats] of groupStats.entries()) {
-  const total = stats.passed + stats.failed + stats.dataGap;
+  const total =
+    stats.passed +
+    stats.failed +
+    stats.dataGap +
+    stats.externalInstability;
 
   const details = [
     stats.failed ? `${stats.failed} failed` : '',
     stats.dataGap ? `${stats.dataGap} data gap` : '',
+    stats.externalInstability
+      ? `${stats.externalInstability} external instability`
+      : '',
   ].filter(Boolean);
 
   console.log(
@@ -646,12 +809,24 @@ for (const [group, stats] of groupStats.entries()) {
 
 console.log(
   `\nAPI smoke: ${passed} passed, ${dataGaps} data gap(s), ` +
+  `${externalInstabilities} external instability case(s), ` +
   `${failed} failed / ${cases.length} total`
 );
 
 if (failed) {
   console.error(
-    `API smoke FAILED: ${failed} release-gate case(s) failed`
+    `API smoke FAILED: ${failed} release-gate case(s) failed` +
+    (
+      externalInstabilities
+        ? `; ${externalInstabilities} external instability case(s)`
+        : ''
+    )
+  );
+  process.exitCode = 1;
+} else if (externalInstabilities) {
+  console.error(
+    `API smoke INCONCLUSIVE: ${externalInstabilities} external ` +
+    'instability case(s) prevented a clean release-gate result'
   );
   process.exitCode = 1;
 } else if (dataGaps) {
