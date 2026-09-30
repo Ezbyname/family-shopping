@@ -1,4 +1,5 @@
 import { pdHasLoc as _pdHasLocFn, pdInitialMode, pdEffectiveRadius as pdEffR, pdCacheKey as pdCKFn, pdRowEligible, pdBuildRequestUrl, pdExtractRows, pdNameFallbackUrl, pdShouldUseFallback } from './js/pd-location.js';
+import { restoreNearbyState, buildPriceQueryScope } from './js/nearby-state.js';
 import { bpSelectName, bpConsumeBatches, bpFetchCorpus } from './js/bp-search.js';
 import { bpTranslate } from './js/bp-translation.js';
 import { bpSelectStrictCandidates } from './js/bp-strict.js';
@@ -1057,16 +1058,28 @@ const _hasLoc    = () => Boolean(_nearbyMode && _selectedLocation?.lat);
 const _pdHasLoc  = () => _pdHasLocFn(_selectedLocation);
 
 (function _initNearbyState() {
-  const r = parseInt(localStorage.getItem('nearbyRadius') || '3', 10);
-  if ([1,3,5,10,25,50].includes(r)) _nearbyRadius = r;
-  try {
-    const sl = localStorage.getItem('selectedLocation');
-    if (sl) _selectedLocation = JSON.parse(sl);
-  } catch (_) {}
+  const restored = restoreNearbyState({
+    nearbyMode:       localStorage.getItem('nearbyMode')       ?? undefined,
+    nearbyRadius:     localStorage.getItem('nearbyRadius')     ?? undefined,
+    selectedLocation: localStorage.getItem('selectedLocation') ?? undefined,
+  });
+  _nearbyMode       = restored.nearbyMode;
+  _nearbyRadius     = restored.nearbyRadius;
+  _selectedLocation = restored.selectedLocation;
+  _radiusExplicitlySet = localStorage.getItem('nearbyRadius') !== null;
+
+  // Flush LS price-cache entries that were saved under nationwide scope
+  // so chips re-fetch with radius params on the first render of this session.
+  if (restored.needsCacheFlush) _pcClearAllLS();
+
   try {
     const rl = localStorage.getItem('recentLocations');
     if (rl) _recentLocations = JSON.parse(rl);
   } catch (_) {}
+
+  // _syncNearbyUI() requires DOM elements that don't exist yet at module-parse
+  // time. Defer to the next microtask so the document is fully set up.
+  setTimeout(_syncNearbyUI, 0);
 })();
 
 function _syncNearbyUI() {
@@ -1114,8 +1127,17 @@ window.toggleNearbyMode = function() {
     return;
   }
   _nearbyMode = !_nearbyMode;
+  try {
+    if (_nearbyMode) localStorage.setItem('nearbyMode', 'true');
+    else             localStorage.removeItem('nearbyMode');
+  } catch(_) {}
+  // Mode change invalidates all cached prices: scope changes from nationwide ↔ radius-filtered.
+  // Both in-memory and LS caches must be flushed so chips re-fetch under the new scope.
+  Object.keys(_priceCache).forEach(k => delete _priceCache[k]);
+  _pcClearAllLS();
   _syncNearbyUI();
   if (_nearbyMode && !_hasLoc()) toggleLocDropdown();
+  else if (curTab === 'all') setTimeout(loadItemPricesInBackground, 80);
 };
 
 window.setNearbyRadius = function(km) {
@@ -1141,12 +1163,19 @@ function _setLocation(loc) {
   }
 }
 
-// Clear the active location
+// Clear the active location — also disables nearby mode since there is no location to filter by
 window.clearLocation = function() {
   _selectedLocation = null;
-  try { localStorage.removeItem('selectedLocation'); } catch(_) {}
+  _nearbyMode = false;
+  try {
+    localStorage.removeItem('selectedLocation');
+    localStorage.removeItem('nearbyMode');
+  } catch(_) {}
+  Object.keys(_priceCache).forEach(k => delete _priceCache[k]);
+  _pcClearAllLS();
   _syncNearbyUI();
   if (lastSearchQuery) searchPrices();
+  if (curTab === 'all') setTimeout(loadItemPricesInBackground, 80);
 };
 
 // Save a manual location to recent list (max 5, deduped by address or label)
@@ -6688,6 +6717,13 @@ function _pcInvalidate(barcode) {
   delete _priceCache[barcode];
   try { localStorage.removeItem(_pcKey(barcode)); } catch(_) {}
 }
+function _pcClearAllLS() {
+  try {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('pc_'))
+      .forEach(k => localStorage.removeItem(k));
+  } catch(_) {}
+}
 
 // Fetch prices for a barcode, using cache when available.
 // Returns { prices, ts, fromCache, stale? } or null on total failure.
@@ -6705,7 +6741,7 @@ async function _fetchPricesForBarcode(barcode) {
     let url = `/api/prices?barcode=${encodeURIComponent(barcode)}`;
     if (myId)    url += `&userId=${encodeURIComponent(myId)}`;
     if (groupId) url += `&groupId=${encodeURIComponent(groupId)}`;
-    if (_hasLoc()) url += `&lat=${_locLat()}&lng=${_locLng()}&radiusKm=${_nearbyRadius}&includeApproximate=true`;
+    url += buildPriceQueryScope(_nearbyMode, _selectedLocation, _nearbyRadius);
     const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
