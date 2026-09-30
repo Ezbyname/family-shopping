@@ -2,16 +2,17 @@
 // Rami Levy price sync — Phase 3 importer.
 // Called from index.js via chain.syncModule when chain.id === 'rami-levy'.
 
-import { createReadStream, createWriteStream, statSync } from 'fs';
+import { createReadStream, createWriteStream, statSync, openSync, readSync, closeSync } from 'fs';
 import { unlink }   from 'fs/promises';
 import { pipeline } from 'stream/promises';
 import { createGunzip } from 'zlib';
-import { Transform } from 'stream';
+import { Transform, PassThrough } from 'stream';
 import { TextDecoder } from 'util';
 import { tmpdir }   from 'os';
 import { join }     from 'path';
 import https        from 'https';
-import { execFile } from 'child_process';
+import { execFile, execFileSync, spawn } from 'child_process';
+import { detectFormatFromBytes, FORMAT } from './detectFormat.js';
 
 const SSL_AGENT = new https.Agent({ rejectUnauthorized: false });
 
@@ -26,6 +27,90 @@ import { logger }                 from './logger.js';
 
 const DOWNLOAD_TIMEOUT = 120_000;
 
+function readMagicBytes(filePath, n) {
+  const buf = Buffer.alloc(n);
+  const fd = openSync(filePath, 'r');
+  try { readSync(fd, buf, 0, n, 0); } finally { closeSync(fd); }
+  return buf;
+}
+
+function extractZipXml(tmpFile, filename) {
+  const pt = new PassThrough();
+  let listing = [];
+  try {
+    listing = execFileSync('unzip', ['-Z1', tmpFile])
+      .toString().trim().split('\n').map(e => e.trim()).filter(Boolean);
+  } catch (err) {
+    process.nextTick(() =>
+      pt.destroy(new Error(`ZIP listing failed for ${filename}: ${err.message}`)));
+    return pt;
+  }
+  const xmlEntries = listing.filter(e => /\.xml$/i.test(e));
+  if (xmlEntries.length === 0) {
+    process.nextTick(() =>
+      pt.destroy(new Error(
+        `ZIP contains no XML entries: ${filename} (entries: ${listing.join(', ') || 'none'})`)));
+    return pt;
+  }
+  if (xmlEntries.length > 1) {
+    process.nextTick(() =>
+      pt.destroy(new Error(
+        `ZIP contains multiple XML entries — ambiguous: ${filename} (${xmlEntries.join(', ')})`)));
+    return pt;
+  }
+  const xmlEntry = xmlEntries[0];
+  const stderrChunks = [];
+  const proc = spawn('unzip', ['-p', tmpFile, xmlEntry]);
+  // { end: false } so that stdout EOF does not auto-end pt — the close handler controls it
+  proc.stdout.pipe(pt, { end: false });
+  proc.stderr.on('data', chunk => stderrChunks.push(chunk));
+  proc.on('close', (code) => {
+    if (code !== 0) {
+      const stderr = Buffer.concat(stderrChunks).toString().trim();
+      pt.destroy(new Error(
+        `unzip failed (exit ${code}) for ${xmlEntry}${stderr ? ': ' + stderr : ''}`));
+    } else {
+      pt.end();
+    }
+  });
+  proc.on('error', (err) => pt.destroy(err));
+  return pt;
+}
+
+export function openDecompressedStream(tmpFile, filename, label) {
+  const header = readMagicBytes(tmpFile, 16);
+  const detectedFormat = detectFormatFromBytes(header);
+  const hexBytes = Array.from(header.slice(0, 4)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+  logger.info('[rami-levy] Format detected', { label, filename, detectedFormat, bytes: hexBytes });
+  const cleanup = () => unlink(tmpFile).catch(() => {});
+  let outStream;
+  if (detectedFormat === FORMAT.GZIP) {
+    const gz = createGunzip();
+    createReadStream(tmpFile).pipe(gz);
+    outStream = gz;
+  } else if (detectedFormat === FORMAT.ZIP) {
+    try {
+      outStream = extractZipXml(tmpFile, filename);
+    } catch (syncErr) {
+      cleanup();
+      throw syncErr;
+    }
+  } else if (detectedFormat === FORMAT.XML) {
+    outStream = createReadStream(tmpFile);
+  } else {
+    // UNKNOWN — reject immediately; do not pass binary garbage to XML parser
+    const pt = new PassThrough();
+    process.nextTick(() =>
+      pt.destroy(new Error(
+        `Unsupported Rami Levy price file format: filename=${filename} magic=${hexBytes}`)));
+    outStream = pt;
+  }
+  outStream.on('end', cleanup);
+  outStream.on('close', cleanup);
+  outStream.on('error', cleanup);
+  return outStream;
+}
+
 async function downloadFTP(url, label, timeoutMs) {
   const filename = url.split('/').pop();
   const tmpFile = join(tmpdir(), 'rl-' + Date.now() + '.tmp');
@@ -37,12 +122,7 @@ async function downloadFTP(url, label, timeoutMs) {
   const size = statSync(tmpFile).size;
   if (size < 100) throw new Error('File too small (' + size + ' bytes)');
   logger.info('[rami-levy] Downloaded ' + label, { bytes: size });
-  const fileStream = createReadStream(tmpFile);
-  const isGz = /\.gz$/i.test(filename);
-  const outStream = isGz ? fileStream.pipe(createGunzip()) : fileStream;
-  const cleanup = () => unlink(tmpFile).catch(() => {});
-  outStream.on('end', cleanup); outStream.on('close', cleanup); outStream.on('error', cleanup);
-  return outStream;
+  return openDecompressedStream(tmpFile, filename, label);
 }
 
 
@@ -286,7 +366,7 @@ export async function sync(chain, writer, config) {
 
       logger.ok(`${storeLabel} Done`, { items: count, skipped, errors });
     } catch (err) {
-      logger.warn(`${storeLabel} Failed (isolated)`, { error: err.message });
+      logger.warn(`${storeLabel} Failed (isolated)`, { storeId, filename: fileInfo.filename, error: err.message });
       result.errors++;
     }
   }
