@@ -1475,13 +1475,13 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
 .price-chip-area{min-height:0;overflow:hidden;display:block}
 .price-chip-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .price-chip-chain{font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.price-chip-price{font-size:12px;font-weight:800}
+.price-chip-price{font-size:12px;font-weight:800;flex-shrink:0;white-space:nowrap}
 .price-chip-qty{font-size:10px;opacity:.6}
 .price-chip-more{font-size:9px;opacity:.6;border-right:1px solid currentColor;padding-right:4px;margin-right:0}
 .price-chip-dist{font-size:9px;opacity:.65;white-space:nowrap;border-right:1px solid currentColor;padding-right:4px;margin-right:0}
 .price-chip{display:inline-flex;align-items:center;gap:4px;margin-top:5px;cursor:pointer;
   border-radius:8px;padding:3px 9px;font-family:'Rubik',sans-serif;
-  font-size:11px;font-weight:700;transition:all .15s;max-width:250px;
+  font-size:11px;font-weight:700;transition:all .15s;max-width:min(250px,100%);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   background:var(--card2);border:1px solid var(--border);color:var(--text);}
 .price-chip:active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
@@ -1492,6 +1492,24 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
   border-radius:9px;
   background:linear-gradient(90deg,var(--card2) 25%,rgba(255,255,255,.08) 50%,var(--card2) 75%);
   background-size:200% 100%;animation:shimmer 1.4s ease infinite}
+
+/* ── List item card: grid layout so the price chip gets its own full-width row ──
+   Fixes the price clipped to a trailing "0" when .item-body was squeezed to ~50px
+   (flat list + drag handle at 360px). display:contents lets the chip span the card. */
+.item-card{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto auto;align-items:center;gap:0}
+.item-body{display:contents}
+.item-card>.ip-tile-wrap,.item-card>.ip-tile{grid-column:1;grid-row:1/span 3}
+.item-card>.pending-tag,.item-card>.bought-tag{grid-column:3;grid-row:1/span 3}
+.item-card>.item-acts{grid-column:4;grid-row:1/span 3}
+.item-card>.drag-handle{grid-column:5;grid-row:1/span 3}
+.item-body .item-name{grid-column:2;grid-row:1}
+.item-body .item-attribution{grid-column:2;grid-row:2}
+.item-body .qty-row{grid-column:2;grid-row:3}
+.item-body .price-chip-area{grid-column:1/-1;grid-row:4}
+/* replaces flex gap: spacing only between items that actually exist */
+.item-card>.pending-tag,.item-card>.bought-tag,.item-card>.item-acts,.item-card>.drag-handle{margin-inline-start:9px}
+.ip-tile-wrap~.item-body .item-name,.ip-tile-wrap~.item-body .item-attribution,.ip-tile-wrap~.item-body .qty-row,
+.ip-tile~.item-body .item-name,.ip-tile~.item-body .item-attribution,.ip-tile~.item-body .qty-row{margin-inline-start:9px}
 
 /* ══ PRICE DETAIL BOTTOM SHEET ══ */
 .pd-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);
