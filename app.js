@@ -23,7 +23,7 @@ const db  = getDatabase(app);
 // ── APP VERSION ────────────────────────────────────────────────────────────
 // Single source of truth for the frontend build. BUMP on every shipped fix so
 // "which build am I running?" is answerable from the UI (group/settings sheet).
-const APP_VERSION = '3.2.0';   // 2026-09: department grouping mode (Stage 4)
+const APP_VERSION = '3.2.1';   // 2026-10: price chip no longer clipped (grid footer layout)
 
 // ── DEPARTMENT GROUPING (Stage 4) ──────────────────────────────────────────
 import { DEPARTMENTS, DEPT_OVERRIDES, DEPT_KEYWORDS, _normText, getItemDepartment } from './js/product-taxonomy.js';
