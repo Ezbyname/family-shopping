@@ -8,6 +8,8 @@
 // The family test uses the product's own data only (its names and the Open Food
 // Facts category taxonomy tags) — there is no hand-written list of product types.
 
+export function bpHebrewTokens(value) { return hebrewTokens(value); }
+
 function hebrewTokens(value) {
   return String(value || '')
     .normalize('NFKC')
@@ -39,6 +41,15 @@ export function bpIsBroadCategoryQuery(normQ, queryLang) {
   return hebrewTokens(normQ).length === 1;
 }
 
+// Known Israeli brand tokens (lowercase). A brand in a query is a filter, not part of the
+// product subtype, so it is never required to sit next to the product words.
+export const IL_BRAND_TOKENS = new Set([
+  'תנובה','שטראוס','עלית','אסם','אוסם','טרה','ויסוצקי','תלמה',"אנג'לה",
+  'tnuva','strauss','elite','osem','tara','wissotzky','telma','angel','yotvata',
+]);
+
+export function bpEnglishParts(value) { return englishParts(value); }
+
 function englishParts(value) {
   return String(value || '')
     .normalize('NFKC')
@@ -58,7 +69,7 @@ function enMatch(queryToken, candidateToken) {
 // the category IS a kind of its last word. So the query's English head must be the
 // tag's last word, and any further query words must appear in the tag.
 // "milk-chocolates" is therefore not a kind of milk; "chocolate-milks" is.
-function categoryMatches(categories, enTokens) {
+export function bpCategoryMatches(categories, enTokens) {
   if (!enTokens.length) return false;
   const head = enTokens[enTokens.length - 1];
   const rest = enTokens.slice(0, -1);
@@ -75,7 +86,7 @@ function hebrewNameMatches(name, forms) {
 
 export function bpIsInProductFamily(p, { forms, enTokens }) {
   if (hebrewNameMatches(p.name, forms) || hebrewNameMatches(p.nameHe, forms)) return true;
-  if (categoryMatches(p.categories, enTokens)) return true;
+  if (bpCategoryMatches(p.categories, enTokens)) return true;
   // Latin-only names: trust only Israeli products (non-Israeli Latin results are the
   // loose-English noise the picker must not surface for a Hebrew query).
   const hasHebrewName = /[֐-׿]/.test(`${p.name || ''}${p.nameHe || ''}`);

@@ -1,7 +1,7 @@
 import { pdHasLoc as _pdHasLocFn, pdInitialMode, pdEffectiveRadius as pdEffR, pdCacheKey as pdCKFn, pdRowEligible, pdBuildRequestUrl, pdExtractRows, pdNameFallbackUrl, pdShouldUseFallback } from './js/pd-location.js';
 import { bpSelectName, bpConsumeBatches, bpFetchCorpus, bpIsIncompleteHebrewCorpus } from './js/bp-search.js';
 import { storeRowTitle, storeAddressLine, navDestination, googleMapsUrl, wazeUrl, NAV_ICON_GOOGLE, NAV_ICON_WAZE } from './js/store-ui.js';
-import { bpSelectBroadCandidates } from './js/bp-intent.js';
+import { bpSelectBroadCandidates, IL_BRAND_TOKENS } from './js/bp-intent.js';
 import { bpDedupeProducts, bpPickerView, bpPage, RESULT_CAP, PICKER_INITIAL } from './js/bp-results.js';
 import { bpTranslate } from './js/bp-translation.js';
 import { bpSelectStrictCandidates } from './js/bp-strict.js';
@@ -3014,10 +3014,7 @@ function _bpDetectLang(t) {
 }
 
 // Known Israeli/Israel-common brand tokens (lowercase) — scoring bonus
-const _IL_BRANDS_SET = new Set([
-  'תנובה','שטראוס','עלית','אסם','אוסם','טרה','ויסוצקי','תלמה','אנג\'לה',
-  'tnuva','strauss','elite','osem','tara','wissotzky','telma','angel','yotvata',
-]);
+const _IL_BRANDS_SET = IL_BRAND_TOKENS; // shared with js/bp-strict.js
 
 // Score a candidate product for a given query.
 // Higher = more relevant. Negative = should be filtered out.

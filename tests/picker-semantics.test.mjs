@@ -29,20 +29,26 @@ const COTTAGE = "קוטג' 5% תנובה";
 const whiteVariants = [
   'גבינה לבנה 5% תנובה', 'גבינה לבנה 9% תנובה', 'גבינה לבנה 3% טרה', 'גבינה לבנה גד',
   'גבינה לבנה 5% 250 גרם', 'גבינה לבנה 500 גרם', 'גבינה לבנה דלת שומן', 'גבינה לבנה חלב עיזים',
+  'תנובה גבינה לבנה 5%', 'טרה גבינה לבנה 5%', 'גבינה 5% לבנה',
 ];
+// No head word in the name; belongs to the subtype only through the OFF taxonomy.
+const taxonomyOnlyWhite = 'לבנה 9% שטראוס';
 const yellow = ['גבינה צהובה עמק 28%', 'גבינה צהובה גאודה', 'גבינה צהובה אדם פרוסות'];
 const others = [
   ['גבינה בולגרית 24%', CHEESE], ['גבינת שמנת פילדלפיה', CHEESE], [COTTAGE, [...CHEESE, 'en:cottage-cheeses']],
   ['מוצרלה במי מלח', [...CHEESE, 'en:mozzarella']], ['פטה יווני', [...CHEESE, 'en:feta']], ['גבינה צפתית', CHEESE],
   ['גבינות קשות מיוחדות', CHEESE], ['גבינה מלוחה', CHEESE], ['גבינה עיזים רכה', CHEESE],
   ['גבינה מגורדת לפיצה', CHEESE], ['גבינת קממבר', CHEESE],
+  // both query words are present, but the subtype is a different one
+  ['גבינה בולגרית לבנה 24%', CHEESE], ['גבינה בולגרית לבנה 250 גרם', [...CHEESE, 'en:bulgarian-cheeses']],
+  ['גבינה צהובה לבנה פרוסה', CHEESE], ['גבינת שמנת לבנה', CHEESE], ['פטה לבנה יווני', [...CHEESE, 'en:feta']],
 ];
 const unrelated = [
   ['שמנת לבישול 15%', ['en:dairies', 'en:creams']], ['שוקולד חלב', ['en:snacks', 'en:milk-chocolates']],
   ['חלבה בטעם וניל', ['en:halvas']], ['לחם פרוס', ['en:breads']], ['יוגורט תות', ['en:dairies', 'en:yogurts']],
 ];
 const corpus = [
-  ...whiteVariants.map(n => off(n, WHITE)), ...yellow.map(n => off(n, CHEESE)),
+  ...whiteVariants.map(n => off(n, WHITE)), off(taxonomyOnlyWhite, WHITE), ...yellow.map(n => off(n, CHEESE)),
   ...others.map(([n, c]) => off(n, c)), ...unrelated.map(([n, c]) => off(n, c)),
   // loose English noise from a non-Israeli product
   { code: '3000000000001', product_name: 'Cheese Puffs Snack', brands: 'X', countries_tags: ['en:france'], categories_tags: ['en:snacks'] },
@@ -76,7 +82,7 @@ test('excludes unrelated foods (cooking cream, chocolate, halva, bread, yogurt)'
   for (const [n] of unrelated) ok(!broad.names.includes(n), n);
 });
 test('excludes loose non-Israeli English results', () => ok(!broad.names.includes('Cheese Puffs Snack')));
-test('total is the FULL match set (not capped at 10)', () => eq(broad.products.length, whiteVariants.length + yellow.length + others.length));
+test('total is the FULL match set (not capped at 10)', () => eq(broad.products.length, whiteVariants.length + 1 + yellow.length + others.length));
 test('more than 10 results → picker shows 10 and exposes "ראה עוד (N-10)"', () => {
   const v = bpPickerView(broad.products);
   eq(v.shown.length, PICKER_INITIAL); eq(v.remaining, broad.products.length - PICKER_INITIAL); ok(v.remaining > 0);
@@ -91,13 +97,37 @@ test('Hebrew forms never leak into look-alike words (חלב ≠ חלבה/חלב�
 console.log('\nB. "גבינה לבנה" — specific intent');
 const white = select('גבינה לבנה');
 test('is NOT broad; uses strict Hebrew matching', () => { eq(bpIsBroadCategoryQuery('גבינה לבנה', 'he'), false); eq(white.mode, 'hebrew'); });
-test('returns every white-cheese variant (manufacturers / fat % / sizes)', () => eq([...white.names].sort(), [...whiteVariants].sort()));
+test('returns every white-cheese variant (manufacturers / fat % / sizes / number between words)', () => eq([...white.names].sort(), [...whiteVariants, taxonomyOnlyWhite].sort()));
 test('excludes yellow cheese', () => ok(!white.names.some(n => n.includes('צהובה'))));
 test('excludes Bulgarian, mozzarella, cream cheese, cottage, other cheese types', () => {
-  for (const n of ['גבינה בולגרית 24%', 'מוצרלה במי מלח', 'גבינת שמנת פילדלפיה', COTTAGE, 'פטה יווני', 'גבינה צפתית']) ok(!white.names.includes(n), n);
+  for (const n of ['גבינה בולגרית 24%', 'פטה יווני', 'מוצרלה במי מלח', 'גבינת שמנת פילדלפיה', COTTAGE, 'פטה יווני', 'גבינה צפתית']) ok(!white.names.includes(n), n);
+});
+test('BLOCKER: "גבינה בולגרית לבנה" (both words present, other subtype) is excluded', () => {
+  for (const n of ['גבינה בולגרית לבנה 24%', 'גבינה בולגרית לבנה 250 גרם']) ok(!white.names.includes(n), n);
+});
+test('BLOCKER: other subtypes that merely contain both words are excluded (צהובה לבנה / שמנת לבנה / פטה לבנה)', () => {
+  for (const n of ['גבינה צהובה לבנה פרוסה', 'גבינת שמנת לבנה', 'פטה לבנה יווני']) ok(!white.names.includes(n), n);
+});
+test('manufacturer before or after the phrase still passes', () => {
+  for (const n of ['תנובה גבינה לבנה 5%', 'טרה גבינה לבנה 5%', 'גבינה לבנה 9% תנובה']) ok(white.names.includes(n), n);
+});
+test('a number between the words is allowed (גבינה 5% לבנה)', () => ok(white.names.includes('גבינה 5% לבנה')));
+test('taxonomy admits a white cheese whose name lacks the head word', () => ok(white.names.includes(taxonomyOnlyWhite)));
+test('taxonomy does NOT override a name that states another subtype', () => {
+  const tricky = off('גבינה בולגרית לבנה 24%', WHITE); // even if mis-tagged as white-cheeses
+  const r = bpSelectStrictCandidates([{ name: tricky.product_name_he, nameHe: tricky.product_name_he, categories: WHITE, isIsraeli: true }], { queryLang: 'he', normQ: 'גבינה לבנה', enQuery: 'white cheese' });
+  eq(r.candidates.length, 0);
+});
+test('"גבינה" (broad) STILL includes the Bulgarian / yellow / cream / feta / white-labelled ones', () => {
+  for (const n of ['גבינה בולגרית לבנה 24%', 'גבינה צהובה לבנה פרוסה', 'גבינת שמנת לבנה', 'פטה לבנה יווני', 'גבינה בולגרית 24%']) ok(broad.names.includes(n), n);
+});
+test('brand filters in the query stay position-independent (גבינה לבנה תנובה)', () => {
+  const r = bpSelectStrictCandidates(raw, { queryLang: 'he', normQ: 'גבינה לבנה תנובה', enQuery: 'white cheese tnuva' });
+  ok(r.candidates.some(p => p.name === 'גבינה לבנה 5% תנובה') && r.candidates.some(p => p.name === 'תנובה גבינה לבנה 5%'));
+  ok(!r.candidates.some(p => p.name.includes('בולגרית')));
 });
 const yel = select('גבינה צהובה');
-test('"גבינה צהובה" → only yellow cheese', () => eq([...yel.names].sort(), [...yellow].sort()));
+test('"גבינה צהובה" → only yellow cheese (incl. one whose name also says לבנה)', () => eq([...yel.names].sort(), [...yellow, 'גבינה צהובה לבנה פרוסה'].sort()));
 test('specificity scales: broad ⊃ specific', () => ok(white.products.length < broad.products.length && yel.products.length < broad.products.length));
 const cot = select('קוטג');
 test('"קוטג" (single word) → cottage only, no other cheese', () => eq(cot.names, [COTTAGE]));
