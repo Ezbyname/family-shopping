@@ -1,5 +1,6 @@
 import { pdHasLoc as _pdHasLocFn, pdInitialMode, pdEffectiveRadius as pdEffR, pdCacheKey as pdCKFn, pdRowEligible, pdBuildRequestUrl, pdExtractRows, pdNameFallbackUrl, pdShouldUseFallback } from './js/pd-location.js';
-import { bpSelectName, bpConsumeBatches, bpFetchCorpus } from './js/bp-search.js';
+import { bpSelectName, bpConsumeBatches, bpFetchCorpus, bpIsIncompleteHebrewCorpus } from './js/bp-search.js';
+import { isShufersal, storeRowTitle, navDestination, googleMapsUrl, wazeUrl } from './js/store-ui.js';
 import { bpTranslate } from './js/bp-translation.js';
 import { bpSelectStrictCandidates } from './js/bp-strict.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -3154,8 +3155,10 @@ async function _bpRunSearch(query, signal, seq) {
     }
     _cacheHit = _corpusResult.fromCache || false;
     bpConsumeBatches(_corpusResult.batches, new Set(), raw, queryLang);
-    if (raw.length === 0 && _corpusResult.partialFailure) {
-      console.log(`[diag-bp-search #${_diagBpSearchSeq}] OFF partial failure with zero usable corpus — unavailable`);
+    // Zero usable corpus, OR a Hebrew query whose Israel-filtered batches both failed so only the
+    // unfiltered English batch survived: that is a transport failure, not a trustworthy result set.
+    if (_corpusResult.partialFailure && (raw.length === 0 || bpIsIncompleteHebrewCorpus(_corpusResult.batches, queryLang))) {
+      console.log(`[diag-bp-search #${_diagBpSearchSeq}] OFF partial failure — unavailable (raw=${raw.length})`);
       _bpProducts = [];
       if (queryEl)   queryEl.textContent  = 'לא ניתן לחפש כרגע — נסה שוב';
       if (resultsEl) resultsEl.innerHTML  = '<div class="bp-loading">⚠️ שגיאה בחיפוש, נסה שוב</div>';
@@ -3282,9 +3285,15 @@ async function _bpRunSearch(query, signal, seq) {
       return;
     }
     const isAttach = _bpMode === 'attach' || _bpMode === 'fav-attach';
-    const _fallbackNotice = _bpFallback
+    const _fallbackNotice = (_bpFallback
       ? '<div class="bp-fallback-note">לא נמצאה התאמה מדויקת — מציגים תוצאות דומות</div>'
-      : '';
+      : '')
+      + (_corpusResult.partialFailure
+      ? '<div class="bp-fallback-note">חלק מהתוצאות לא נטענו — נסה שוב לתוצאות מלאות</div>'
+      : '')
+      + (_corpusResult.cacheStatus === 'stale-if-error'
+      ? '<div class="bp-fallback-note">מוצגות תוצאות שמורות — ייתכן שאינן העדכניות ביותר</div>'
+      : '');
     if (resultsEl) resultsEl.innerHTML = _fallbackNotice + _bpProducts.slice(0, 14).map((p, i) => {
       const nameHtml = _boldKeyword(p.name, normQ);
       const sub = [p.brand, p.size].filter(Boolean).join(' · ');
@@ -4057,8 +4066,8 @@ function renderPriceRow(p, isFirst, total, warnings) {
     const pname = sanitize(_currentScanProduct?.name||selectedProduct?.name||'');
     actions = `<div class="override-actions" onclick="event.stopPropagation()">
       <button class="override-btn primary" onclick="event.stopPropagation();openOverrideModal(${_jsAttr(chainKey)},${_jsAttr(store)},${p.price},${_jsAttr(pname)})">✏️ תקן אישי</button>
-      <button class="override-btn" onclick="event.stopPropagation();openReportModal(${_jsAttr(chainKey)},${_jsAttr(store)},${p.price},${_jsAttr(pname)})">🚨 דווח שגיאה</button>
     </div>`;
+    // "דווח שגיאה" (openReportModal) intentionally not rendered for now; handler kept intact.
   }
 
   // City + distance meta line
@@ -4083,7 +4092,7 @@ function renderPriceRow(p, isFirst, total, warnings) {
       onclick="openStoreDetail(window._sdRows[${_sdIdx}])">
     <div style="flex:1;min-width:0">
       <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-        <span class="spr-name">${esc(store)}</span> ${badge} ${staleBadge}
+        <span class="spr-name">${esc(isShufersal(p) ? storeRowTitle(p) : store)}</span> ${badge} ${staleBadge}
         ${isBest&&total>1?'<span class="best-badge">הכי זול 🏆</span>':''}
       </div>
       ${metaLine}${submittedLine}${overrideLine}${warnLine}${actions}
@@ -4260,7 +4269,7 @@ window.showProductPricesEnhanced = async function(product) {
       ${barcode?`<button onclick="openScanner()" class="clear-btn" style="margin-top:10px">📷 סרוק בסופר ועדכן מחיר</button>`:''}
     </div>
     <div style="font-size:10px;color:var(--muted);text-align:center;padding:8px 0">
-      ✏️ תיקון אישי גלוי רק לך · 🚨 דיווח מוצג לאחרי 2+ דיווחים · 📝 מחיר משפחה גלוי לקבוצה בלבד
+      ✏️ תיקון אישי גלוי רק לך · 📝 מחיר משפחה גלוי לקבוצה בלבד
     </div>`;
 
   _renderSpdMore();   // populate "show more 10" button + "showing X of N"
@@ -7449,7 +7458,7 @@ function _renderPriceDetail() {
     const badge       = sourceBadge(p.sourceDisplay || src, p.submittedByDisplayName);
     const chainName    = p.chainName || p.chainId || '';
     const chainColor   = (CHAIN_META[chainName] || {}).color || '#7d8590';
-    const primaryName  = p.storeName || chainName;
+    const primaryName  = storeRowTitle(p);
     const chainKey     = p._key || `${p.chainId || chainName.replace(/\s/g,'_')}_${p.storeId || '0'}`;
     const approxMark   = p.approximateLocation ? `<span class="approx-badge">~משוער</span>` : '';
     const addrLine     = [p.address, p.city].filter(Boolean).join(', ');
@@ -7469,9 +7478,8 @@ function _renderPriceDetail() {
       <div class="pd-row-actions" onclick="event.stopPropagation()">
         <button class="pd-row-act"
           onclick="event.stopPropagation();openMp2(${_jsAttr(_pdBarcode)},${_jsAttr(_pdName)},true,${_jsAttr(chainName)},${displayP},${_jsAttr(chainKey)})">✏️ תקן</button>
-        <button class="pd-row-act"
-          onclick="event.stopPropagation();openReportModal(${_jsAttr(chainKey)},${_jsAttr(chainName)},${displayP},${_jsAttr(_pdName)})">🚨 דווח</button>
       </div>` : '';
+    // "דווח" (openReportModal) intentionally not rendered for now; handler kept intact.
 
     // Override rows get a distinct background; all rows are tappable → opens store detail
     const rowCls = ['pd-row', isBest ? 'best' : '', isOverride ? 'is-override' : ''].filter(Boolean).join(' ');
@@ -7662,7 +7670,7 @@ let _sdStore = null;
 window._sdNav = function(i) {
   const s = window._sdRows && window._sdRows[i];
   if (!s) return;
-  navigateToStoreDirect(s.latitude, s.longitude, s.address || '', s.storeName || s.chainName || '');
+  navigateToStoreDirect(s.latitude, s.longitude, s.address || '', s.storeName || s.chainName || '', s.city || '');
 };
 
 function normalizeStoreInfo(p) {
@@ -7777,17 +7785,7 @@ window.closeStoreDetail = function() {
 window.navigateToStore = function() {
   if (!_sdStore) return;
   const { latitude, longitude, address, storeName, chainName, city } = _sdStore;
-  let url;
-  if (latitude && longitude) {
-    url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=driving`;
-  } else if (address || city) {
-    const q = encodeURIComponent([address, city].filter(Boolean).join(', '));
-    url = `https://www.google.com/maps/search/?api=1&query=${q}`;
-  } else {
-    const q = encodeURIComponent((storeName || chainName || '') + (city ? ' ' + city : ''));
-    url = `https://www.google.com/maps/search/?api=1&query=${q}`;
-  }
-  window.open(url, '_blank');
+  navigateToStoreDirect(latitude, longitude, address || '', storeName || chainName || '', city || '');
 };
 
 window.searchStoreProducts = function() {
@@ -7941,7 +7939,7 @@ function _renderBasketCompare(data, requestItems) {
       ${savingVsNext > 0.05 ? `<div class="bc-hero-saving">חסכת ₪${savingVsNext.toFixed(2)} לעומת הסופר הבא</div>` : ''}
       ${savingVsMax  > 0.05 ? `<div class="bc-hero-note">אפשר לחסוך עד ₪${savingVsMax.toFixed(2)} לעומת הסופר היקר ביותר</div>` : ''}
       <div class="bc-hero-actions">
-        <button class="bc-hero-btn" onclick="navigateToStoreDirect(${cheapest.latitude},${cheapest.longitude},${JSON.stringify(cheapest.address||'')},${JSON.stringify(nameLine)})">🗺 נווט</button>
+        <button class="bc-hero-btn" onclick="navigateToStoreDirect(${cheapest.latitude},${cheapest.longitude},${JSON.stringify(cheapest.address||'')},${JSON.stringify(nameLine)},${JSON.stringify(cheapest.city||'')})">🗺 נווט</button>
         <button class="bc-hero-btn ghost" onclick="_bcToggleBreakdown(0)">📋 פירוט</button>
       </div>
     </div>`;
@@ -8040,7 +8038,7 @@ function _bcRenderCard(s, rank, bestTotal, isChampion) {
         <span class="bc-item-price missing">לא זמין</span>
       </div>`).join('')}
       ${s.latitude && s.longitude ? `<button class="bc-action-btn" style="margin-top:8px"
-        onclick="navigateToStoreDirect(${s.latitude},${s.longitude},${JSON.stringify(s.address||'')},${JSON.stringify(s.chainName||'')})">
+        onclick="navigateToStoreDirect(${s.latitude},${s.longitude},${JSON.stringify(s.address||'')},${JSON.stringify(s.chainName||'')},${JSON.stringify(s.city||'')})">
         🗺 נווט לחנות זו
       </button>` : ''}
     </div>
@@ -8166,17 +8164,41 @@ window._bcCloseDiagnostics = function() {
 };
 
 // Navigate directly using coordinates from basket compare results
-window.navigateToStoreDirect = function(lat, lng, address, name) {
-  let url;
-  if (lat && lng) {
-    url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
-  } else if (address) {
-    url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-  } else {
-    url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}`;
-  }
-  window.open(url, '_blank');
+// Asks which app to use (Google Maps / Waze); both receive the same destination
+// from navDestination() (js/store-ui.js): trusted coords, else address + city.
+window.navigateToStoreDirect = function(lat, lng, address, name, city) {
+  const dest = navDestination({ lat, lng, address, city, name });
+  if (!dest) { toast('אין כתובת לניווט'); return; }
+  _openNavChooser(dest);
 };
+
+function _closeNavChooser() {
+  document.getElementById('nav-chooser')?.remove();
+}
+
+function _openNavChooser(dest) {
+  _closeNavChooser();
+  const el = document.createElement('div');
+  el.id = 'nav-chooser';
+  el.className = 'nav-chooser';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-label', 'בחר אפליקציית ניווט');
+  el.innerHTML = `<div class="nav-chooser-sheet">
+      <div class="nav-chooser-title">נווט באמצעות</div>
+      <button class="nav-chooser-btn" data-nav="google">🗺 Google Maps</button>
+      <button class="nav-chooser-btn" data-nav="waze">🚗 Waze</button>
+      <button class="nav-chooser-btn cancel" data-nav="cancel">ביטול</button>
+    </div>`;
+  el.addEventListener('click', e => {
+    const t = e.target.closest('[data-nav]');
+    if (!t && e.target !== el) return;
+    const which = t ? t.dataset.nav : 'cancel';
+    if (which === 'google') window.open(googleMapsUrl(dest), '_blank');
+    else if (which === 'waze') window.open(wazeUrl(dest), '_blank');
+    _closeNavChooser();
+  });
+  document.body.appendChild(el);
+}
 
 
 // ══ THEME SYSTEM ══════════════════════════════════════════════════════════════
