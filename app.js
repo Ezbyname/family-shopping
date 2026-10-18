@@ -8254,8 +8254,10 @@ function _openNavChooser(dest) {
   el.setAttribute('aria-label', 'בחר אפליקציית ניווט');
   el.innerHTML = `<div class="nav-chooser-sheet">
       <div class="nav-chooser-title">נווט באמצעות</div>
-      <button class="nav-chooser-btn" data-nav="google">${NAV_ICON_GOOGLE}<span>Google Maps</span></button>
-      <button class="nav-chooser-btn" data-nav="waze">${NAV_ICON_WAZE}<span>Waze</span></button>
+      <div class="nav-tiles">
+        <button class="nav-chooser-btn nav-tile" data-nav="google">${NAV_ICON_GOOGLE}<span>Google Maps</span></button>
+        <button class="nav-chooser-btn nav-tile" data-nav="waze">${NAV_ICON_WAZE}<span>Waze</span></button>
+      </div>
       <button class="nav-chooser-btn cancel" data-nav="cancel">ביטול</button>
     </div>`;
   el.addEventListener('click', e => {

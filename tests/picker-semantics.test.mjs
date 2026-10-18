@@ -178,7 +178,13 @@ test('chooser buttons render the icons (no emoji identity)', () => {
   ok(app.includes('${NAV_ICON_GOOGLE}<span>Google Maps</span>')); ok(app.includes('${NAV_ICON_WAZE}<span>Waze</span>'));
   ok(!app.includes('🗺 Google Maps') && !app.includes('🚗 Waze'));
 });
-test('icon buttons are mobile-sized', () => ok(css.includes('.nav-chooser-btn{min-height:46px') && css.includes('.nav-ico{width:24px;height:24px')));
+test('providers are large app tiles (76px icon, 2-column grid), not inline glyphs', () => {
+  ok(css.includes('.nav-tiles{display:grid;grid-template-columns:1fr 1fr'));
+  ok(css.includes('.nav-tile .nav-ico{width:76px;height:76px'));
+  ok(app.includes('class="nav-tiles"') && app.includes('nav-chooser-btn nav-tile" data-nav="google"') && app.includes('nav-chooser-btn nav-tile" data-nav="waze"'));
+  ok(NAV_ICON_GOOGLE.includes('viewBox="0 0 96 96"') && NAV_ICON_WAZE.includes('viewBox="0 0 96 96"'));
+  ok(!/.nav-chooser-btn[data-nav="(google|waze)"] .nav-ico path/.test(css), 'no fill override on tile art');
+});
 test('REGRESSION הזגג 11, אילת → both providers get the same Eilat destination', () => {
   const d = navDestination({ address: 'הזגג 11', city: 'אילת', name: 'רמי לוי' });
   const g = new URL(googleMapsUrl(d)).searchParams.get('query'), w = new URL(wazeUrl(d)).searchParams.get('q');

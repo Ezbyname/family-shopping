@@ -1977,9 +1977,11 @@ body.sheet-open{overflow:hidden!important;touch-action:none!important}
 .nav-chooser-btn:active{border-color:var(--accent);color:var(--accent)}
 .nav-chooser-btn.cancel{background:transparent;color:var(--muted);font-weight:500}
 .nav-chooser-btn{display:flex;align-items:center;justify-content:center;gap:10px}
-.nav-ico{width:24px;height:24px;flex:0 0 24px}
-.nav-chooser-btn[data-nav="google"] .nav-ico path{fill:#4285F4}
-.nav-chooser-btn[data-nav="waze"] .nav-ico path{fill:#33CCFF}
+/* Chooser: two large app tiles side by side, Cancel underneath */
+.nav-tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px;direction:ltr}
+.nav-tile{flex-direction:column;gap:10px;padding:16px 8px 12px;min-height:128px;min-width:0;font-size:14px}
+.nav-tile .nav-ico{width:76px;height:76px;flex:0 0 76px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.18))}
+.nav-tile span{line-height:1.2}
 
 /* Product picker: "ראה עוד" + expanded paginated results */
 .bp-more-btn{display:block;width:calc(100% - 16px);margin:10px 8px 4px;min-height:44px;border-radius:12px;
