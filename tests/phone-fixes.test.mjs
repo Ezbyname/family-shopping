@@ -77,8 +77,8 @@ test('multiple Shufersal stores in one modal all carry שופרסל', () => {
   const names = ['BE אייס מול אילת', 'אקספרס אילת שחמון', 'דיל אילת הסתת', 'דילאילת נחל אורה', 'שלי רזין אילת'];
   for (const n of names) ok(storeRowTitle(S({ storeName: n })).includes('שופרסל'), n);
 });
-test('non-Shufersal chain unchanged (רמי לוי / אילת)', () => {
-  eq(storeRowTitle({ chainId: 'rami-levy', chainName: 'רמי לוי', storeName: 'אילת' }), 'אילת');
+test('non-Shufersal chain also carries its chain name (רמי לוי · אילת)', () => {
+  eq(storeRowTitle({ chainId: 'rami-levy', chainName: 'רמי לוי', storeName: 'אילת' }), 'רמי לוי · אילת');
   eq(isShufersal({ chainId: 'rami-levy', chainName: 'רמי לוי' }), false);
 });
 test('non-Shufersal chain without storeName falls back to chain name', () =>

@@ -1,6 +1,8 @@
 import { pdHasLoc as _pdHasLocFn, pdInitialMode, pdEffectiveRadius as pdEffR, pdCacheKey as pdCKFn, pdRowEligible, pdBuildRequestUrl, pdExtractRows, pdNameFallbackUrl, pdShouldUseFallback } from './js/pd-location.js';
 import { bpSelectName, bpConsumeBatches, bpFetchCorpus, bpIsIncompleteHebrewCorpus } from './js/bp-search.js';
-import { isShufersal, storeRowTitle, navDestination, googleMapsUrl, wazeUrl } from './js/store-ui.js';
+import { storeRowTitle, storeAddressLine, navDestination, googleMapsUrl, wazeUrl, NAV_ICON_GOOGLE, NAV_ICON_WAZE } from './js/store-ui.js';
+import { bpSelectBroadCandidates } from './js/bp-intent.js';
+import { bpDedupeProducts, bpPickerView, bpPage, RESULT_CAP, PICKER_INITIAL } from './js/bp-results.js';
 import { bpTranslate } from './js/bp-translation.js';
 import { bpSelectStrictCandidates } from './js/bp-strict.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -3210,7 +3212,6 @@ async function _bpRunSearch(query, signal, seq) {
             _s: _bpScore(p, normQ, queryLang, enQuery, queryBrand)
           }))
           .sort(_stableSort)
-          .slice(0, 20)
           .map(({ _s, ...p }) => p);
 
         console.log(
@@ -3250,7 +3251,21 @@ async function _bpRunSearch(query, signal, seq) {
       }
     }
 
+    // ── Broad category query ("גבינה"): the whole product family, not one phrase ──
+    let _broadUsed = false;
     if (!_heStrictUsed) {
+      const _broad = bpSelectBroadCandidates(eligible, { queryLang, normQ, enQuery });
+      if (_broad.used && _broad.candidates.length > 0) {
+        _broadUsed = true;
+        _bpProducts = _broad.candidates
+          .map(p => ({ ...p, _s: _bpScore(p, normQ, queryLang, enQuery, queryBrand) }))
+          .sort(_stableSort)
+          .map(({ _s, ...p }) => p);
+        console.log('[search-quality]', { rawQuery, normalizedQuery: normQ, translatedQuery: enQuery, broadCategory: true, resultCount: _bpProducts.length, candidateCount: raw.length, cacheHit: _cacheHit });
+      }
+    }
+
+    if (!_heStrictUsed && !_broadUsed) {
       // Score every candidate, filter irrelevant ones, sort by relevance
       const MIN_SCORE = queryLang !== 'latin' ? -10 : -20;
       const _scored = eligible.map(p => ({ ...p, _s: _bpScore(p, normQ, queryLang, enQuery, queryBrand) }));
@@ -3258,8 +3273,7 @@ async function _bpRunSearch(query, signal, seq) {
       _bpProducts = _scored
         .filter(p => p._s > MIN_SCORE)
         .sort(_stableSort)
-        .map(({ _s, ...p }) => p)
-        .slice(0, 20);
+        .map(({ _s, ...p }) => p);
       // Layer 5: if strict filter removed everything, show best non-negative candidates anyway
       if (!_bpProducts.length && raw.length > 0) {
         const nonNeg = _scored.filter(p => p._s >= 0);
@@ -3277,6 +3291,8 @@ async function _bpRunSearch(query, signal, seq) {
     const resultsVisible = resultsEl ? window.getComputedStyle(resultsEl).display !== 'none' : false;
     console.log(`[diag-bp-search #${_diagBpSearchSeq}] overlayVisible=${overlayVisible} resultsElExists=${!!resultsEl} resultsVisible=${resultsVisible}`);
 
+    // dedup -> (ranked order kept) -> total; the picker shows the first PICKER_INITIAL
+    _bpProducts = bpDedupeProducts(_bpProducts).slice(0, RESULT_CAP);
     if (queryEl) queryEl.textContent = _bpProducts.length
       ? `מצאנו ${_bpProducts.length} מוצרים עבור "${query}"`
       : `לא נמצאו תוצאות עבור "${query}"`;
@@ -3284,7 +3300,6 @@ async function _bpRunSearch(query, signal, seq) {
       if (resultsEl) resultsEl.innerHTML = '<div class="bp-loading">😕 לא נמצאו מוצרים<br><small>נסה מילה אחרת</small></div>';
       return;
     }
-    const isAttach = _bpMode === 'attach' || _bpMode === 'fav-attach';
     const _fallbackNotice = (_bpFallback
       ? '<div class="bp-fallback-note">לא נמצאה התאמה מדויקת — מציגים תוצאות דומות</div>'
       : '')
@@ -3294,24 +3309,14 @@ async function _bpRunSearch(query, signal, seq) {
       + (_corpusResult.cacheStatus === 'stale-if-error'
       ? '<div class="bp-fallback-note">מוצגות תוצאות שמורות — ייתכן שאינן העדכניות ביותר</div>'
       : '');
-    if (resultsEl) resultsEl.innerHTML = _fallbackNotice + _bpProducts.slice(0, 14).map((p, i) => {
-      const nameHtml = _boldKeyword(p.name, normQ);
-      const sub = [p.brand, p.size].filter(Boolean).join(' · ');
-      const imgTag = p.image
-        ? `<img class="bp-item-img" src="${esc(p.image)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-        : '';
-      const phStyle = p.image ? 'style="display:none"' : '';
-      const btnClick = `selectBrandProduct(${i})`;
-      const btnLabel = isAttach ? 'בחר' : 'הוסף';
-      return `<div class="bp-item">
-        ${imgTag}<div class="bp-img-ph" ${phStyle}>🛒</div>
-        <div class="bp-item-info">
-          <div class="bp-item-name">${nameHtml}</div>
-          ${sub ? `<div class="bp-item-sub">${esc(sub)}</div>` : ''}
-        </div>
-        <button class="bp-add-btn" onclick="${btnClick}">${btnLabel}</button>
-      </div>`;
-    }).join('');
+    _bpQueryNorm = normQ;
+    _bpQueryLabel = query;
+    const _view = bpPickerView(_bpProducts);
+    if (resultsEl) resultsEl.innerHTML = _fallbackNotice
+      + _view.shown.map((p, i) => _bpItemHtml(p, i)).join('')
+      + (_view.remaining > 0
+        ? `<button class="bp-more-btn" onclick="openBpMore()">ראה עוד (${_view.remaining})</button>`
+        : '');
   } catch(e) {
     // [DIAG-BUG5A] catch — distinguishes abort from real error
     console.log(`[diag-bp-search] CAUGHT name=${e.name} message=${e.message}`);
@@ -3320,6 +3325,71 @@ async function _bpRunSearch(query, signal, seq) {
     if (resultsEl) resultsEl.innerHTML = `<div class="bp-loading">⚠️ ${esc(e.message)}</div>`;
   }
 }
+
+let _bpQueryNorm = '';
+let _bpQueryLabel = '';
+let _bpMorePage = 1;
+
+// One product row; i is the index into the full ranked _bpProducts list.
+function _bpItemHtml(p, i) {
+  const isAttach = _bpMode === 'attach' || _bpMode === 'fav-attach';
+  const nameHtml = _boldKeyword(p.name, _bpQueryNorm);
+  const sub = [p.brand, p.size].filter(Boolean).join(' · ');
+  const imgTag = p.image
+    ? `<img class="bp-item-img" src="${esc(p.image)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+    : '';
+  const phStyle = p.image ? 'style="display:none"' : '';
+  return `<div class="bp-item">
+        ${imgTag}<div class="bp-img-ph" ${phStyle}>🛒</div>
+        <div class="bp-item-info">
+          <div class="bp-item-name">${nameHtml}</div>
+          ${sub ? `<div class="bp-item-sub">${esc(sub)}</div>` : ''}
+        </div>
+        <button class="bp-add-btn" onclick="selectBrandProduct(${i})">${isAttach ? 'בחר' : 'הוסף'}</button>
+      </div>`;
+}
+
+// Expanded results: the same ranked list, paginated. Selecting reuses selectBrandProduct.
+function _bpRenderMore() {
+  const el = document.getElementById('bp-more');
+  if (!el) return;
+  const pg = bpPage(_bpProducts, _bpMorePage);
+  _bpMorePage = pg.page;
+  el.innerHTML = `<div class="bp-more-head">
+      <button class="bp-more-back" onclick="closeBpMore()">→ חזרה</button>
+      <div class="bp-more-title">"${esc(_bpQueryLabel)}" · ${pg.total} מוצרים</div>
+    </div>
+    <div class="bp-more-list" id="bp-more-list">${pg.items.map((p, k) => _bpItemHtml(p, pg.start + k)).join('')}</div>
+    <div class="bp-more-pager">
+      <button class="bp-pg-btn" id="bp-pg-prev" ${pg.hasPrev ? '' : 'disabled'} onclick="bpMorePage(-1)">קודם</button>
+      <span class="bp-pg-info">עמוד ${pg.page} מתוך ${pg.pages}</span>
+      <button class="bp-pg-btn" id="bp-pg-next" ${pg.hasNext ? '' : 'disabled'} onclick="bpMorePage(1)">הבא</button>
+    </div>`;
+  document.getElementById('bp-more-list')?.scrollTo?.(0, 0);
+}
+
+window.openBpMore = function() {
+  if (_bpProducts.length <= PICKER_INITIAL) return;
+  let el = document.getElementById('bp-more');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'bp-more';
+    el.className = 'bp-more';
+    el.setAttribute('role', 'dialog');
+    document.body.appendChild(el);
+  }
+  _bpMorePage = 1;
+  _bpRenderMore();
+};
+
+window.bpMorePage = function(delta) {
+  _bpMorePage += delta;
+  _bpRenderMore();
+};
+
+window.closeBpMore = function() {
+  document.getElementById('bp-more')?.remove();
+};
 
 // openBrandPicker(mode='new')           — from add-bar brand button
 // openBrandPicker('attach', id, name)   — from ip-tile on existing items
@@ -3425,6 +3495,7 @@ window.selectBrandProduct = function(nameOrIdx, barcode) {
 };
 
 window.closeBrandPicker = function() {
+  document.getElementById('bp-more')?.remove();
   clearTimeout(_bpSearchTimer);
   if (_bpAbortCtrl) { _bpAbortCtrl.abort(); _bpAbortCtrl = null; }
   document.getElementById('bp-overlay')?.classList.remove('show');
@@ -4072,7 +4143,8 @@ function renderPriceRow(p, isFirst, total, warnings) {
 
   // City + distance meta line
   const metaParts = [];
-  if (p.city) metaParts.push(esc(p.city));
+  const _addrLine = storeAddressLine(p);
+  if (_addrLine) metaParts.push(esc(_addrLine));
   if (p.distanceKm != null) metaParts.push(`📍 ${p.distanceKm} ק"מ`);
   const metaLine = metaParts.length
     ? `<div style="font-size:10px;color:var(--muted);margin-top:1px">${metaParts.join(' · ')}</div>`
@@ -4092,7 +4164,7 @@ function renderPriceRow(p, isFirst, total, warnings) {
       onclick="openStoreDetail(window._sdRows[${_sdIdx}])">
     <div style="flex:1;min-width:0">
       <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-        <span class="spr-name">${esc(isShufersal(p) ? storeRowTitle(p) : store)}</span> ${badge} ${staleBadge}
+        <span class="spr-name">${esc(storeRowTitle(p))}</span> ${badge} ${staleBadge}
         ${isBest&&total>1?'<span class="best-badge">הכי זול 🏆</span>':''}
       </div>
       ${metaLine}${submittedLine}${overrideLine}${warnLine}${actions}
@@ -7461,7 +7533,7 @@ function _renderPriceDetail() {
     const primaryName  = storeRowTitle(p);
     const chainKey     = p._key || `${p.chainId || chainName.replace(/\s/g,'_')}_${p.storeId || '0'}`;
     const approxMark   = p.approximateLocation ? `<span class="approx-badge">~משוער</span>` : '';
-    const addrLine     = [p.address, p.city].filter(Boolean).join(', ');
+    const addrLine     = storeAddressLine(p);
 
     // Freshness label
     const freshInfo   = _freshnessLabel(p.syncedAt);
@@ -8185,8 +8257,8 @@ function _openNavChooser(dest) {
   el.setAttribute('aria-label', 'בחר אפליקציית ניווט');
   el.innerHTML = `<div class="nav-chooser-sheet">
       <div class="nav-chooser-title">נווט באמצעות</div>
-      <button class="nav-chooser-btn" data-nav="google">🗺 Google Maps</button>
-      <button class="nav-chooser-btn" data-nav="waze">🚗 Waze</button>
+      <button class="nav-chooser-btn" data-nav="google">${NAV_ICON_GOOGLE}<span>Google Maps</span></button>
+      <button class="nav-chooser-btn" data-nav="waze">${NAV_ICON_WAZE}<span>Waze</span></button>
       <button class="nav-chooser-btn cancel" data-nav="cancel">ביטול</button>
     </div>`;
   el.addEventListener('click', e => {

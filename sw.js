@@ -1,7 +1,7 @@
 // sw.js — Family Shopping PWA Service Worker v3
 // Strategy: Network-first for API/Firebase, Cache-first for app shell
 
-const CACHE_VERSION = 'fsl-v47';
+const CACHE_VERSION = 'fsl-v48';
 
 const APP_SHELL = [
   '/',
@@ -18,6 +18,8 @@ const APP_SHELL = [
   '/js/pd-location.js',
   '/js/bp-search.js',
   '/js/store-ui.js',
+  '/js/bp-intent.js',
+  '/js/bp-results.js',
 ];
 
 // Patterns that should NEVER be served from cache

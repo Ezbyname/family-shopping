@@ -5,7 +5,7 @@
 
 const OFF_BASE = 'https://world.openfoodfacts.org/cgi/search.pl';
 const OFF_FIELDS =
-  'product_name,product_name_he,product_name_ar,brands,quantity,image_small_url,code,countries_tags';
+  'product_name,product_name_he,product_name_ar,brands,quantity,image_small_url,code,countries_tags,categories_tags';
 const OFF_IL =
   '&tagtype_0=countries&tag_contains_0=contains&tag_0=israel';
 

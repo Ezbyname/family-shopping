@@ -60,6 +60,7 @@ export function bpConsumeBatches(batches, seen, raw, queryLang) {
         nameHe:    p.product_name_he || '',
         nameAr:    p.product_name_ar || '',
         nameEn:    p.product_name    || '',
+        categories: Array.isArray(p.categories_tags) ? p.categories_tags : [],
       });
     }
   }
