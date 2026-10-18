@@ -65,6 +65,18 @@ export function bpConsumeBatches(batches, seen, raw, queryLang) {
   }
 }
 
+// ── Completeness ──────────────────────────────────────────────────────────────
+
+// A Hebrew query is only trustworthy when at least one Israel-filtered batch
+// (original_il / translated_il) succeeded. If all of them failed, whatever the
+// unfiltered translated_broad batch returned (typically loosely matched English
+// products) must not be presented as the answer.
+export function bpIsIncompleteHebrewCorpus(batches, queryLang) {
+  if (queryLang !== 'he' || !Array.isArray(batches)) return false;
+  const il = batches.filter(b => b.strategy !== 'translated_broad');
+  return il.length > 0 && il.every(b => b.error !== null);
+}
+
 // ── Transport ─────────────────────────────────────────────────────────────────
 
 // Fetch with an internal AbortController so we can distinguish:
@@ -184,6 +196,14 @@ export async function bpFetchCorpus(normQ, translatedQ, cacheKey, pageSize, { si
         }
         return { status: 'REMOTE_FAILURE', batches: [], fromCache: false, stale: false };
       }
+      // Server-side last-known-good is older than our own session cache: never let it
+      // replace (or be stored as) a complete result.
+      if (fresh.cacheStatus === 'stale-if-error') {
+        if (age < STALE_IF_ERROR) {
+          return { ...cached.data, fromCache: true, stale: true };
+        }
+        return { ...fresh, fromCache: false, stale: false };
+      }
       // Check if result is complete (no batch failures)
       const hasPartialFailure = fresh.batches.some(b => b.error !== null);
       if (hasPartialFailure) {
@@ -209,6 +229,10 @@ export async function bpFetchCorpus(normQ, translatedQ, cacheKey, pageSize, { si
   try {
     const result = await _fetchFromProxy(normQ, translatedQ, pageSize, signal);
     if (result.status === 'REMOTE_FAILURE') {
+      return { ...result, fromCache: false, stale: false };
+    }
+    // Server-stale (last-known-good) answers are shown but never cached as fresh.
+    if (result.cacheStatus === 'stale-if-error') {
       return { ...result, fromCache: false, stale: false };
     }
     const hasPartialFailure = result.batches.some(b => b.error !== null);
