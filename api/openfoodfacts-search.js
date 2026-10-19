@@ -21,6 +21,7 @@
 import { setCors, getDbUrl, getAdminToken } from './_firebase.js';
 import { searchOpenFoodFacts } from './_openfoodfacts.js';
 import { createSearchLkgRuntime } from './_search-lkg-runtime.js';
+import { getPickerLkgConfig } from './_search-lkg-config.js';
 import { buildPickerLkgKey, resolvePickerSearch } from './_off-picker-lkg.js';
 
 export { OFF_ERR } from './_openfoodfacts.js';
@@ -32,7 +33,7 @@ export { OFF_ERR } from './_openfoodfacts.js';
 //   ageSeconds   age of that LKG              (stale-if-error only)
 //
 // Last-Known-Good uses the existing Search LKG runtime. While
-// SEARCH_LKG_PERSISTENCE_APPROVED=false (api/_search-lkg-config.js) no repository
+// PICKER_LKG_PERSISTENCE_APPROVED=false (api/_search-lkg-config.js) no repository
 // exists, so this endpoint performs no Firebase reads or writes.
 
 let _pickerLkgTestConfig = null;
@@ -52,9 +53,11 @@ export function _setPickerLkgForTests(repository = null, ttlMs = null) {
 function getActiveLkg() {
   if (_pickerLkgTestConfig) return _pickerLkgTestConfig;
 
+  // Picker-only gate: SEARCH_LKG_* (used by /api/prices) has no effect here.
   const runtime = createSearchLkgRuntime({
     dbUrl: getDbUrl(),
     tokenProvider: getAdminToken,
+    configProvider: getPickerLkgConfig,
   });
 
   return runtime.enabled
