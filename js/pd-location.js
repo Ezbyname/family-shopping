@@ -180,3 +180,16 @@ export function pdNameFallbackUrl(name, mode, location, radiusExplicitlySet, nea
 export function pdShouldUseFallback(prices, pdName, mode) {
   return prices.length === 0 && Boolean(pdName) && mode !== 'city';
 }
+
+/**
+ * Which empty state the price-detail sheet should render when it has no rows.
+ * Radius mode without a saved location is NOT "no prices" — the request was
+ * never made, so the user must be asked for a location instead.
+ *
+ * @param {string|null|undefined} blocked  `blocked` from pdBuildRequestUrl / _pdFetchPrices
+ * @param {'city'|'radius'|'all'} mode
+ * @returns {'location-required'|'no-prices'}
+ */
+export function pdEmptyStateKind(blocked, mode) {
+  return (mode === 'radius' && blocked === 'no-location') ? 'location-required' : 'no-prices';
+}

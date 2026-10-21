@@ -1,4 +1,4 @@
-import { pdHasLoc as _pdHasLocFn, pdInitialMode, pdEffectiveRadius as pdEffR, pdCacheKey as pdCKFn, pdRowEligible, pdBuildRequestUrl, pdExtractRows, pdNameFallbackUrl, pdShouldUseFallback } from './js/pd-location.js';
+import { pdHasLoc as _pdHasLocFn, pdInitialMode, pdEffectiveRadius as pdEffR, pdCacheKey as pdCKFn, pdRowEligible, pdBuildRequestUrl, pdExtractRows, pdNameFallbackUrl, pdShouldUseFallback, pdEmptyStateKind } from './js/pd-location.js';
 import { bpSelectName, bpConsumeBatches, bpFetchCorpus, bpIsIncompleteHebrewCorpus } from './js/bp-search.js';
 import { storeRowTitle, storeAddressLine, navDestination, googleMapsUrl, wazeUrl, NAV_ICON_GOOGLE, NAV_ICON_WAZE } from './js/store-ui.js';
 import { bpSelectBroadCandidates, IL_BRAND_TOKENS } from './js/bp-intent.js';
@@ -7078,6 +7078,7 @@ let _pdSort         = 'cheapest';
 let _pdFilters      = new Set();
 let _pdPrices       = [];
 let _pdFromCache    = false;
+let _pdBlocked      = null;   // 'no-location' | 'no-cities' | null — why no request was made
 let _pdUnsub        = null;   // Firebase real-time unsub
 let _pdLastUpdateBy = null;   // track who just updated for notification
 let _pdMode         = 'all';  // 'city' | 'radius' | 'all' — recomputed on each open
@@ -7210,8 +7211,9 @@ function _pdRefreshPrices() {
   _pdFetchPrices(_pdBarcode).then(result => {
     _pdPrices    = result?.prices || [];
     _pdFromCache = result?.fromCache || false;
+    _pdBlocked   = result?.blocked || null;
     _renderPriceDetail();
-  }).catch(() => { _pdPrices = []; _renderPriceDetail(); });
+  }).catch(() => { _pdPrices = []; _pdBlocked = null; _renderPriceDetail(); });
 }
 
 function _syncPdLocationUI() {
@@ -7386,12 +7388,14 @@ window.openPriceDetailModal = async function(barcode, name, qty) {
   if (cached?.prices?.length) {
     _pdPrices    = cached.prices;
     _pdFromCache = true;
+    _pdBlocked   = null;
     _renderPriceDetail();
     // Background refresh — bypass cache so a real network request is made
     _pdFetchPrices(barcode, true).then(result => {
       if (result && !result.fromCache && _pdBarcode === barcode) {
         _pdPrices    = result.prices;
         _pdFromCache = false;
+        _pdBlocked   = result.blocked || null;
         _renderPriceDetail();
       }
     }).catch(() => {});
@@ -7401,6 +7405,7 @@ window.openPriceDetailModal = async function(barcode, name, qty) {
     const result = await _pdFetchPrices(barcode).catch(() => null);
     _pdPrices    = result?.prices || [];
     _pdFromCache = result?.fromCache || false;
+    _pdBlocked   = result?.blocked || null;
     _renderPriceDetail();
   }
 
@@ -7417,6 +7422,7 @@ window.openPriceDetailModal = async function(barcode, name, qty) {
       _pdFetchPrices(barcode).then(result => {
         if (!result) return;
         _pdPrices = result.prices || [];
+        _pdBlocked = result.blocked || null;
         if (snap.exists()) {
           const vals = Object.values(snap.val() || {});
           const latest = vals.sort((a,b) => (b.submittedAt||'') > (a.submittedAt||'') ? 1 : -1)[0];
@@ -7476,6 +7482,20 @@ function _renderPriceDetail() {
     _seenKeys.add(p._key);
     return true;
   });
+
+  // Radius tab with no saved location: no request was made — ask for a location,
+  // never claim "no prices".
+  if (!_pdPricesDeduped.length && pdEmptyStateKind(_pdBlocked, _pdMode) === 'location-required') {
+    body.innerHTML = updateByBanner + offlineBanner + `
+      <div class="pd-empty pd-loc-required">
+        <div class="pe-icon">📍</div>
+        <div style="font-size:14px;font-weight:700;margin-bottom:6px">בחר מיקום כדי לראות מחירים לפי מרחק</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:14px">עוד לא נבחר מיקום לחיפוש לפי מרחק</div>
+      </div>
+      <button class="pd-manual-btn" onclick="selectLocGPS()">📍 השתמש במיקום הנוכחי</button>
+      <button class="pd-manual-btn" onclick="openManualAddressModal()">📌 הזן כתובת</button>`;
+    return;
+  }
 
   if (!_pdPricesDeduped.length) {
     body.innerHTML = updateByBanner + offlineBanner + `
