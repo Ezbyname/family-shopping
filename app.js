@@ -4218,12 +4218,17 @@ window.showProductPricesEnhanced = async function(product) {
   // option in a separate card. Any failure → fall back to the full list.
   let displayRows = prices, outsideCard = null, noLocationHint = false, radiusActive = false;
   if (_hasLoc()) {
-    const apiRows = await _fetchPricesWithDistance(barcode);
+    // Nearby list uses the real radius; the outside-area candidate comes from a
+    // separate national read and can never replace or empty the nearby list.
+    const [nearbyRows, outsideRows] = await Promise.all([
+      _fetchPricesWithDistance(barcode),
+      _fetchPricesWithDistance(barcode, OUTSIDE_CANDIDATE_RADIUS_KM),
+    ]);
     if (mySeq !== _pdSeq) return;                 // superseded during await
-    if (apiRows && apiRows.length) {
-      const part  = _partitionByRadius(apiRows, _nearbyRadius);
-      displayRows = part.nearby;                  // outside + unknown excluded
-      outsideCard = part.showOutsideCard ? part.cheapestOutside : null;
+    const view = _buildNearbyView(nearbyRows, outsideRows, _nearbyRadius);
+    if (view.active) {
+      displayRows = view.nearby;                  // outside + unknown excluded
+      outsideCard = view.outsideCard;
       radiusActive = true;
     }
   } else {
@@ -6801,20 +6806,42 @@ async function _fetchPricesForBarcode(barcode) {
   }
 }
 
-// Fetch all price rows WITH per-store distance for the current location, by
-// asking the API with a very large radius (price records carry no coords; the
-// API joins store coords server-side and returns distanceKm). Used by System-1
-// to partition nearby vs. outside-radius. Returns rows[] or null on failure.
-async function _fetchPricesWithDistance(barcode) {
+// Fetch price rows WITH per-store distance for the current location, using the
+// active nearby radius (price records carry no coords; the API joins store
+// coords server-side and returns distanceKm). The radius must be applied by the
+// server BEFORE its MAX_PRICES cap — a huge radius returned the 50 cheapest
+// stores nationwide, so nearby stores were cut and the 3 km view showed 0.
+// Used by System-1. Returns rows[] or null on failure.
+async function _fetchPricesWithDistance(barcode, radiusKm = _nearbyRadius) {
   if (!_hasLoc() || !navigator.onLine) return null;
   try {
     const url = `/api/prices?barcode=${encodeURIComponent(barcode)}`
-      + `&lat=${_locLat()}&lng=${_locLng()}&radiusKm=99999&includeApproximate=true`;
+      + `&lat=${_locLat()}&lng=${_locLng()}&radiusKm=${radiusKm}&includeApproximate=true`;
     const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
     if (!res.ok) return null;
     const data = await res.json();
     return (data.prices || []).filter(p => (p.displayPrice || p.price || 0) > 0);
   } catch (_) { return null; }
+}
+
+// National read used ONLY for the "cheapest outside your area" card. Its
+// MAX_PRICES cap is safe here: the card shows only when nothing is nearby or
+// the outside row is cheaper than every nearby row, so it is always among the
+// cheapest rows nationwide.
+const OUTSIDE_CANDIDATE_RADIUS_KM = 99999;
+
+// Combine System-1 nearby rows (real radius) with the outside candidate rows.
+// nearby comes only from nearbyRows; outsideRows only supplies the card.
+// Active when either read returned rows (same trigger as the old single read),
+// but never when the nearby read itself failed — that keeps the full-list fallback.
+function _buildNearbyView(nearbyRows, outsideRows, radiusKm) {
+  const nearby = _partitionByRadius(nearbyRows || [], radiusKm).nearby;
+  const cheapestOutside = _partitionByRadius(outsideRows || [], radiusKm).cheapestOutside;
+  const active = nearbyRows != null && (nearby.length > 0 || Boolean(outsideRows && outsideRows.length));
+  const minNearby = nearby.length ? (nearby[0].displayPrice ?? nearby[0].price ?? Infinity) : Infinity;
+  const outP = cheapestOutside ? (cheapestOutside.displayPrice ?? cheapestOutside.price ?? Infinity) : Infinity;
+  const showOutside = !!cheapestOutside && (nearby.length === 0 || outP < minNearby);
+  return { active, nearby, outsideCard: showOutside ? cheapestOutside : null };
 }
 
 // Client mirror of api/prices.js partitionByRadius (kept in sync; tested there).
