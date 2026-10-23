@@ -186,10 +186,15 @@ export function pdShouldUseFallback(prices, pdName, mode) {
  * Radius mode without a saved location is NOT "no prices" — the request was
  * never made, so the user must be asked for a location instead.
  *
+ * While a current-location request from the sheet is in flight or has failed,
+ * the radius tab shows that GPS state instead — never the generic "no prices".
+ *
  * @param {string|null|undefined} blocked  `blocked` from pdBuildRequestUrl / _pdFetchPrices
  * @param {'city'|'radius'|'all'} mode
- * @returns {'location-required'|'no-prices'}
+ * @param {'idle'|'locating'|'location-error'} [gpsState]  System-2 current-location state
+ * @returns {'location-required'|'locating'|'location-error'|'no-prices'}
  */
-export function pdEmptyStateKind(blocked, mode) {
+export function pdEmptyStateKind(blocked, mode, gpsState = 'idle') {
+  if (mode === 'radius' && (gpsState === 'locating' || gpsState === 'location-error')) return gpsState;
   return (mode === 'radius' && blocked === 'no-location') ? 'location-required' : 'no-prices';
 }

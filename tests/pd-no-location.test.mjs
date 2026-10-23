@@ -54,11 +54,11 @@ function render({ prices = [], blocked = null, mode = 'radius', online = true })
   const body = { innerHTML: '' };
   const factory = new Function(
     'document', 'navigator', '_pdLastUpdateBy', '_pdFromCache', '_pcGet', 'PRICE_CACHE_TTL', '_pdBarcode',
-    '_pdName', '_pdPrices', '_pdBlocked', '_pdMode', 'pdEmptyStateKind', 'esc', '_jsAttr',
+    '_pdName', '_pdPrices', '_pdBlocked', '_pdMode', '_pdGpsState', 'pdEmptyStateKind', 'esc', '_jsAttr',
     `${extractFn('_renderPriceDetail')}\nreturn _renderPriceDetail;`
   );
   factory({ getElementById: () => body }, { onLine: online }, null, false, () => null, 0, '7290004131074',
-    'חלב', prices, blocked, mode, pd.pdEmptyStateKind, s => s, s => JSON.stringify(s))();
+    'חלב', prices, blocked, mode, 'idle', pd.pdEmptyStateKind, s => s, s => JSON.stringify(s))();
   return body.innerHTML;
 }
 const GENERIC = 'אין מחירים זמינים';
@@ -83,7 +83,7 @@ await test('1. no saved location → _pdFetchPrices reports blocked:no-location,
 await test('2. no saved location → explicit location-required state with GPS + address CTAs', () => {
   const html = render({ blocked: 'no-location' });
   ok(html.includes(CTA), 'CTA text shown');
-  ok(html.includes('onclick="selectLocGPS()"'), 'GPS option');
+  ok(html.includes('onclick="_pdUseCurrentLocation()"'), 'GPS option');
   ok(html.includes('onclick="openManualAddressModal()"'), 'manual address option');
 });
 

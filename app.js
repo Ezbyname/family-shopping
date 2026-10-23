@@ -26,7 +26,7 @@ const db  = getDatabase(app);
 // ── APP VERSION ────────────────────────────────────────────────────────────
 // Single source of truth for the frontend build. BUMP on every shipped fix so
 // "which build am I running?" is answerable from the UI (group/settings sheet).
-const APP_VERSION = '3.2.1';   // 2026-10: price chip no longer clipped (grid footer layout)
+const APP_VERSION = '3.2.2';   // 2026-10: in-sheet current-location feedback (System-2 GPS)
 
 // ── DEPARTMENT GROUPING (Stage 4) ──────────────────────────────────────────
 import { DEPARTMENTS, DEPT_OVERRIDES, DEPT_KEYWORDS, _normText, getItemDepartment } from './js/product-taxonomy.js';
@@ -1134,6 +1134,7 @@ window.setNearbyRadius = function(km) {
 // Set the active location and persist to localStorage
 function _setLocation(loc) {
   _selectedLocation = loc;
+  _pdGpsState = 'idle';  // any new location ends a pending/failed in-sheet GPS state
   try { localStorage.setItem('selectedLocation', JSON.stringify(loc)); } catch(_) {}
   _syncNearbyUI();
   // Refresh price-detail sheet if it is open and in radius mode — location change affects radius results.
@@ -1195,9 +1196,10 @@ window.selectRecentLocation = function(idx) {
 };
 
 // ── GPS location ──────────────────────────────────────────────────────────────
+// Resolves true when a location was set, false on any failure.
 window.selectLocGPS = async function() {
   closeLocDropdown();
-  if (!navigator.geolocation) { toast('⚠️ GPS לא נתמך בדפדפן זה'); return; }
+  if (!navigator.geolocation) { toast('⚠️ GPS לא נתמך בדפדפן זה'); return false; }
   const srcLabel = document.getElementById('loc-source-label');
   const srcIcon  = document.getElementById('loc-source-icon');
   if (srcLabel) srcLabel.textContent = 'מאתר...';
@@ -1215,9 +1217,11 @@ window.selectLocGPS = async function() {
     });
     toast('📍 מיקום נמצא!');
     if (lastSearchQuery) searchPrices();
+    return true;
   } catch (e) {
     _syncNearbyUI(); // restore button state
     toast('⚠️ לא ניתן לקבל מיקום — בדוק הרשאות GPS');
+    return false;
   }
 };
 
@@ -7082,6 +7086,7 @@ let _pdBlocked      = null;   // 'no-location' | 'no-cities' | null — why no r
 let _pdUnsub        = null;   // Firebase real-time unsub
 let _pdLastUpdateBy = null;   // track who just updated for notification
 let _pdMode         = 'all';  // 'city' | 'radius' | 'all' — recomputed on each open
+let _pdGpsState     = 'idle'; // 'idle' | 'locating' | 'location-error' — in-sheet current-location feedback
 
 // ── PD LOCATION SYSTEM ────────────────────────────────────────────────────────
 
@@ -7202,6 +7207,17 @@ function _pdSetRadius(km) {
 function _pdSelectGPS() {
   openManualAddressModal();
 }
+
+// System-2 "use current location": feedback is rendered inside the sheet because the
+// global toast and the search-strip status are both covered by the price-detail overlay.
+async function _pdUseCurrentLocation() {
+  _pdGpsState = 'locating';
+  _renderPriceDetail();
+  if (await selectLocGPS()) return;  // _setLocation reset the state and refreshed the sheet
+  _pdGpsState = 'location-error';
+  _renderPriceDetail();
+}
+window._pdUseCurrentLocation = _pdUseCurrentLocation;
 
 function _pdRefreshPrices() {
   if (!_pdBarcode) return;
@@ -7359,6 +7375,7 @@ window.openPriceDetailModal = async function(barcode, name, qty) {
   _pdSort      = 'cheapest';
   _pdFilters   = new Set();
   _pdLastUpdateBy = null;
+  _pdGpsState  = 'idle';
   _pdMode      = _pdInitMode();
 
   const overlay = document.getElementById('price-detail-overlay');
@@ -7484,15 +7501,24 @@ function _renderPriceDetail() {
   });
 
   // Radius tab with no saved location: no request was made — ask for a location,
-  // never claim "no prices".
-  if (!_pdPricesDeduped.length && pdEmptyStateKind(_pdBlocked, _pdMode) === 'location-required') {
-    body.innerHTML = updateByBanner + offlineBanner + `
-      <div class="pd-empty pd-loc-required">
+  // never claim "no prices". A sheet-initiated GPS request shows its own state here.
+  const emptyKind = _pdPricesDeduped.length ? null : pdEmptyStateKind(_pdBlocked, _pdMode, _pdGpsState);
+  if (emptyKind === 'location-required' || emptyKind === 'locating' || emptyKind === 'location-error') {
+    const status = emptyKind === 'locating'
+      ? `<div class="pd-loading pd-gps-locating"><div class="spin"></div><p>מאתר מיקום...</p></div>`
+      : emptyKind === 'location-error'
+      ? `<div class="pd-empty pd-gps-error">
+        <div class="pe-icon">⚠️</div>
+        <div style="font-size:14px;font-weight:700;margin-bottom:14px">לא הצלחנו לקבל את המיקום הנוכחי</div>
+      </div>`
+      : `<div class="pd-empty pd-loc-required">
         <div class="pe-icon">📍</div>
         <div style="font-size:14px;font-weight:700;margin-bottom:6px">בחר מיקום כדי לראות מחירים לפי מרחק</div>
         <div style="font-size:12px;color:var(--muted);margin-bottom:14px">עוד לא נבחר מיקום לחיפוש לפי מרחק</div>
-      </div>
-      <button class="pd-manual-btn" onclick="selectLocGPS()">📍 השתמש במיקום הנוכחי</button>
+      </div>`;
+    const gpsBtn = emptyKind === 'locating' ? ''
+      : `<button class="pd-manual-btn" onclick="_pdUseCurrentLocation()">📍 ${emptyKind === 'location-error' ? 'נסה שוב מיקום נוכחי' : 'השתמש במיקום הנוכחי'}</button>`;
+    body.innerHTML = updateByBanner + offlineBanner + status + gpsBtn + `
       <button class="pd-manual-btn" onclick="openManualAddressModal()">📌 הזן כתובת</button>`;
     return;
   }
