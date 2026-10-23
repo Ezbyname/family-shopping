@@ -198,3 +198,20 @@ export function pdEmptyStateKind(blocked, mode, gpsState = 'idle') {
   if (mode === 'radius' && (gpsState === 'locating' || gpsState === 'location-error')) return gpsState;
   return (mode === 'radius' && blocked === 'no-location') ? 'location-required' : 'no-prices';
 }
+
+/**
+ * Failure reason for a geolocation error, from GeolocationPositionError.code
+ * (1 PERMISSION_DENIED, 2 POSITION_UNAVAILABLE, 3 TIMEOUT). Anything else —
+ * including a non-geolocation exception — is 'unknown'.
+ *
+ * @param {{code?: number}|null|undefined} err
+ * @returns {'denied'|'unavailable'|'timeout'|'unknown'}
+ */
+export function pdGpsErrorKind(err) {
+  switch (err?.code) {
+    case 1:  return 'denied';
+    case 2:  return 'unavailable';
+    case 3:  return 'timeout';
+    default: return 'unknown';
+  }
+}

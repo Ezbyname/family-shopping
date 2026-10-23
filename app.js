@@ -1,4 +1,4 @@
-import { pdHasLoc as _pdHasLocFn, pdInitialMode, pdEffectiveRadius as pdEffR, pdCacheKey as pdCKFn, pdRowEligible, pdBuildRequestUrl, pdExtractRows, pdNameFallbackUrl, pdShouldUseFallback, pdEmptyStateKind } from './js/pd-location.js';
+import { pdHasLoc as _pdHasLocFn, pdInitialMode, pdEffectiveRadius as pdEffR, pdCacheKey as pdCKFn, pdRowEligible, pdBuildRequestUrl, pdExtractRows, pdNameFallbackUrl, pdShouldUseFallback, pdEmptyStateKind, pdGpsErrorKind } from './js/pd-location.js';
 import { bpSelectName, bpConsumeBatches, bpFetchCorpus, bpIsIncompleteHebrewCorpus } from './js/bp-search.js';
 import { storeRowTitle, storeAddressLine, navDestination, googleMapsUrl, wazeUrl, NAV_ICON_GOOGLE, NAV_ICON_WAZE } from './js/store-ui.js';
 import { bpSelectBroadCandidates, IL_BRAND_TOKENS } from './js/bp-intent.js';
@@ -26,7 +26,7 @@ const db  = getDatabase(app);
 // ── APP VERSION ────────────────────────────────────────────────────────────
 // Single source of truth for the frontend build. BUMP on every shipped fix so
 // "which build am I running?" is answerable from the UI (group/settings sheet).
-const APP_VERSION = '3.2.2';   // 2026-10: in-sheet current-location feedback (System-2 GPS)
+const APP_VERSION = '3.2.3';   // 2026-10: location-permission guidance per GPS failure reason (System-2)
 
 // ── DEPARTMENT GROUPING (Stage 4) ──────────────────────────────────────────
 import { DEPARTMENTS, DEPT_OVERRIDES, DEPT_KEYWORDS, _normText, getItemDepartment } from './js/product-taxonomy.js';
@@ -1196,10 +1196,11 @@ window.selectRecentLocation = function(idx) {
 };
 
 // ── GPS location ──────────────────────────────────────────────────────────────
-// Resolves true when a location was set, false on any failure.
+// Resolves true when a location was set; otherwise the failure reason:
+// 'denied' | 'unavailable' | 'timeout' | 'unknown' | 'unsupported'.
 window.selectLocGPS = async function() {
   closeLocDropdown();
-  if (!navigator.geolocation) { toast('⚠️ GPS לא נתמך בדפדפן זה'); return false; }
+  if (!navigator.geolocation) { toast('⚠️ GPS לא נתמך בדפדפן זה'); return 'unsupported'; }
   const srcLabel = document.getElementById('loc-source-label');
   const srcIcon  = document.getElementById('loc-source-icon');
   if (srcLabel) srcLabel.textContent = 'מאתר...';
@@ -1221,7 +1222,7 @@ window.selectLocGPS = async function() {
   } catch (e) {
     _syncNearbyUI(); // restore button state
     toast('⚠️ לא ניתן לקבל מיקום — בדוק הרשאות GPS');
-    return false;
+    return pdGpsErrorKind(e);
   }
 };
 
@@ -7087,6 +7088,7 @@ let _pdUnsub        = null;   // Firebase real-time unsub
 let _pdLastUpdateBy = null;   // track who just updated for notification
 let _pdMode         = 'all';  // 'city' | 'radius' | 'all' — recomputed on each open
 let _pdGpsState     = 'idle'; // 'idle' | 'locating' | 'location-error' — in-sheet current-location feedback
+let _pdGpsError     = null;   // failure reason from selectLocGPS while _pdGpsState is 'location-error'
 
 // ── PD LOCATION SYSTEM ────────────────────────────────────────────────────────
 
@@ -7213,11 +7215,39 @@ function _pdSelectGPS() {
 async function _pdUseCurrentLocation() {
   _pdGpsState = 'locating';
   _renderPriceDetail();
-  if (await selectLocGPS()) return;  // _setLocation reset the state and refreshed the sheet
+  const result = await selectLocGPS();
+  if (result === true) return;  // _setLocation reset the state and refreshed the sheet
+  _pdGpsError = result;
   _pdGpsState = 'location-error';
   _renderPriceDetail();
 }
 window._pdUseCurrentLocation = _pdUseCurrentLocation;
+
+// In-sheet message for a failed current-location request. A web page cannot open the
+// Android app-permission screen, so permission denial gets written instructions only.
+function _pdGpsErrorHtml(kind) {
+  const title  = t => `<div style="font-size:14px;font-weight:700;margin-bottom:6px">${t}</div>`;
+  const detail = t => `<div style="font-size:12px;color:var(--muted);margin-bottom:14px">${t}</div>`;
+  let content;
+  if (kind === 'denied') {
+    content = title('לאפליקציה אין הרשאה להשתמש במיקום שלך')
+      + detail('כדי להשתמש בחיפוש לפי מרחק, יש לאפשר ל-Chrome גישה למיקום.')
+      + `<div class="pd-gps-help" style="font-size:12px;text-align:right;line-height:1.6;margin-bottom:14px">
+          <b>ב-Android:</b><br>הגדרות &gt; אפליקציות &gt; Chrome &gt; הרשאות &gt; מיקום &gt; אפשר בזמן השימוש<br>
+          ודא שגם הרשאת המיקום לאתר הזה מאופשרת ב-Chrome.
+        </div>`;
+  } else if (kind === 'unavailable') {
+    content = title('לא הצלחנו לזהות את המיקום כרגע.')
+      + detail('ודא ששירותי המיקום במכשיר פעילים ונסה שוב.');
+  } else if (kind === 'timeout') {
+    content = title('איתור המיקום ארך יותר מדי זמן.')
+      + detail('נסה שוב.');
+  } else {
+    content = title('לא הצלחנו לקבל את המיקום הנוכחי')
+      + detail('נסה שוב או הזן כתובת.');
+  }
+  return `<div class="pd-empty pd-gps-error pd-gps-${kind || 'unknown'}"><div class="pe-icon">${kind === 'denied' ? '🔒' : '⚠️'}</div>${content}</div>`;
+}
 
 function _pdRefreshPrices() {
   if (!_pdBarcode) return;
@@ -7507,19 +7537,17 @@ function _renderPriceDetail() {
     const status = emptyKind === 'locating'
       ? `<div class="pd-loading pd-gps-locating"><div class="spin"></div><p>מאתר מיקום...</p></div>`
       : emptyKind === 'location-error'
-      ? `<div class="pd-empty pd-gps-error">
-        <div class="pe-icon">⚠️</div>
-        <div style="font-size:14px;font-weight:700;margin-bottom:14px">לא הצלחנו לקבל את המיקום הנוכחי</div>
-      </div>`
+      ? _pdGpsErrorHtml(_pdGpsError)
       : `<div class="pd-empty pd-loc-required">
         <div class="pe-icon">📍</div>
         <div style="font-size:14px;font-weight:700;margin-bottom:6px">בחר מיקום כדי לראות מחירים לפי מרחק</div>
         <div style="font-size:12px;color:var(--muted);margin-bottom:14px">עוד לא נבחר מיקום לחיפוש לפי מרחק</div>
       </div>`;
+    const failed = emptyKind === 'location-error';
     const gpsBtn = emptyKind === 'locating' ? ''
-      : `<button class="pd-manual-btn" onclick="_pdUseCurrentLocation()">📍 ${emptyKind === 'location-error' ? 'נסה שוב מיקום נוכחי' : 'השתמש במיקום הנוכחי'}</button>`;
+      : `<button class="pd-manual-btn" onclick="_pdUseCurrentLocation()">📍 ${failed ? 'נסה שוב' : 'השתמש במיקום הנוכחי'}</button>`;
     body.innerHTML = updateByBanner + offlineBanner + status + gpsBtn + `
-      <button class="pd-manual-btn" onclick="openManualAddressModal()">📌 הזן כתובת</button>`;
+      <button class="pd-manual-btn" onclick="openManualAddressModal()">📌 ${failed ? 'הזן כתובת במקום' : 'הזן כתובת'}</button>`;
     return;
   }
 
