@@ -26,7 +26,7 @@ const db  = getDatabase(app);
 // ── APP VERSION ────────────────────────────────────────────────────────────
 // Single source of truth for the frontend build. BUMP on every shipped fix so
 // "which build am I running?" is answerable from the UI (group/settings sheet).
-const APP_VERSION = '3.2.3';   // 2026-10: location-permission guidance per GPS failure reason (System-2)
+const APP_VERSION = '3.2.4';   // 2026-10: clear saved location from the distance sheet (System-2)
 
 // ── DEPARTMENT GROUPING (Stage 4) ──────────────────────────────────────────
 import { DEPARTMENTS, DEPT_OVERRIDES, DEPT_KEYWORDS, _normText, getItemDepartment } from './js/product-taxonomy.js';
@@ -1148,8 +1148,16 @@ function _setLocation(loc) {
 // Clear the active location
 window.clearLocation = function() {
   _selectedLocation = null;
+  _pdGpsState = 'idle';
+  _pdGpsError = null;
   try { localStorage.removeItem('selectedLocation'); } catch(_) {}
   _syncNearbyUI();
+  // Same price-detail refresh as _setLocation — with no location the radius tab
+  // falls back to the location-required panel via _pdRefreshPrices.
+  if (_pdBarcode && document.getElementById('price-detail-overlay')?.classList.contains('show')) {
+    _syncPdLocationUI();
+    if (_pdMode === 'radius') _pdRefreshPrices();
+  }
   if (lastSearchQuery) searchPrices();
 };
 
@@ -7303,6 +7311,7 @@ function _syncPdLocationUI() {
       <div class="pd-radius-loc-row">
         ${locLabel}
         <button class="pd-change-loc-btn" onclick="_pdSelectGPS()">שנה מיקום</button>
+        ${_pdHasLoc() ? `<button class="pd-change-loc-btn pd-clear-loc-btn" onclick="clearLocation()">נקה מיקום</button>` : ''}
       </div>
       <div class="pd-radius-seg">${segs}</div>
     </div>`;
