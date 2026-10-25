@@ -426,25 +426,43 @@ function trackEvent(eventName, props = {}) {
 }
 
 // ── SYNC HEALTH MONITOR ──────────────────────────────────────────────────────
-// Reads syncSummary once on app connect. Shows a dismissible banner if prices
-// are stale (>36 h) or majority of chains failed the last sync run.
-const _STALE_HOURS = 36;
+// Reads syncStatus once on app connect. Shows a dismissible banner only when the
+// newest SUCCESSFUL price-chain sync is more than 24 h old (FS-SYNC-STALE-001).
+// syncSummary.lastSync is not used: it is written at the end of every run, failed
+// runs included. Failed chains alone never trigger the banner.
+const _STALE_HOURS = 24;
+
+// Newest valid syncStatus/*.lastSuccessAt in ms, or null. Skips *-stores entries
+// (store-list syncs, not prices) and missing / malformed timestamps.
+function _newestPriceSyncSuccessMs(syncStatus) {
+  if (!syncStatus || typeof syncStatus !== 'object') return null;
+  let newest = null;
+  for (const [key, s] of Object.entries(syncStatus)) {
+    if (key.endsWith('-stores') || !s || typeof s !== 'object') continue;
+    const raw = s.lastSuccessAt;
+    const ms  = typeof raw === 'number' ? raw : typeof raw === 'string' && raw ? Date.parse(raw) : NaN;
+    if (!Number.isFinite(ms) || ms <= 0) continue;
+    if (newest === null || ms > newest) newest = ms;
+  }
+  return newest;
+}
+
+// Strictly greater than 24 h — exactly 24 h is still fresh.
+function _isSyncStale(lastSuccessMs, now) {
+  return lastSuccessMs != null && (now - lastSuccessMs) > _STALE_HOURS * 3_600_000;
+}
 
 async function checkSyncHealth() {
   if (!db) return;
   try {
-    const snap = await withClientTimeout(get(ref(db, 'syncSummary')), 5_000, 'syncSummary');
+    const snap = await withClientTimeout(get(ref(db, 'syncStatus')), 5_000, 'syncStatus');
     if (!snap?.exists()) return;
-    const { lastSync, chainsFailed, chainsSucceeded } = snap.val() || {};
-    const ageHours    = lastSync ? (Date.now() - lastSync) / 3_600_000 : Infinity;
-    const majorFailed = (chainsFailed || 0) > (chainsSucceeded || 0);
-    if (ageHours > _STALE_HOURS || majorFailed) {
-      const label = isFinite(ageHours) ? `${Math.round(ageHours)} שעות` : 'זמן רב';
-      showSyncStaleBanner(label);
-      trackEvent('sync_stale_banner_shown', {
-        ageHours:    Math.round(isFinite(ageHours) ? ageHours : 999),
-        chainsFailed: chainsFailed || 0,
-      });
+    const lastSuccessMs = _newestPriceSyncSuccessMs(snap.val());
+    const now = Date.now();
+    if (_isSyncStale(lastSuccessMs, now)) {
+      const ageHours = (now - lastSuccessMs) / 3_600_000;
+      showSyncStaleBanner(`${Math.round(ageHours)} שעות`);
+      trackEvent('sync_stale_banner_shown', { ageHours: Math.round(ageHours) });
     }
   } catch (_) {} // non-blocking — ignore all failures silently
 }
@@ -513,7 +531,7 @@ function connectToGroup(){
   setTimeout(updateHeaderAvatar, 300);
   // Attach hidden admin long-press gesture (silently no-ops for non-admins)
   setTimeout(initAdminGesture, 600);
-  // Check sync health — warn users if prices are stale (>36 h since last sync)
+  // Check sync health — warn users if prices are stale (>24 h since last successful sync)
   setTimeout(checkSyncHealth, 4000);
 
   toast('👋 שלום '+myName+'!');
