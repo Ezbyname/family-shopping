@@ -1292,6 +1292,19 @@ window.closeManualAddressModal = function() {
   document.getElementById('addr-overlay').classList.remove('show');
 };
 
+// Hebrew message per /api/geocode HTTP status (FS-I18N-ADDR-001). The backend's
+// `data.error` is English and never shown — it stays an internal API contract.
+const _GEOCODE_ERROR_HE = {
+  422: 'הכתובת כללית מדי — יש להזין רחוב, מספר ועיר',
+  404: 'לא הצלחנו למצוא את הכתובת — בדוק את הפרטים ונסה שוב',
+  429: 'בוצעו יותר מדי ניסיונות — המתן מעט ונסה שוב',
+  503: 'שירות איתור הכתובת אינו זמין כרגע — נסה שוב מאוחר יותר',
+};
+const _GEOCODE_ERROR_HE_DEFAULT = 'לא הצלחנו לאתר את הכתובת — נסה שוב';
+function _geocodeErrorMessage(status) {
+  return _GEOCODE_ERROR_HE[status] || _GEOCODE_ERROR_HE_DEFAULT;
+}
+
 window.submitManualAddress = async function() {
   const input   = document.getElementById('addr-input');
   const errEl   = document.getElementById('addr-error');
@@ -1312,17 +1325,19 @@ window.submitManualAddress = async function() {
 
   try {
     const res  = await fetch(`/api/geocode?address=${encodeURIComponent(address)}`);
-    const data = await res.json();
 
     if (!res.ok) {
-      errEl.textContent = data.error || 'כתובת לא נמצאה — נסה לפרט יותר';
-      if (data.suggestion && resEl) resEl.textContent = `אולי התכוונת: ${data.suggestion}`;
+      // Error bodies may be non-JSON (e.g. a platform 502 page) — still show the mapped message.
+      const errData = await res.json().catch(() => ({}));
+      errEl.textContent = _geocodeErrorMessage(res.status);
+      if (errData?.suggestion && resEl) resEl.textContent = `אולי התכוונת: ${errData.suggestion}`;
       input?.classList.add('error');
       btn.textContent = 'חפש כתובת';
       btn.disabled    = false;
       return;
     }
 
+    const data = await res.json();
     if (resEl) resEl.textContent = `✅ ${data.formattedAddress}`;
 
     const loc = {
