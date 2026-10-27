@@ -26,7 +26,7 @@ const db  = getDatabase(app);
 // ── APP VERSION ────────────────────────────────────────────────────────────
 // Single source of truth for the frontend build. BUMP on every shipped fix so
 // "which build am I running?" is answerable from the UI (group/settings sheet).
-const APP_VERSION = '3.2.4';   // 2026-10: clear saved location from the distance sheet (System-2)
+const APP_VERSION = '3.2.5';   // 2026-10: stable release — 24h sync banner, Hebrew geocode errors, one-time SW update reload
 
 // ── DEPARTMENT GROUPING (Stage 4) ──────────────────────────────────────────
 import { DEPARTMENTS, DEPT_OVERRIDES, DEPT_KEYWORDS, _normText, getItemDepartment } from './js/product-taxonomy.js';
@@ -6122,7 +6122,29 @@ function buildAvatarHTML(avatarType, avatarValue, avatarEmoji, size = 36) {
 }
 
 // SERVICE WORKER
+// Release gate: sw.js serves app.js / modules cache-first, so a page opened under the
+// OLD worker runs old code even after the new one installs. When the new worker takes
+// control (skipWaiting + clients.claim) reload once so this tab runs the new build.
+// - first-ever install (no controller before registration) → no reload
+// - at most once per tab session (sessionStorage guard) → no reload loop
+// - sessionStorage unavailable → no guard possible → no reload (update applies next launch)
+const SW_RELOAD_SESSION_KEY = 'fs-sw-update-reloaded';
+function _installSwUpdateReload(sw, getStorage, reload) {
+  const hadController = !!sw.controller;
+  let reloading = false;
+  sw.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    try {
+      const storage = getStorage();
+      if (storage.getItem(SW_RELOAD_SESSION_KEY)) return;
+      storage.setItem(SW_RELOAD_SESSION_KEY, '1');
+    } catch (_) { return; }
+    reloading = true;
+    reload();
+  });
+}
 if('serviceWorker' in navigator){
+  _installSwUpdateReload(navigator.serviceWorker, () => window.sessionStorage, () => window.location.reload());
   navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 
