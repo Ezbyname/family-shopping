@@ -5,6 +5,7 @@ import { bpSelectBroadCandidates, IL_BRAND_TOKENS } from './js/bp-intent.js';
 import { bpDedupeProducts, bpPickerView, bpPage, RESULT_CAP, PICKER_INITIAL } from './js/bp-results.js';
 import { bpTranslate } from './js/bp-translation.js';
 import { bpSelectStrictCandidates } from './js/bp-strict.js';
+import { NEARBY_MODE_KEY, restoreNearbyMode, persistNearbyMode } from './js/nearby-state.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, get, push, onValue, update, remove }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -1088,6 +1089,9 @@ const _pdHasLoc  = () => _pdHasLocFn(_selectedLocation);
     const rl = localStorage.getItem('recentLocations');
     if (rl) _recentLocations = JSON.parse(rl);
   } catch (_) {}
+  // FS-RADIUS-001: restore the nearby toggle only when a valid saved location exists
+  try { _nearbyMode = restoreNearbyMode(localStorage.getItem(NEARBY_MODE_KEY), _selectedLocation); } catch (_) {}
+  if (_nearbyMode) setTimeout(_syncNearbyUI, 0);  // DOM-dependent; run after module init
 })();
 
 function _syncNearbyUI() {
@@ -1135,6 +1139,7 @@ window.toggleNearbyMode = function() {
     return;
   }
   _nearbyMode = !_nearbyMode;
+  persistNearbyMode(localStorage, _nearbyMode);
   _syncNearbyUI();
   if (_nearbyMode && !_hasLoc()) toggleLocDropdown();
 };

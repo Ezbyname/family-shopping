@@ -22,6 +22,7 @@ const APP_SHELL = [
   '/js/bp-results.js',
   '/js/bp-translation.js',
   '/js/bp-strict.js',
+  '/js/nearby-state.js',
 ];
 
 // Patterns that should NEVER be served from cache
