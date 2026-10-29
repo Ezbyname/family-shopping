@@ -102,11 +102,11 @@ function runSw({ existingCaches = [], cached = {} } = {}) {
 console.log('\nSERVICE WORKER RELEASE GATE');
 
 // Versions
-await test('CACHE_VERSION is fsl-v49', async () => {
-  eq(sw.match(/const CACHE_VERSION\s*=\s*'([^']+)'/)?.[1], 'fsl-v49', 'CACHE_VERSION');
+await test('CACHE_VERSION is fsl-v50', async () => {
+  eq(sw.match(/const CACHE_VERSION\s*=\s*'([^']+)'/)?.[1], 'fsl-v50', 'CACHE_VERSION');
 });
-await test('APP_VERSION is 3.2.5', async () => {
-  eq(app.match(/const APP_VERSION\s*=\s*'([^']+)'/)?.[1], '3.2.5', 'APP_VERSION');
+await test('APP_VERSION is 3.2.6', async () => {
+  eq(app.match(/const APP_VERSION\s*=\s*'([^']+)'/)?.[1], '3.2.6', 'APP_VERSION');
 });
 
 // Reload guard
@@ -170,7 +170,7 @@ await test('registration still occurs, guard installed BEFORE register()', async
 await test('install: pre-caches app shell into the new cache, then skipWaiting()', async () => {
   const w = runSw();
   await w.dispatch('install');
-  eq(w.log.opened[0], 'fsl-v49', 'cache opened');
+  eq(w.log.opened[0], 'fsl-v50', 'cache opened');
   for (const a of ['/', '/index.html', '/styles.css', '/app.js', '/appinline.js', '/manifest.json']) {
     ok(w.log.added.includes(a), `app shell missing ${a}`);
   }
@@ -184,11 +184,11 @@ await test('app shell includes every ./js/*.js module app.js imports statically'
   const missing = imported.filter(u => !w.log.added.includes(u));
   eq(missing.length, 0, `missing from APP_SHELL: ${missing.join(', ')}`);
 });
-await test('activate: deletes every old cache, keeps fsl-v49, then clients.claim()', async () => {
-  const w = runSw({ existingCaches: ['fsl-v44', 'fsl-v48', 'fsl-v49', 'other'] });
+await test('activate: deletes every old cache, keeps fsl-v50, then clients.claim()', async () => {
+  const w = runSw({ existingCaches: ['fsl-v44', 'fsl-v48', 'fsl-v49', 'fsl-v50', 'other'] });
   await w.dispatch('activate');
-  eq(JSON.stringify(w.log.deleted.sort()), JSON.stringify(['fsl-v44', 'fsl-v48', 'other']), 'deleted');
-  ok(w.store.has('fsl-v49'), 'current cache kept');
+  eq(JSON.stringify(w.log.deleted.sort()), JSON.stringify(['fsl-v44', 'fsl-v48', 'fsl-v49', 'other']), 'deleted');
+  ok(w.store.has('fsl-v50'), 'current cache kept');
   eq(w.log.claim, 1, 'clients.claim');
 });
 await test('fetch strategy unchanged: navigation network-first, assets cache-first, /api/ bypassed', async () => {
@@ -203,11 +203,11 @@ await test('fetch strategy unchanged: navigation network-first, assets cache-fir
   w.handlers.fetch({ request: { method: 'GET', url: `${origin}/api/prices?x=1` }, respondWith: () => { responded = true; } });
   eq(responded, false, '/api/ not intercepted');
 });
-await test('GET_CACHE_VERSION diag reply reports fsl-v49', async () => {
+await test('GET_CACHE_VERSION diag reply reports fsl-v50', async () => {
   const w = runSw();
   let reply = null;
   w.handlers.message({ data: { type: 'GET_CACHE_VERSION' }, source: { postMessage: m => { reply = m; } } });
-  eq(reply?.version, 'fsl-v49', 'reply');
+  eq(reply?.version, 'fsl-v50', 'reply');
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

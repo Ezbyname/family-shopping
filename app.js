@@ -27,7 +27,7 @@ const db  = getDatabase(app);
 // ── APP VERSION ────────────────────────────────────────────────────────────
 // Single source of truth for the frontend build. BUMP on every shipped fix so
 // "which build am I running?" is answerable from the UI (group/settings sheet).
-const APP_VERSION = '3.2.5';   // 2026-10: stable release — 24h sync banner, Hebrew geocode errors, one-time SW update reload
+const APP_VERSION = '3.2.6';   // 2026-10: consolidated stable release — 3.2.5 + nearby mode persists across restarts (FS-RADIUS-001)
 
 // ── DEPARTMENT GROUPING (Stage 4) ──────────────────────────────────────────
 import { DEPARTMENTS, DEPT_OVERRIDES, DEPT_KEYWORDS, _normText, getItemDepartment } from './js/product-taxonomy.js';
